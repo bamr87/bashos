@@ -1,0 +1,6 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "kernel": "bashos.kernel.server:graph"
+  }
+}

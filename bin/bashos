@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# bashOS launcher — bootstraps a virtualenv on first run, then hands off.
+set -Eeuo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV="${ROOT}/.venv"
+
+if [[ ! -x "${VENV}/bin/bashos" ]]; then
+  echo "bashos: first run — creating ${VENV}" >&2
+  python3 -m venv "${VENV}"
+  "${VENV}/bin/pip" --quiet install --upgrade pip
+  "${VENV}/bin/pip" --quiet install -e "${ROOT}"
+fi
+
+exec "${VENV}/bin/bashos" "$@"

@@ -1,0 +1,67 @@
+# bashOS service stack.
+#
+#   docker compose up -d            → phoenix (observability) + langgraph-dev (kernel API)
+#   docker compose run bashos       → the terminal itself, containerized (profile: cli)
+#
+# The terminal remains the core access point — these services are optional
+# infrastructure around it: Phoenix traces every kernel loop, and the LangGraph
+# server exposes the same kernel graph over HTTP (LangGraph Studio-compatible).
+#
+# Auth inside containers: set CLAUDE_CODE_OAUTH_TOKEN (mint with
+# `claude setup-token`) or ANTHROPIC_API_KEY in .env — an interactive CLI login
+# is not available in a container.
+
+services:
+  phoenix:
+    # Already running Phoenix on this machine (another project's stack)?
+    # Either remap these host ports via BASHOS_PHOENIX_*_PORT, or skip this
+    # service entirely and point PHOENIX_COLLECTOR_ENDPOINT at the existing one
+    # — Phoenix separates data by project name ("bashos").
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "${BASHOS_PHOENIX_UI_PORT:-6006}:6006"     # UI + OTLP HTTP collector
+      - "${BASHOS_PHOENIX_GRPC_PORT:-4317}:4317"   # OTLP gRPC collector
+    environment:
+      PHOENIX_WORKING_DIR: /mnt/data
+    volumes:
+      - phoenix-data:/mnt/data
+    restart: unless-stopped
+
+  langgraph-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    # --allow-blocking: the claude-code backend spawns the Claude Code CLI, whose
+    # bootstrap does synchronous file IO that the dev server's blocking detector
+    # would otherwise reject (fine for a dev server; the api backend avoids it).
+    command: ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024", "--no-browser", "--allow-blocking"]
+    ports:
+      - "${BASHOS_LANGGRAPH_PORT:-2024}:2024"   # LangGraph API (GET /ok; Studio-compatible)
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BASHOS_MODEL: ${BASHOS_MODEL:-claude-opus-5}
+      BASHOS_BACKEND: ${BASHOS_BACKEND:-}
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      BASHOS_TRACE: "1"
+    depends_on:
+      - phoenix
+    restart: unless-stopped
+
+  bashos:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    profiles: ["cli"]   # start explicitly: docker compose run bashos
+    stdin_open: true
+    tty: true
+    command: ["bashos"]
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BASHOS_MODEL: ${BASHOS_MODEL:-claude-opus-5}
+      BASHOS_BACKEND: ${BASHOS_BACKEND:-}
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+
+volumes:
+  phoenix-data:
