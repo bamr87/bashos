@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# os-health — deterministic health verdict for this machine (macOS + Linux).
+#
+# The forge-health pattern (docs/FORGE.md): one "[ OK ]/[WARN]/[CRIT] check
+# detail" line per check, real numbers only, exit 0 only when every check is
+# OK (1 = warnings, 2 = critical). Read-only: safe under the react loop's
+# probe allowlist. /health runs this first as its deterministic floor.
+set -Eeuo pipefail
+
+STATUS=0
+verdict() { # verdict <LEVEL> <name> <detail>
+  printf '[%s] %-11s %s\n' "$1" "$2" "$3"
+  if [ "$1" = "CRIT" ]; then
+    STATUS=2
+  elif [ "$1" = "WARN" ] && [ "$STATUS" -lt 1 ]; then
+    STATUS=1
+  fi
+}
+ok()   { verdict " OK " "$1" "$2"; }
+warn() { verdict "WARN" "$1" "$2"; }
+crit() { verdict "CRIT" "$1" "$2"; }
+
+os=$(uname -s)
+printf 'os-health %s · %s\n\n' "$(date '+%Y-%m-%d %H:%M')" "$(uname -sr)"
+
+# ---- load vs cores ---------------------------------------------------------
+if [ "$os" = "Darwin" ]; then
+  cores=$(sysctl -n hw.ncpu)
+  load=$(sysctl -n vm.loadavg | awk '{print $2}')
+else
+  cores=$(nproc)
+  load=$(awk '{print $1}' /proc/loadavg)
+fi
+if awk -v l="$load" -v c="$cores" 'BEGIN{exit !(l > c)}'; then
+  warn load "$load (cores: $cores)"
+else
+  ok load "$load (cores: $cores)"
+fi
+
+# ---- memory ----------------------------------------------------------------
+if [ "$os" = "Darwin" ]; then
+  page=$(sysctl -n vm.pagesize)
+  total=$(sysctl -n hw.memsize)
+  freeish=$(vm_stat | awk -v p="$page" '
+    /Pages free/          {f=$NF}
+    /Pages inactive/      {i=$NF}
+    /Pages speculative/   {s=$NF}
+    END{gsub(/\./,"",f); gsub(/\./,"",i); gsub(/\./,"",s); print (f+i+s)*p}')
+else
+  total=$(( $(awk '/^MemTotal/{print $2}' /proc/meminfo) * 1024 ))
+  freeish=$(( $(awk '/^MemAvailable/{print $2}' /proc/meminfo) * 1024 ))
+fi
+pct=$(( freeish * 100 / total ))
+total_h=$(( total / 1024 / 1024 ))
+if [ "$pct" -lt 8 ]; then
+  crit memory "${pct}% available of ${total_h}Mi"
+elif [ "$pct" -lt 15 ]; then
+  warn memory "${pct}% available of ${total_h}Mi"
+else
+  ok memory "${pct}% available of ${total_h}Mi"
+fi
+
+# ---- disk (root filesystem) ------------------------------------------------
+use=$(df -P / | awk 'NR==2{print $5}' | tr -d '%')
+avail=$(df -Ph / | awk 'NR==2{print $4}')
+if [ "$use" -gt 92 ]; then
+  crit disk "/ ${use}% used (${avail} free)"
+elif [ "$use" -gt 85 ]; then
+  warn disk "/ ${use}% used (${avail} free)"
+else
+  ok disk "/ ${use}% used (${avail} free)"
+fi
+
+# ---- docker (only when the CLI exists) -------------------------------------
+if command -v docker >/dev/null 2>&1; then
+  if n=$(docker ps -q 2>/dev/null | wc -l | tr -d ' '); then
+    ok docker "$n container(s) running"
+  else
+    warn docker "CLI present but daemon unreachable"
+  fi
+fi
+
+# ---- processes -------------------------------------------------------------
+ok processes "$(ps -e | awk 'END{print NR-1}') running"
+
+exit "$STATUS"

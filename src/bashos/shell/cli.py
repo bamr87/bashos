@@ -93,6 +93,64 @@ def doctor() -> None:
     render.print_doctor_table(run_checks(KernelConfig.from_env()))
 
 
+remote_app = typer.Typer(
+    no_args_is_help=True,
+    help="Drive a dev box over ssh: probe, monitor, and mirror AI interactions "
+    "onto its physical display. Hosts are ~/.ssh/config aliases. (docs/FORGE.md)",
+)
+app.add_typer(remote_app, name="remote")
+
+
+@remote_app.command("doctor")
+def remote_doctor(host: str = typer.Argument(..., help="ssh alias of the box")) -> None:
+    """Check the box: ssh, tmux console, monitor client, health floor."""
+    from .. import remote
+
+    checks = asyncio.run(remote.doctor(host))
+    for name, ok, detail in checks:
+        mark = "[ OK ]" if ok else "[FAIL]"
+        typer.echo(f"{mark} {name:<17} {detail}")
+    raise typer.Exit(0 if all(ok for _, ok, _ in checks) else 1)
+
+
+@remote_app.command("health")
+def remote_health(host: str = typer.Argument(..., help="ssh alias of the box")) -> None:
+    """Run the deterministic health floor + probes on the box; print verdicts."""
+    from .. import remote
+
+    sections = asyncio.run(remote.gather(host))
+    typer.echo(sections.get("health", "(no health section — floor failed to run)"))
+    raise typer.Exit(0 if "[WARN]" not in sections.get("health", "") and "[CRIT]" not in sections.get("health", "") else 1)
+
+
+@remote_app.command("setup")
+def remote_setup(host: str = typer.Argument(..., help="ssh alias of the box")) -> None:
+    """Install the monitoring kit on the box (user-level; sudo only if -n works)."""
+    from .. import remote
+
+    for action in asyncio.run(remote.setup(host)):
+        typer.echo(f"  · {action}")
+
+
+@remote_app.command("ask")
+def remote_ask(
+    host: str = typer.Argument(..., help="ssh alias of the box"),
+    words: list[str] = typer.Argument(None, help="question about the box (default: health sweep)"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="rendered prompt only; no model, no mirror"),
+    model: str | None = typer.Option(None, "--model", "-m", help="model override"),
+    no_mirror: bool = typer.Option(False, "--no-mirror", help="do not display the interaction on the box's monitor"),
+) -> None:
+    """Probe the box, reason over the readings with Claude, and mirror the
+    interaction onto the box's physical monitor."""
+    from .. import remote
+
+    config = KernelConfig.from_env(model=model, dry_run=dry_run)
+    answer = asyncio.run(
+        remote.ask(host, " ".join(words or []), config, do_mirror=not no_mirror)
+    )
+    render.print_output(answer)
+
+
 @app.command("repl")
 def repl(
     model: str | None = typer.Option(None, "--model", "-m", help="model override"),

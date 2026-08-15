@@ -1,7 +1,8 @@
 # bashOS
 
 Terminal-first AI runtime: Claude slash commands routed through a LangGraph
-kernel on Claude Code OAuth. Design doc: docs/HARNESS.md.
+kernel on Claude Code OAuth. Design doc: docs/HARNESS.md. The dev-server
+monitoring pattern (`bin/os-health`, `/health`, `/dash`): docs/FORGE.md.
 
 ## Layout
 
@@ -17,6 +18,10 @@ kernel on Claude Code OAuth. Design doc: docs/HARNESS.md.
 - `src/bashos/runtime/` — backend resolution + the Claude Agent SDK adapter
   (`ClaudeCodeChatModel`). Default backend is Claude Code OAuth; API key is
   fallback. Default model: claude-opus-5.
+- `src/bashos/remote.py` — dev-box integration (`bashos remote …`): CODE runs
+  fixed read-only probes over ssh, the model reasons locally over the gathered
+  text, and the interaction mirrors onto the box's tmux console monitor. Never
+  give loops ssh/network tools — extend `remote.PROBES` instead.
 - `src/bashos/shell/` — Typer CLI, prompt-toolkit REPL, Rich rendering.
 - `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
   `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024),

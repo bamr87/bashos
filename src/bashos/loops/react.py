@@ -31,6 +31,11 @@ PROBE_COMMANDS = [
     "uname", "uptime", "df", "du", "ps", "top", "vm_stat", "free",
     "sw_vers", "sysctl", "ls", "which", "whoami", "id", "date",
     "netstat", "head", "wc", "file", "stat", "env", "git status", "git log",
+    # the deterministic health floor (docs/FORGE.md) — read-only by contract
+    "bin/os-health", "./bin/os-health",
+    # read-only tmux verbs, so /health can inspect a dashboard session;
+    # deliberately narrow — never bare "tmux" (that would allow kill-server)
+    "tmux list-", "tmux capture-pane", "tmux has-session", "tmux display-message",
 ]
 
 DISALLOWED_TOOLS = ["Write", "Edit", "NotebookEdit", "WebSearch", "WebFetch"]
