@@ -5,6 +5,7 @@
     bashos run <plain english> routed to the best command by the kernel
     bashos list                command table
     bashos doctor              auth + environment checks
+    bashos opencode …          the engine: sync · status · auth · serve
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ from . import render
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=False,
-    help="bashOS — terminal-first AI runtime on Claude Code OAuth.",
+    help="bashOS — terminal-first AI runtime on the OpenCode engine, "
+    "authenticated with Claude Code OAuth.",
 )
 
 
@@ -35,6 +37,8 @@ async def run_line(
     model: str | None = None,
     verbose: bool = False,
 ) -> int:
+    from ..opencode.engine import shutdown_engine
+
     config = KernelConfig.from_env(model=model, dry_run=dry_run, verbose=verbose)
     registry = load_registry()
     llm = None if dry_run else get_chat_model(config)
@@ -49,6 +53,9 @@ async def run_line(
     except Exception as exc:  # render a clean panel, not a traceback
         render.print_error(str(exc))
         return 1
+    finally:
+        # a one-shot run owns any engine it started — never leave one behind
+        await shutdown_engine()
 
     if verbose:
         render.print_trace(result.get("trace", []))
@@ -91,6 +98,103 @@ def list_commands() -> None:
 def doctor() -> None:
     """Check auth and environment."""
     render.print_doctor_table(run_checks(KernelConfig.from_env()))
+
+
+engine_app = typer.Typer(
+    no_args_is_help=True,
+    help="The OpenCode engine bashOS runs on: project the registry onto it, "
+    "wire Claude Code OAuth into it, inspect it, or serve it. (docs/OPENCODE.md)",
+)
+app.add_typer(engine_app, name="opencode")
+
+
+@engine_app.command("sync")
+def engine_sync() -> None:
+    """Compile .claude/commands/*.md and the tool policy into opencode.jsonc."""
+    from ..opencode import project
+    from ..registry import find_root
+
+    root = find_root()
+    path, changed = project.sync(root, load_registry(root))
+    verb = "wrote" if changed else "already up to date:"
+    typer.echo(f"{verb} {path}")
+
+
+@engine_app.command("auth")
+def engine_auth() -> None:
+    """Show which credential the engine will run on, and where it came from."""
+    from ..opencode import auth as engine_auth_mod
+
+    env, description = engine_auth_mod.engine_environment()
+    typer.echo(description)
+    if not env:
+        raise typer.Exit(1)
+    # names only — the values are secrets and belong in the child process alone
+    typer.echo(f"passed to the engine as: {', '.join(sorted(env))}")
+    if credential := engine_auth_mod.discover():
+        typer.echo(f"source: {credential.source}")
+        typer.echo(f"refreshable: {credential.refreshable}")
+
+
+@engine_app.command("status")
+def engine_status() -> None:
+    """Boot the engine and report what it is actually running."""
+    from ..opencode.engine import OpencodeEngine
+
+    async def go() -> list[tuple[str, str]]:
+        engine = OpencodeEngine(KernelConfig.from_env())
+        try:
+            await engine.start()
+            agents = [a.get("name", "?") for a in await engine.client.agents()]
+            providers = await engine.client.connected_providers()
+            return [
+                ("url", f"{engine.url} ({'supervised' if engine.supervised else 'attached'})"),
+                ("version", engine.version),
+                ("auth", engine.auth_status),
+                ("providers", ", ".join(providers) or "none connected"),
+                ("config", engine.sync_status),
+                ("agents", ", ".join(sorted(agents))),
+            ]
+        finally:
+            await engine.stop()
+
+    try:
+        render.print_engine_status(asyncio.run(go()))
+    except Exception as exc:
+        render.print_error(str(exc))
+        raise typer.Exit(1) from exc
+
+
+@engine_app.command("serve")
+def engine_serve() -> None:
+    """Run an engine in the foreground; other bashOS processes can attach.
+
+    Prints the export line to put in another terminal.
+    """
+    from ..opencode.engine import OpencodeEngine
+
+    async def go() -> None:
+        engine = OpencodeEngine(KernelConfig.from_env())
+        await engine.start()
+        typer.echo(f"engine listening on {engine.url}")
+        typer.echo(f"auth: {engine.auth_status}")
+        typer.echo("\nattach another terminal with:")
+        typer.echo(f"  export BASHOS_OPENCODE_URL={engine.url}")
+        if engine.password:
+            # the socket brokers shell access, so it is password-guarded; an
+            # attaching process needs the secret this run generated
+            typer.echo(f"  export BASHOS_OPENCODE_PASSWORD={engine.password}")
+        typer.echo("\nctrl-c to stop")
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        finally:
+            await engine.stop()
+
+    try:
+        asyncio.run(go())
+    except KeyboardInterrupt:
+        typer.echo("\nengine stopped")
 
 
 remote_app = typer.Typer(

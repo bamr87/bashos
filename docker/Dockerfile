@@ -1,6 +1,7 @@
 # bashOS service image — used by both the `bashos` terminal container and the
-# `langgraph-dev` API server. Node is required for the Claude Code CLI, which
-# the Claude Agent SDK drives for OAuth-backed model calls.
+# `langgraph-dev` API server. Node carries two things bashOS needs: the
+# OpenCode engine it runs on, and the Claude Code CLI (the fallback backend,
+# and the source of the OAuth credential the engine is wired with).
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -10,11 +11,11 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs npm git curl shellcheck \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install -g @anthropic-ai/claude-code
+    && npm install -g opencode-ai @anthropic-ai/claude-code
 
 WORKDIR /app
 
-COPY pyproject.toml README.md langgraph.json ./
+COPY pyproject.toml README.md langgraph.json opencode.jsonc ./
 COPY src ./src
 COPY .claude ./.claude
 COPY docs ./docs

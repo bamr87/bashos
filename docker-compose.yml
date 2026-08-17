@@ -9,7 +9,8 @@
 #
 # Auth inside containers: set CLAUDE_CODE_OAUTH_TOKEN (mint with
 # `claude setup-token`) or ANTHROPIC_API_KEY in .env — an interactive CLI login
-# is not available in a container.
+# is not available in a container. bashOS bridges whichever it finds into the
+# OpenCode engine it supervises inside the container (the image ships it).
 
 services:
   phoenix:
@@ -31,9 +32,10 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    # --allow-blocking: the claude-code backend spawns the Claude Code CLI, whose
-    # bootstrap does synchronous file IO that the dev server's blocking detector
-    # would otherwise reject (fine for a dev server; the api backend avoids it).
+    # --allow-blocking: the engine and the claude-code fallback both spawn a
+    # node process whose bootstrap does synchronous file IO that the dev
+    # server's blocking detector would otherwise reject (fine for a dev
+    # server; the api backend avoids it).
     command: ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024", "--no-browser", "--allow-blocking"]
     ports:
       - "${BASHOS_LANGGRAPH_PORT:-2024}:2024"   # LangGraph API (GET /ok; Studio-compatible)
@@ -42,6 +44,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       BASHOS_MODEL: ${BASHOS_MODEL:-claude-opus-5}
       BASHOS_BACKEND: ${BASHOS_BACKEND:-}
+      BASHOS_OPENCODE_AUTH: ${BASHOS_OPENCODE_AUTH:-}
       PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
       BASHOS_TRACE: "1"
     depends_on:
@@ -61,6 +64,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       BASHOS_MODEL: ${BASHOS_MODEL:-claude-opus-5}
       BASHOS_BACKEND: ${BASHOS_BACKEND:-}
+      BASHOS_OPENCODE_AUTH: ${BASHOS_OPENCODE_AUTH:-}
       PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
 
 volumes:

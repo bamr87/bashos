@@ -11,3 +11,6 @@ build/
 # secrets & local state
 .env
 .bashos_history
+
+# engine runtime state (supervised opencode server logs)
+.bashos/

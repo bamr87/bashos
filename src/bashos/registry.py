@@ -11,11 +11,14 @@ one through a kernel orchestration loop declared in its frontmatter:
       loop: prompt | refine | react        # which orchestration loop runs it
       requires-args: true                  # optional, default true
       system: extra system prompt          # optional
+      agent: bashos | bashos-sealed        # optional, defaults from the loop
     ---
     prompt body with $ARGUMENTS placeholder
 
-One file, two runtimes: type /sh inside Claude Code, or `bashos run /sh ...`
-in any terminal.
+One file, three runtimes: type /sh inside Claude Code, run `bashos run /sh ...`
+in any terminal, or type /sh in the OpenCode TUI — `bashos opencode sync`
+compiles this same registry into the engine's project config, and `agent:`
+picks which tool policy (opencode/policy.py) the command runs under.
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ class CommandSpec:
     loop: str = "prompt"
     system: str | None = None
     requires_args: bool = True
+    agent: str | None = None  # engine agent override; None = derived from loop
 
     def render(self, args: str) -> str:
         return self.body.replace("$ARGUMENTS", args)
@@ -69,6 +73,7 @@ def parse_command_file(path: Path) -> CommandSpec:
         argument_hint=str(meta.get("argument-hint", "")).strip(),
         loop=loop,
         system=bashos_meta.get("system"),
+        agent=bashos_meta.get("agent"),
         requires_args=bool(bashos_meta.get("requires-args", True)),
         body=body.strip(),
         path=path,

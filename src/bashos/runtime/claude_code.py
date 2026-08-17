@@ -1,12 +1,13 @@
 """LangChain chat-model adapter over the Claude Agent SDK.
 
-This is the bridge that lets every LangGraph loop in bashOS run on the user's
-Claude Code OAuth credentials: LangChain interface on top, the `claude` harness
-underneath. No API key required — auth comes from the logged-in Claude Code CLI
-or a CLAUDE_CODE_OAUTH_TOKEN minted with `claude setup-token`.
+The fallback backend: LangChain interface on top, the `claude` harness
+underneath, for machines where the OpenCode engine is not installed. Auth is
+the same Claude Code OAuth the engine uses — the logged-in CLI or a
+CLAUDE_CODE_OAUTH_TOKEN minted with `claude setup-token`.
 
-Single-completion calls only (tools off, one turn). Agentic tool use goes
-through loops/react.py, which drives the harness directly.
+Single-completion calls only (tools off, one turn). Agentic tool use requires
+the engine: the react loop's policy is expressed in OpenCode's permission
+model, and this backend has no way to enforce it.
 """
 
 from __future__ import annotations
@@ -15,11 +16,11 @@ import asyncio
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from ..config import DEFAULT_MODEL
-from .llm import message_text
+from .llm import flatten_messages
 
 _INSTALL_HINT = (
     "claude-agent-sdk is not installed — reinstall bashOS (`pip install -e .`)"
@@ -37,24 +38,6 @@ _NO_TOOLS = [
     "WebSearch", "WebFetch", "NotebookEdit", "Task", "TodoWrite",
 ]
 _NO_TOOLS_NOTE = "You have no tools in this context — answer directly in a single message."
-
-
-def _split_messages(messages: list[BaseMessage]) -> tuple[str | None, str]:
-    """Flatten a LangChain message list into (system_prompt, prompt)."""
-    system_parts: list[str] = []
-    turns: list[tuple[str, str]] = []
-    for message in messages:
-        if isinstance(message, SystemMessage):
-            system_parts.append(message_text(message))
-        else:
-            role = "Assistant" if message.type == "ai" else "User"
-            turns.append((role, message_text(message)))
-    system = "\n\n".join(p for p in system_parts if p) or None
-    if len(turns) <= 1:
-        prompt = turns[0][1] if turns else ""
-    else:
-        prompt = "\n\n".join(f"{role}: {text}" for role, text in turns)
-    return system, prompt
 
 
 class ClaudeCodeChatModel(BaseChatModel):
@@ -81,7 +64,7 @@ class ClaudeCodeChatModel(BaseChatModel):
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError(_INSTALL_HINT) from exc
 
-        system, prompt = _split_messages(messages)
+        system, prompt = flatten_messages(messages)
         system = f"{system}\n\n{_NO_TOOLS_NOTE}" if system else _NO_TOOLS_NOTE
         options = ClaudeAgentOptions(
             system_prompt=system,

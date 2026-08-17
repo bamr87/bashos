@@ -1,61 +1,33 @@
 """The react loop: reason ↔ act on the real machine, read-only.
 
-This loop hands the task to the Claude Code harness (Claude Agent SDK) — the
-same agent runtime the user's subscription already powers — under an explicit
-tool policy:
+This loop no longer drives a model directly — it hands the task to the OpenCode
+engine, which owns the agent loop and the tool broker, and binds it to the
+`bashos` agent whose permission ruleset lives in `opencode/policy.py`:
 
-  * Read / Glob / Grep for file inspection under the current directory
-  * Bash restricted to an allowlist of diagnostic probes (uname, df, ps, ...)
-  * Write/Edit and network tools disallowed outright
+  * read / glob / grep / list for inspection under the project root
+  * bash deny-by-default, with an allowlist of diagnostic probes
+  * edit / write / apply_patch / webfetch / websearch / task denied outright
 
-Anything outside the policy is denied by the harness and the model adapts.
-Every tool action is surfaced to the terminal via `on_event` as it happens.
+The gate is the engine's, not a prompt's: a denied command never executes.
+Every tool call streams to the terminal through `on_event` as it happens.
+
+The probe allowlist is re-exported here because it is this loop's contract,
+even though the engine is what enforces it.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 
 from ..config import KernelConfig
 from ..kernel.context import context_block, system_prompt
 from ..kernel.state import KernelState
+from ..opencode import policy, project
+from ..opencode.policy import PROBE_COMMANDS, readonly_policy
 from ..registry import CommandSpec
 from .common import dry_run_report, usage_or_none
 
-READ_TOOLS = ["Read", "Glob", "Grep"]
-
-# Read-only diagnostic probes the agent may run via Bash. Deny-by-default:
-# anything not matching these patterns is refused by the harness.
-PROBE_COMMANDS = [
-    "uname", "uptime", "df", "du", "ps", "top", "vm_stat", "free",
-    "sw_vers", "sysctl", "ls", "which", "whoami", "id", "date",
-    "netstat", "head", "wc", "file", "stat", "env", "git status", "git log",
-    # the deterministic health floor (docs/FORGE.md) — read-only by contract
-    "bin/os-health", "./bin/os-health",
-    # read-only tmux verbs, so /health can inspect a dashboard session;
-    # deliberately narrow — never bare "tmux" (that would allow kill-server)
-    "tmux list-", "tmux capture-pane", "tmux has-session", "tmux display-message",
-]
-
-DISALLOWED_TOOLS = ["Write", "Edit", "NotebookEdit", "WebSearch", "WebFetch"]
-
-
-def readonly_policy() -> list[str]:
-    return [*READ_TOOLS, *(f"Bash({command}:*)" for command in PROBE_COMMANDS)]
-
-
-def describe_tool(name: str, tool_input: dict) -> str:
-    detail = (
-        tool_input.get("command")
-        or tool_input.get("file_path")
-        or tool_input.get("pattern")
-        or ""
-    )
-    detail = str(detail).replace("\n", " ")
-    if len(detail) > 88:
-        detail = detail[:85] + "..."
-    return f"{name}({detail})" if detail else name
+__all__ = ["PROBE_COMMANDS", "make_react_node", "readonly_policy"]
 
 
 def make_react_node(
@@ -70,63 +42,33 @@ def make_react_node(
             return {"output": usage, "trace": ["react: missing args → usage"]}
 
         task = f"{spec.render(args)}\n\n{context_block()}"
+        agent = spec.agent or project.LOOP_AGENTS["react"]
         if config.dry_run:
-            policy = "allowed tools: " + ", ".join(readonly_policy())
+            report = f"engine agent: {agent}\n{policy.describe_policy()}"
             return {
-                "output": dry_run_report(spec, task, extra=policy),
+                "output": dry_run_report(spec, task, extra=report),
                 "trace": ["react: dry-run"],
             }
 
-        try:
-            from claude_agent_sdk import (
-                AssistantMessage,
-                ClaudeAgentOptions,
-                ResultMessage,
-                TextBlock,
-                ToolUseBlock,
-                query,
-            )
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "claude-agent-sdk is not installed — reinstall bashOS (`pip install -e .`)"
-            ) from exc
+        from ..opencode.engine import get_engine
 
-        options = ClaudeAgentOptions(
-            system_prompt=system_prompt(spec.system),
-            model=config.model,
-            allowed_tools=readonly_policy(),
-            disallowed_tools=DISALLOWED_TOOLS,
-            max_turns=config.react_max_turns,
-            cwd=os.getcwd(),
+        engine = await get_engine(config)
+        result = await engine.act(
+            task,
+            system=system_prompt(spec.system),
+            agent=agent,
+            on_event=on_event,
         )
-
-        last_text = ""
-        final_result: str | None = None
-        steps = 0
-        async for message in query(prompt=task, options=options):
-            if isinstance(message, AssistantMessage):
-                texts: list[str] = []
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        texts.append(block.text)
-                    elif isinstance(block, ToolUseBlock):
-                        steps += 1
-                        if on_event:
-                            on_event(describe_tool(block.name, block.input))
-                if joined := "".join(texts).strip():
-                    last_text = joined
-            elif isinstance(message, ResultMessage):
-                if message.is_error:
-                    return {
-                        "error": f"react: agent loop failed: {message.result or 'unknown error'}",
-                        "route": "error",
-                        "trace": [f"react: error after {steps} tool call(s)"],
-                    }
-                final_result = message.result
-
+        steps = len(result.tool_calls)
+        if result.failed:
+            return {
+                "error": f"react: engine run failed: {result.error}",
+                "route": "error",
+                "trace": [f"react: error after {steps} tool call(s)"],
+            }
         return {
-            "output": (final_result or last_text).strip(),
-            "trace": [f"react: {steps} tool call(s) via the Claude Code harness"],
+            "output": result.text.strip(),
+            "trace": [f"react: {steps} tool call(s) via the opencode engine ({agent})"],
         }
 
     return loop_react

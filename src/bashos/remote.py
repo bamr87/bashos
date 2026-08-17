@@ -250,7 +250,7 @@ async def doctor(host: str, *, runner: Runner = ssh_exec) -> list[tuple[str, boo
         "sudo-n": "sudo -n true 2>/dev/null && echo yes",
     }
     results = await asyncio.gather(*(runner(host, cmd) for cmd in probes.values()))
-    for (name, _), result in zip(probes.items(), results):
+    for (name, _), result in zip(probes.items(), results, strict=True):
         detail = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
         checks.append((name, result.ok and bool(detail), detail or "not found"))
     return checks

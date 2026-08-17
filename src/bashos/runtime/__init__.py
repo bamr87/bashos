@@ -1,5 +1,9 @@
-"""Model runtime: backend resolution, the Claude Code OAuth adapter, and auth checks."""
+"""Model runtime: backend resolution, message flattening, and auth checks.
 
-from .llm import get_chat_model, message_text, resolve_backend
+The default backend is the OpenCode engine (`bashos.opencode`); the Claude
+Agent SDK adapter and the direct API client are fallbacks.
+"""
 
-__all__ = ["get_chat_model", "message_text", "resolve_backend"]
+from .llm import flatten_messages, get_chat_model, message_text, resolve_backend
+
+__all__ = ["flatten_messages", "get_chat_model", "message_text", "resolve_backend"]
