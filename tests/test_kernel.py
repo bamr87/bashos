@@ -59,11 +59,16 @@ async def test_missing_args_shows_usage(registry):
     assert result["output"].startswith("usage: /sh")
 
 
-async def test_react_dry_run_reports_tool_policy(registry):
+async def test_react_dry_run_reports_engine_agent_and_policy(registry):
     kernel = build_kernel(registry, None, KernelConfig(dry_run=True))
     result = await kernel.ainvoke({"input": "/sys", "trace": []})
-    assert "loop=react" in result["output"]
-    assert "Bash(uname:*)" in result["output"]
+    output = result["output"]
+    assert "loop=react" in output
+    assert "engine agent: bashos" in output
+    # the policy the engine will enforce is printed before anything runs
+    assert "bash:*=deny" in output
+    assert "bash:uname *=allow" in output
+    assert "write=deny" in output
 
 
 async def test_trace_accumulates_across_nodes(registry):

@@ -59,12 +59,17 @@ def print_trace(trace: list[str]) -> None:
 
 def print_command_table(registry: dict[str, CommandSpec]) -> None:
     table = Table(title="bashOS commands", title_justify="left", border_style="dim")
+    from ..opencode.project import agent_for
+
     table.add_column("command", style="bold cyan", no_wrap=True)
     table.add_column("loop", style="magenta", no_wrap=True)
+    table.add_column("agent", style="dim magenta", no_wrap=True)
     table.add_column("args", style="dim", no_wrap=True, max_width=28)
     table.add_column("description")
     for spec in registry.values():
-        table.add_row(f"/{spec.name}", spec.loop, spec.argument_hint, spec.description)
+        table.add_row(
+            f"/{spec.name}", spec.loop, agent_for(spec), spec.argument_hint, spec.description
+        )
     console.print(table)
     console.print(
         "[dim]builtins: help · list · doctor · clear · exit · !<cmd> runs your real shell[/dim]"
@@ -79,6 +84,15 @@ def print_doctor_table(checks: list[Check]) -> None:
     for check in checks:
         mark = "[green]✓[/green]" if check.ok else "[yellow]✗[/yellow]"
         table.add_row(mark, check.label, check.detail)
+    console.print(table)
+
+
+def print_engine_status(rows: list[tuple[str, str]]) -> None:
+    table = Table(title="bashos engine", title_justify="left", border_style="dim")
+    table.add_column("", style="bold", no_wrap=True)
+    table.add_column("detail")
+    for label, detail in rows:
+        table.add_row(label, detail)
     console.print(table)
 
 

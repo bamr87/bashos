@@ -22,7 +22,7 @@ from ..runtime.auth import run_checks
 from ..runtime.llm import get_chat_model, resolve_backend
 from . import render
 
-BUILTINS = ("help", "list", "doctor", "clear", "exit", "quit")
+BUILTINS = ("help", "list", "doctor", "engine", "clear", "exit", "quit")
 HISTORY_FILE = Path.home() / ".bashos_history"
 
 
@@ -33,6 +33,22 @@ async def _passthrough(command: str) -> None:
         render.console.print(f"exit {code}", style="dim red")
 
 
+async def _engine_rows(config: KernelConfig) -> list[tuple[str, str]]:
+    """Live engine state for the `engine` builtin — boots it if it is not up."""
+    from ..opencode.engine import get_engine
+
+    engine = await get_engine(config)
+    agents = [a.get("name", "?") for a in await engine.client.agents()]
+    return [
+        ("url", f"{engine.url} ({'supervised' if engine.supervised else 'attached'})"),
+        ("version", engine.version),
+        ("auth", engine.auth_status),
+        ("providers", ", ".join(await engine.client.connected_providers()) or "none"),
+        ("config", engine.sync_status),
+        ("agents", ", ".join(sorted(agents))),
+    ]
+
+
 async def run_repl(model: str | None = None) -> None:
     config = KernelConfig.from_env(model=model)
     registry = load_registry()
@@ -40,6 +56,17 @@ async def run_repl(model: str | None = None) -> None:
     render.print_banner(config, backend)
 
     llm = get_chat_model(config)
+    try:
+        await _session(config, registry, llm)
+    finally:
+        # the REPL may have supervised an engine process — take it down with us
+        from ..opencode.engine import shutdown_engine
+
+        await shutdown_engine()
+    render.console.print("logout", style="dim")
+
+
+async def _session(config: KernelConfig, registry: dict, llm) -> None:
     kernel = build_kernel(registry, llm, config, on_event=render.print_event)
     completer = WordCompleter(
         [f"/{name}" for name in registry] + list(BUILTINS),
@@ -62,6 +89,9 @@ async def run_repl(model: str | None = None) -> None:
             continue
         if line in ("exit", "quit"):
             break
+        if line == "engine":
+            render.print_engine_status(await _engine_rows(config))
+            continue
         if line == "clear":
             render.console.clear()
             continue
@@ -86,5 +116,3 @@ async def run_repl(model: str | None = None) -> None:
             render.print_error(result.get("output", "unknown kernel error"))
         else:
             render.print_output(result.get("output", ""))
-
-    render.console.print("logout", style="dim")

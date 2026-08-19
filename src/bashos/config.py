@@ -8,13 +8,15 @@ from pydantic import BaseModel
 
 DEFAULT_MODEL = "claude-opus-5"
 
+BACKEND_OPENCODE = "opencode"
 BACKEND_CLAUDE_CODE = "claude-code"
 BACKEND_API = "api"
+BACKENDS = (BACKEND_OPENCODE, BACKEND_CLAUDE_CODE, BACKEND_API)
 
 
 class KernelConfig(BaseModel):
     model: str = DEFAULT_MODEL
-    backend: str | None = None  # "claude-code" | "api" | None = auto-detect
+    backend: str | None = None  # one of BACKENDS, or None = auto-detect
     max_output_tokens: int = 16000
     react_max_turns: int = 12
     refine_max_iters: int = 2  # bounded repair passes in the refine loop
