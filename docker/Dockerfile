@@ -2,7 +2,7 @@
 # `langgraph-dev` API server. Node carries two things bashOS needs: the
 # OpenCode engine it runs on, and the Claude Code CLI (the fallback backend,
 # and the source of the OAuth credential the engine is wired with).
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
