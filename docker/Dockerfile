@@ -1,7 +1,7 @@
 # bashOS service image — used by both the `bashos` terminal container and the
 # `langgraph-dev` API server. Node is required for the Claude Code CLI, which
 # the Claude Agent SDK drives for OAuth-backed model calls.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
