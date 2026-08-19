@@ -37,7 +37,7 @@ dependencies = [
   # fallback model runtime (Claude Code OAuth harness, no tool policy)
   "claude-agent-sdk>=0.1.0",
   # terminal
-  "typer>=0.15",
+  "typer>=0.27.1",
   "rich>=13.9",
   "prompt-toolkit>=3.0.48",
   # foundation
