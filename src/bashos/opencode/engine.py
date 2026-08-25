@@ -292,18 +292,41 @@ class OpencodeEngine:
 
 
 _ENGINE: OpencodeEngine | None = None
+_ENGINE_LOCK: asyncio.Lock | None = None
+_ENGINE_LOCK_LOOP: asyncio.AbstractEventLoop | None = None
+
+
+def _engine_lock() -> asyncio.Lock:
+    """A lock scoped to the running loop.
+
+    The engine singleton is process-wide, but one process may run several
+    event loops over its lifetime (one per asyncio.run); concurrency only
+    exists within a loop, so the lock is rebuilt when the loop changes.
+    """
+    global _ENGINE_LOCK, _ENGINE_LOCK_LOOP
+    loop = asyncio.get_running_loop()
+    if _ENGINE_LOCK is None or _ENGINE_LOCK_LOOP is not loop:
+        _ENGINE_LOCK = asyncio.Lock()
+        _ENGINE_LOCK_LOOP = loop
+    return _ENGINE_LOCK
 
 
 async def get_engine(config: KernelConfig, **kwargs: object) -> OpencodeEngine:
-    """Process-wide engine, started once and reused across REPL lines."""
+    """Process-wide engine, started once and reused across turns.
+
+    Serialized: two windows prompting at the same time must share one engine,
+    not race each other into spawning two.
+    """
     global _ENGINE
-    if _ENGINE is None or not _ENGINE.started:
-        _ENGINE = await OpencodeEngine(config, **kwargs).start()  # type: ignore[arg-type]
-    return _ENGINE
+    async with _engine_lock():
+        if _ENGINE is None or not _ENGINE.started:
+            _ENGINE = await OpencodeEngine(config, **kwargs).start()  # type: ignore[arg-type]
+        return _ENGINE
 
 
 async def shutdown_engine() -> None:
     global _ENGINE
-    if _ENGINE is not None:
-        await _ENGINE.stop()
-        _ENGINE = None
+    async with _engine_lock():
+        if _ENGINE is not None:
+            engine, _ENGINE = _ENGINE, None
+            await engine.stop()

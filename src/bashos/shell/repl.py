@@ -7,7 +7,6 @@ bash fence, and `!` passes a line straight to the real shell.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
@@ -21,28 +20,14 @@ from ..registry import load_registry
 from ..runtime.auth import run_checks
 from ..runtime.llm import models_for, resolve_backend
 from . import execute, render
+from .session import ConsoleSession
 
 BUILTINS = ("help", "list", "doctor", "engine", "clear", "exec", "exit", "quit")
 HISTORY_FILE = Path.home() / ".bashos_history"
-_HISTORY_TURNS = 3
-_EXCERPT = 280
-
-
-def _excerpt(text: str) -> str:
-    flat = " ".join(text.split())
-    return flat[: _EXCERPT - 3] + "..." if len(flat) > _EXCERPT else flat
-
-
-def _format_history(turns: list[tuple[str, str, str]]) -> str:
-    chunks = []
-    for user, command, output in turns[-_HISTORY_TURNS:]:
-        chunks.append(f"in: {user}\nvia: /{command}\nout: {_excerpt(output)}")
-    return "\n---\n".join(chunks)
 
 
 async def _passthrough(command: str) -> None:
-    proc = await asyncio.create_subprocess_shell(command)
-    code = await proc.wait()
+    code = await execute.run_command(command)
     if code:
         render.console.print(f"exit {code}", style="dim red")
 
@@ -50,17 +35,9 @@ async def _passthrough(command: str) -> None:
 async def _engine_rows(config: KernelConfig) -> list[tuple[str, str]]:
     """Live engine state for the `engine` builtin — boots it if it is not up."""
     from ..opencode.engine import get_engine
+    from ..opencode.status import engine_rows
 
-    engine = await get_engine(config)
-    agents = [a.get("name", "?") for a in await engine.client.agents()]
-    return [
-        ("url", f"{engine.url} ({'supervised' if engine.supervised else 'attached'})"),
-        ("version", engine.version),
-        ("auth", engine.auth_status),
-        ("providers", ", ".join(await engine.client.connected_providers()) or "none"),
-        ("config", engine.sync_status),
-        ("agents", ", ".join(sorted(agents))),
-    ]
+    return await engine_rows(await get_engine(config))
 
 
 async def run_repl(model: str | None = None) -> None:
@@ -89,8 +66,7 @@ async def _session(config: KernelConfig, registry: dict, llm, classify_llm) -> N
         WORD=True,  # treat "/sh" as one word — without this, "/" breaks completion
     )
     session: PromptSession = PromptSession(history=FileHistory(str(HISTORY_FILE)))
-    turns: list[tuple[str, str, str]] = []
-    last_output = ""
+    conversation = ConsoleSession()
 
     while True:
         try:
@@ -119,7 +95,7 @@ async def _session(config: KernelConfig, registry: dict, llm, classify_llm) -> N
             render.print_doctor_table(run_checks(config))
             continue
         if line == "exec":
-            command = execute.runnable_from(last_output)
+            command = conversation.runnable_from_last()
             if not command:
                 render.print_error("nothing to exec — no bash fence in the last answer")
                 continue
@@ -131,12 +107,7 @@ async def _session(config: KernelConfig, registry: dict, llm, classify_llm) -> N
             await _passthrough(line[1:].strip())
             continue
 
-        payload: dict = {"input": line, "trace": []}
-        if turns:
-            last_user, last_command, _ = turns[-1]
-            payload["history"] = _format_history(turns)
-            payload["last_command"] = last_command
-            payload["last_input"] = last_user
+        payload = conversation.payload_for(line)
 
         try:
             with render.status():
@@ -150,7 +121,5 @@ async def _session(config: KernelConfig, registry: dict, llm, classify_llm) -> N
             continue
 
         output = result.get("output", "")
-        last_output = output
-        if command := result.get("command"):
-            turns.append((line, command, output))
+        conversation.record(line, result.get("command"), output)
         render.print_output(output)

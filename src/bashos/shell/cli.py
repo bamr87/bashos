@@ -179,21 +179,13 @@ def engine_auth() -> None:
 def engine_status() -> None:
     """Boot the engine and report what it is actually running."""
     from ..opencode.engine import OpencodeEngine
+    from ..opencode.status import engine_rows
 
     async def go() -> list[tuple[str, str]]:
         engine = OpencodeEngine(KernelConfig.from_env())
         try:
             await engine.start()
-            agents = [a.get("name", "?") for a in await engine.client.agents()]
-            providers = await engine.client.connected_providers()
-            return [
-                ("url", f"{engine.url} ({'supervised' if engine.supervised else 'attached'})"),
-                ("version", engine.version),
-                ("auth", engine.auth_status),
-                ("providers", ", ".join(providers) or "none connected"),
-                ("config", engine.sync_status),
-                ("agents", ", ".join(sorted(agents))),
-            ]
+            return await engine_rows(engine)
         finally:
             await engine.stop()
 

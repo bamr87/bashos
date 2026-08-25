@@ -50,12 +50,18 @@ class EngineHandle:
     process: asyncio.subprocess.Process | None = None
     log_path: Path | None = None
     auth: tuple[str, str] | None = None  # basic-auth pair guarding the socket
+    drain_task: asyncio.Task | None = None  # keeps the child's stdout pipe empty
 
     @property
     def supervised(self) -> bool:
         return self.process is not None
 
     async def stop(self) -> None:
+        if self.drain_task is not None:
+            self.drain_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.drain_task
+            self.drain_task = None
         await self.client.aclose()
         if self.process is None or self.process.returncode is not None:
             return
@@ -162,9 +168,36 @@ async def spawn(
 
     client = OpencodeClient(url, directory=directory, auth=auth)
     await _wait_healthy(client)
+    assert process.stdout is not None
     return EngineHandle(
-        url=url, client=client, process=process, log_path=log_path, auth=auth
+        url=url,
+        client=client,
+        process=process,
+        log_path=log_path,
+        auth=auth,
+        # _read_listen_url stops reading once it has the address; without a
+        # drain, a chatty --print-logs child fills the ~64KB pipe buffer and
+        # blocks on write, deadlocking a long-lived engine
+        drain_task=asyncio.create_task(_drain_stdout(process.stdout, log_path)),
     )
+
+
+async def _drain_stdout(stream: asyncio.StreamReader, log_path: Path | None) -> None:
+    """Append the child's remaining stdout to the engine log, forever."""
+    sink = open(log_path, "ab") if log_path else None
+    try:
+        while True:
+            line = await stream.readline()
+            if not line:
+                return  # child closed its stdout
+            if sink is not None:
+                sink.write(line)
+                sink.flush()
+    except Exception:
+        return  # a broken drain must never take the engine down
+    finally:
+        if sink is not None:
+            sink.close()
 
 
 async def _read_listen_url(process: asyncio.subprocess.Process) -> str:
