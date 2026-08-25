@@ -25,16 +25,24 @@ from ..conftest import FakeChat
 
 
 @pytest.fixture
-def dry_services(registry) -> DesktopServices:
-    return DesktopServices(config=KernelConfig(dry_run=True), registry=registry)
+def dry_services(registry, tmp_path) -> DesktopServices:
+    return DesktopServices(
+        config=KernelConfig(dry_run=True),
+        registry=registry,
+        history_path=tmp_path / "history",
+    )
 
 
 @pytest.fixture
-def fake_services(registry):
+def fake_services(registry, tmp_path):
     def make(replies: list[str]) -> tuple[DesktopServices, FakeChat]:
         llm = FakeChat(replies=replies)
         services = DesktopServices(
-            config=KernelConfig(), registry=registry, llm=llm, classify_llm=llm
+            config=KernelConfig(),
+            registry=registry,
+            llm=llm,
+            classify_llm=llm,
+            history_path=tmp_path / "history",
         )
         return services, llm
 

@@ -12,9 +12,11 @@ import itertools
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
+from .. import events as engine_events
 from .apps import APPS
+from .exec_panel import ShellRunner
 from .launcher import BashosCommandProvider, DesktopAppProvider, LauncherScreen
-from .messages import OpenAppRequest
+from .messages import EngineEventMsg, OpenAppRequest
 from .modals import HelpModal, QuitConfirm
 from .services import DesktopServices
 from .taskbar import TaskBar
@@ -46,6 +48,7 @@ class BashOSApp(App[None]):
     ) -> None:
         self.services = services or DesktopServices.from_env(model=model)
         self._window_ids = itertools.count(1)
+        self.shell_runner = ShellRunner(self)
         super().__init__()
 
     # ---------------------------------------------------------------- layout
@@ -78,6 +81,18 @@ class BashOSApp(App[None]):
     def on_desktop_changed(self, message: Desktop.Changed) -> None:
         self.taskbar.update_windows(self.desktop.windows, self.desktop.active)
 
+    def on_engine_event_msg(self, message: EngineEventMsg) -> None:
+        event = message.event
+        if isinstance(event, engine_events.LifecycleEvent):
+            if event.phase == "prompt.started":
+                self.taskbar.set_engine_state("busy")
+            elif event.phase in ("prompt.finished", "session.deleted"):
+                self.taskbar.set_engine_state("ready")
+            elif event.phase == "stream.lost":
+                self.taskbar.set_engine_state("reconnecting")
+        elif isinstance(event, engine_events.ErrorEvent):
+            self.taskbar.set_engine_state("error")
+
     # ------------------------------------------------------------------ apps
 
     async def open_app_by_id(self, app_id: str, args: str = "") -> None:
@@ -90,12 +105,14 @@ class BashOSApp(App[None]):
                     self.desktop.activate(window)
                     return
         wid = f"win-{app_id}-{next(self._window_ids)}"
-        window = Window(spec.factory(self.services), title=spec.title, wid=wid)
+        body = spec.factory(self.services)
+        if args and hasattr(body, "set_prefill"):
+            body.set_prefill(args)
+        window = Window(body, title=spec.title, wid=wid)
         await self.desktop.add_window(window)
 
     async def open_command(self, name: str) -> None:
-        """Open a console window pre-aimed at /name (placeholder until the
-        console app lands)."""
+        """Open a console window with /name pre-typed, ready for arguments."""
         await self.open_app_by_id("console", args=f"/{name} ")
 
     async def on_open_app_request(self, message: OpenAppRequest) -> None:

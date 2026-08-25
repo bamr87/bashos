@@ -45,11 +45,17 @@ def _placeholder(text: str) -> Callable[[DesktopServices], Widget]:
     return factory
 
 
+def _console(services: DesktopServices) -> Widget:
+    from .console import ConsoleApp
+
+    return ConsoleApp(services)
+
+
 APPS: dict[str, AppSpec] = {
     "console": AppSpec(
         id="console",
         title="AI Console",
-        factory=_placeholder("AI Console — arriving in the next milestone"),
+        factory=_console,
     ),
     "health": AppSpec(
         id="health",

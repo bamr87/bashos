@@ -154,6 +154,90 @@ LauncherScreen {
     background: $surface;
 }
 
+/* -------------------------------------------------------------- console */
+
+.console {
+    height: 100%;
+}
+
+.transcript {
+    height: 1fr;
+    padding: 0 1;
+}
+
+.user-line {
+    color: $primary;
+    text-style: bold;
+    margin-top: 1;
+}
+
+.answer {
+    margin: 0;
+    padding: 0;
+    background: $surface;
+}
+
+.literal-output {
+    color: $foreground 80%;
+    background: $panel 40%;
+    padding: 0 1;
+}
+
+.notice {
+    color: $foreground 50%;
+    text-style: italic;
+}
+
+.error-panel {
+    margin-top: 1;
+}
+
+.tool-feed {
+    height: 5;
+    max-height: 5;
+    border-top: dashed $panel;
+    background: $surface;
+    color: $foreground 60%;
+    padding: 0 1;
+}
+
+.prompt-bar {
+    height: 3;
+    padding: 0 1;
+}
+
+.prompt-glyph {
+    width: 2;
+    content-align: left middle;
+    height: 3;
+    color: $primary;
+    text-style: bold;
+}
+
+.prompt-input {
+    width: 1fr;
+}
+
+.stop-btn {
+    width: auto;
+    height: 3;
+    content-align: center middle;
+    padding: 0 1;
+    color: $error;
+    text-style: bold;
+}
+
+.route-hint {
+    height: 1;
+    padding: 0 2;
+    color: $foreground 45%;
+}
+
+.shell-output {
+    padding: 0 1;
+    background: $surface;
+}
+
 /* --------------------------------------------------------------- modals */
 
 HelpModal, QuitConfirm {

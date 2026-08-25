@@ -1,10 +1,8 @@
-"""Shared modal screens: help and quit confirmation.
-
-(The exec-confirm modal joins these in the console milestone.)
-"""
+"""Shared modal screens: help, quit confirmation, and exec confirmation."""
 
 from __future__ import annotations
 
+from rich.panel import Panel
 from rich.table import Table
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -57,3 +55,44 @@ class QuitConfirm(ModalScreen[bool]):
 
     def action_cancel_quit(self) -> None:
         self.dismiss(False)
+
+
+class ExecModal(ModalScreen[str | None]):
+    """Confirm-then-run for a generated command.
+
+    Dismisses with 'captured' (output into a window), 'attached' (suspend
+    the desktop, give the command the real terminal), or None. Cancel holds
+    the default focus — running anything requires deliberate intent, the
+    same contract as the CLI's Confirm(default=False).
+    """
+
+    BINDINGS = [Binding("escape", "cancel_exec", "cancel")]
+
+    def __init__(self, command: str) -> None:
+        super().__init__()
+        self.command = command
+
+    def compose(self):
+        with Vertical(id="exec-modal", classes="modal-box"):
+            yield Static(
+                Panel(self.command, title="exec", border_style="yellow", title_align="left")
+            )
+            yield Static("run this command?", id="exec-question")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("run", variant="warning", id="exec-captured")
+                yield Button("run attached", id="exec-attached")
+                yield Button("cancel", variant="primary", id="exec-cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#exec-cancel", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.dismiss(
+            {"exec-captured": "captured", "exec-attached": "attached"}.get(
+                event.button.id or ""
+            )
+        )
+
+    def action_cancel_exec(self) -> None:
+        self.dismiss(None)
