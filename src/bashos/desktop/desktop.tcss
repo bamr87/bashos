@@ -238,6 +238,87 @@ LauncherScreen {
     background: $surface;
 }
 
+/* ------------------------------------------------------------ app suite */
+
+.button-row {
+    height: 3;
+    padding: 0 1;
+}
+
+.button-row Button {
+    margin-right: 2;
+}
+
+.health-header {
+    height: 1;
+    padding: 0 1;
+    text-style: bold;
+}
+
+.health-table {
+    height: 1fr;
+}
+
+.engine-note {
+    height: 1;
+    padding: 0 1;
+    color: $foreground 55%;
+}
+
+.engine-table {
+    height: 1fr;
+}
+
+.policy-view {
+    padding: 0 1;
+    color: $foreground 80%;
+}
+
+.event-log {
+    height: 1fr;
+    padding: 0 1;
+    color: $foreground 65%;
+}
+
+.command-meta {
+    height: 2;
+    padding: 0 1;
+    color: $foreground 60%;
+}
+
+.command-args {
+    margin: 0 1;
+}
+
+.command-preview-body {
+    padding: 0 1;
+    color: $foreground 80%;
+}
+
+.trace-note {
+    height: 1;
+    padding: 0 1;
+    color: $foreground 55%;
+}
+
+#trace-list {
+    height: 40%;
+}
+
+.trace-detail {
+    padding: 0 1;
+    color: $foreground 75%;
+}
+
+.opencode-note {
+    padding: 1 1;
+    color: $foreground 70%;
+}
+
+.opencode-tui Button {
+    margin: 1 1;
+}
+
 /* --------------------------------------------------------------- modals */
 
 HelpModal, QuitConfirm {

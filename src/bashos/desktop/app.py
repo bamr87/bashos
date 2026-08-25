@@ -14,9 +14,11 @@ from textual.binding import Binding
 
 from .. import events as engine_events
 from .apps import APPS
+from .apps.engine import EngineApp
+from .apps.trace import TraceViewerApp
 from .exec_panel import ShellRunner
 from .launcher import BashosCommandProvider, DesktopAppProvider, LauncherScreen
-from .messages import EngineEventMsg, OpenAppRequest
+from .messages import EngineEventMsg, OpenAppRequest, TurnFinished
 from .modals import HelpModal, QuitConfirm
 from .services import DesktopServices
 from .taskbar import TaskBar
@@ -81,8 +83,14 @@ class BashOSApp(App[None]):
     def on_desktop_changed(self, message: Desktop.Changed) -> None:
         self.taskbar.update_windows(self.desktop.windows, self.desktop.active)
 
+    def on_turn_finished(self, message: TurnFinished) -> None:
+        for viewer in self.query(TraceViewerApp):
+            viewer.add_turn(message)
+
     def on_engine_event_msg(self, message: EngineEventMsg) -> None:
         event = message.event
+        for inspector in self.query(EngineApp):
+            inspector.feed_event(event)
         if isinstance(event, engine_events.LifecycleEvent):
             if event.phase == "prompt.started":
                 self.taskbar.set_engine_state("busy")

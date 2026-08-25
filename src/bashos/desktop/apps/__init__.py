@@ -51,34 +51,44 @@ def _console(services: DesktopServices) -> Widget:
     return ConsoleApp(services)
 
 
+def _health(services: DesktopServices) -> Widget:
+    from .health import HealthApp
+
+    return HealthApp(services)
+
+
+def _engine(services: DesktopServices) -> Widget:
+    from .engine import EngineApp
+
+    return EngineApp(services)
+
+
+def _command(services: DesktopServices) -> Widget:
+    from .command import CommandApp
+
+    return CommandApp(services)
+
+
+def _trace(services: DesktopServices) -> Widget:
+    from .trace import TraceViewerApp
+
+    return TraceViewerApp(services)
+
+
+def _opencode_tui(services: DesktopServices) -> Widget:
+    from .opencode_tui import OpencodeTuiApp
+
+    return OpencodeTuiApp(services)
+
+
 APPS: dict[str, AppSpec] = {
-    "console": AppSpec(
-        id="console",
-        title="AI Console",
-        factory=_console,
-    ),
-    "health": AppSpec(
-        id="health",
-        title="Health",
-        factory=_placeholder("Health monitor — arriving in a later milestone"),
-        singleton=True,
-    ),
-    "doctor": AppSpec(
-        id="doctor",
-        title="Doctor",
-        factory=DoctorPanel,
-        singleton=True,
-    ),
-    "engine": AppSpec(
-        id="engine",
-        title="Engine",
-        factory=_placeholder("Engine inspector — arriving in a later milestone"),
-        singleton=True,
-    ),
-    "trace": AppSpec(
-        id="trace",
-        title="Trace",
-        factory=_placeholder("Kernel trace viewer — arriving in a later milestone"),
-        singleton=True,
+    "console": AppSpec(id="console", title="AI Console", factory=_console),
+    "health": AppSpec(id="health", title="Health", factory=_health, singleton=True),
+    "doctor": AppSpec(id="doctor", title="Doctor", factory=DoctorPanel, singleton=True),
+    "engine": AppSpec(id="engine", title="Engine", factory=_engine, singleton=True),
+    "command": AppSpec(id="command", title="Commands", factory=_command, singleton=True),
+    "trace": AppSpec(id="trace", title="Trace", factory=_trace, singleton=True),
+    "opencode": AppSpec(
+        id="opencode", title="OpenCode TUI", factory=_opencode_tui, singleton=True
     ),
 }
