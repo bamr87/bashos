@@ -21,6 +21,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from ..config import KernelConfig
+from ..events import EventSink
 from ..registry import CommandSpec
 from .state import KernelState
 
@@ -119,6 +120,7 @@ def build_kernel(
     config: KernelConfig,
     on_event: Callable[[str], None] | None = None,
     classify_llm: BaseChatModel | None = None,
+    on_engine_event: EventSink | None = None,
 ):
     from ..loops.prompt import make_prompt_node
     from ..loops.react import make_react_node
@@ -210,7 +212,12 @@ def build_kernel(
     graph.add_node("classify", classify_node)
     graph.add_node("loop_prompt", make_prompt_node(registry, llm, config))
     graph.add_node("loop_refine", _delta_trace(build_refine_graph(registry, llm, config), "refine:"))
-    graph.add_node("loop_react", make_react_node(registry, config, on_event=on_event))
+    graph.add_node(
+        "loop_react",
+        make_react_node(
+            registry, config, on_event=on_event, on_engine_event=on_engine_event
+        ),
+    )
     graph.add_node("respond", respond_node)
 
     graph.add_edge(START, "parse")

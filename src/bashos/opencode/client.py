@@ -25,7 +25,49 @@ CONTROL_TIMEOUT = httpx.Timeout(15.0)
 
 
 class OpencodeError(RuntimeError):
-    """The engine refused a request or returned an unusable response."""
+    """The engine refused a request or returned an unusable response.
+
+    Subclasses give a UI something to branch on; every existing
+    `except OpencodeError` keeps catching all of them.
+    """
+
+
+class EngineUnreachable(OpencodeError):
+    """No server answered — not installed, not started, or died."""
+
+
+class EngineHTTPError(OpencodeError):
+    """The server answered with an HTTP error status."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class EngineAuthError(EngineHTTPError):
+    """The server rejected our credentials for its own socket (401/403)."""
+
+
+class ProviderError(OpencodeError):
+    """The engine ran but the model provider failed the request."""
+
+
+class RunAborted(OpencodeError):
+    """The user stopped the run — an outcome, not a failure."""
+
+
+class EmptyCompletion(OpencodeError):
+    """The engine finished without producing any text."""
+
+
+def classify_result_error(error: dict[str, Any] | None) -> str:
+    """'aborted' | 'auth' | 'provider' — from the engine's error `name`."""
+    name = str((error or {}).get("name", ""))
+    if name == "MessageAbortedError":
+        return "aborted"
+    if name in ("ProviderAuthError", "AuthError"):
+        return "auth"
+    return "provider"
 
 
 @dataclass
@@ -63,10 +105,16 @@ class PromptResult:
     tool_calls: list[ToolCall]
     error: str | None = None
     model: str = ""
+    error_name: str = ""  # the engine's error class, e.g. "MessageAbortedError"
 
     @property
     def failed(self) -> bool:
         return self.error is not None
+
+    @property
+    def aborted(self) -> bool:
+        """A user Stop is an outcome, not a failure — render 'stopped', not red."""
+        return self.error_name == "MessageAbortedError"
 
 
 class OpencodeClient:
@@ -105,11 +153,12 @@ class OpencodeClient:
         try:
             response = await self._http.request(method, path, params=params, **kwargs)
         except httpx.HTTPError as exc:
-            raise OpencodeError(f"engine unreachable at {self.base_url}: {exc}") from exc
+            raise EngineUnreachable(f"engine unreachable at {self.base_url}: {exc}") from exc
         if response.status_code >= 400:
-            raise OpencodeError(
-                f"engine {method} {path} → {response.status_code}: {response.text[:400]}"
-            )
+            message = f"engine {method} {path} → {response.status_code}: {response.text[:400]}"
+            if response.status_code in (401, 403):
+                raise EngineAuthError(message, response.status_code)
+            raise EngineHTTPError(message, response.status_code)
         if not response.content:
             return None
         try:
@@ -264,6 +313,7 @@ def _read_message(payload: dict[str, Any]) -> PromptResult:
         tool_calls=calls,
         error=_error_text(error) if error else None,
         model=str(info.get("modelID", "")),
+        error_name=str(error.get("name", "")) if isinstance(error, dict) else "",
     )
 
 

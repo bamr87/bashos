@@ -25,7 +25,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 
-from .client import OpencodeClient, OpencodeError
+from .client import EngineUnreachable, OpencodeClient, OpencodeError
 
 DEFAULT_BINARY = "opencode"
 LISTEN_RE = re.compile(r"(https?://[^\s]+)")
@@ -164,7 +164,7 @@ async def spawn(
         with contextlib.suppress(ProcessLookupError):
             process.kill()
         detail = f" (engine log: {log_path})" if log_path else ""
-        raise OpencodeError(f"opencode server did not start{detail}: {exc}") from exc
+        raise EngineUnreachable(f"opencode server did not start{detail}: {exc}") from exc
 
     client = OpencodeClient(url, directory=directory, auth=auth)
     await _wait_healthy(client)

@@ -26,13 +26,23 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from collections.abc import Callable
+import time
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from typing import Any
 
+from .. import events
 from ..config import KernelConfig
 from ..registry import CommandSpec, find_root, load_registry
 from . import auth, project, server
-from .client import OpencodeClient, OpencodeError, PromptResult
+from .client import (
+    EmptyCompletion,
+    EngineHTTPError,
+    OpencodeClient,
+    OpencodeError,
+    PromptResult,
+    ProviderError,
+)
 
 STATE_DIR = ".bashos"
 ENGINE_LOG = "opencode.log"
@@ -41,6 +51,97 @@ _REJECTION = (
     "Denied by bashOS policy — this terminal is non-interactive and cannot "
     "approve. Work within your allowed tools and report what you found."
 )
+
+
+async def watch_events(
+    stream: AsyncIterator[dict[str, Any]],
+    session_id: str,
+    sink: events.EventSink | None,
+    live: asyncio.Event,
+    client: Any,
+) -> None:
+    """Consume one session's slice of the engine event stream.
+
+    Emits typed events to `sink`, and refuses anything that stops to ask:
+    bashOS is non-interactive by construction — the policy in policy.py is
+    the answer, so an approval request is a request the policy did not
+    already allow, and the honest reply is no.
+
+    Pure over an injected stream so tests and the event bus can both drive
+    it. Any stream failure sets `live` and returns: a dead stream must never
+    wedge the prompt.
+    """
+    from .client import read_tool_part
+
+    started: dict[str, float] = {}
+    try:
+        async for event in stream:
+            live.set()  # the stream is open; the prompt may start
+            kind = event.get("type")
+            props = event.get("properties") or {}
+            if props.get("sessionID") not in (session_id, None):
+                continue  # another session on the same engine
+
+            if kind == "permission.asked":
+                await client.reject_permission(session_id, str(props.get("id")))
+                _emit(sink, events.PermissionEvent(
+                    session_id=session_id,
+                    request_id=str(props.get("id")),
+                    action=str(props.get("permission")),
+                    protocol="v1",
+                    decision="auto-rejected",
+                ))
+            elif kind == "permission.v2.asked":
+                await client.reject_permission_v2(str(props.get("id")), _REJECTION)
+                _emit(sink, events.PermissionEvent(
+                    session_id=session_id,
+                    request_id=str(props.get("id")),
+                    action=str(props.get("action")),
+                    protocol="v2",
+                    decision="auto-rejected",
+                ))
+            elif kind == "message.part.updated":
+                part = props.get("part") or {}
+                if part.get("type") != "tool":
+                    continue
+                call = read_tool_part(part)
+                if not call.call_id:
+                    continue
+                now = time.monotonic()
+                first = started.setdefault(call.call_id, now)
+                duration = (
+                    int((now - first) * 1000)
+                    if call.status in ("completed", "error")
+                    else None
+                )
+                _emit(sink, events.ToolEvent(
+                    session_id=session_id,
+                    tool=call.tool,
+                    call_id=call.call_id,
+                    status=call.status,
+                    title=call.title,
+                    input=call.input,
+                    description=call.describe(),
+                    duration_ms=duration,
+                ))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        live.set()  # a broken event stream must never wedge the prompt
+        return
+
+
+def _emit(sink: events.EventSink | None, event: events.EngineEvent) -> None:
+    if sink is not None:
+        sink(event)
+
+
+def _with_hint(exc: OpencodeError, hint: str) -> OpencodeError:
+    """Rebuild the same error type with the failure hint appended."""
+    message = f"{exc}{hint}"
+    if isinstance(exc, EngineHTTPError):
+        return type(exc)(message, exc.status)
+    return type(exc)(message)
 
 
 class OpencodeEngine:
@@ -167,15 +268,21 @@ class OpencodeEngine:
 
     # ----------------------------------------------------------------- verbs
 
-    async def complete(self, prompt: str, *, system: str | None = None) -> str:
+    async def complete(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        on_event: events.EventSink | None = None,
+    ) -> str:
         """One answer, no tools — the syscall the stateless loops run on."""
         result = await self._run(
-            prompt, agent=project.SEALED_AGENT, system=system, on_event=None
+            prompt, agent=project.SEALED_AGENT, system=system, sink=on_event
         )
         if result.failed:
-            raise OpencodeError(f"engine completion failed: {result.error}")
+            raise ProviderError(f"engine completion failed: {result.error}")
         if not result.text:
-            raise OpencodeError(
+            raise EmptyCompletion(
                 "engine returned an empty completion — run `bashos doctor`"
             )
         return result.text
@@ -187,9 +294,15 @@ class OpencodeEngine:
         system: str | None = None,
         agent: str = project.READONLY_AGENT,
         on_event: Callable[[str], None] | None = None,
+        on_engine_event: events.EventSink | None = None,
     ) -> PromptResult:
-        """A full reason ↔ act loop under policy, streaming tool calls."""
-        return await self._run(prompt, agent=agent, system=system, on_event=on_event)
+        """A full reason ↔ act loop under policy, streaming tool calls.
+
+        `on_engine_event` receives typed events; `on_event` is the legacy
+        one-line string callback (used only when no typed sink is given).
+        """
+        sink = on_engine_event or (events.to_legacy(on_event) if on_event else None)
+        return await self._run(prompt, agent=agent, system=system, sink=sink)
 
     async def _run(
         self,
@@ -197,28 +310,34 @@ class OpencodeEngine:
         *,
         agent: str,
         system: str | None,
-        on_event: Callable[[str], None] | None,
+        sink: events.EventSink | None,
     ) -> PromptResult:
         client = self.client
         session_id = await client.create_session(title=f"bashos:{agent}", agent=agent)
+        _emit(sink, events.LifecycleEvent(session_id=session_id, phase="session.created"))
         # The watcher always runs, even with nothing to display: it is what
         # refuses approval prompts. A rule that resolves to "ask" would
         # otherwise block a headless run until the request timed out.
         live = asyncio.Event()
-        watcher = asyncio.create_task(self._watch(session_id, on_event, live))
+        watcher = asyncio.create_task(
+            watch_events(client.events(), session_id, sink, live, client)
+        )
         try:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(live.wait(), timeout=5)
-            return await client.prompt(
+            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="prompt.started"))
+            result = await client.prompt(
                 session_id,
                 prompt,
                 agent=agent,
                 system=system,
                 model=project.qualify_model(self.config.model),
             )
+            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="prompt.finished"))
+            return result
         except OpencodeError as exc:
             await client.abort(session_id)
-            raise OpencodeError(f"{exc}{self._failure_hint()}") from exc
+            raise _with_hint(exc, self._failure_hint()) from exc
         except BaseException:
             await client.abort(session_id)
             raise
@@ -227,57 +346,7 @@ class OpencodeEngine:
             with contextlib.suppress(asyncio.CancelledError):
                 await watcher
             await client.delete_session(session_id)
-
-    async def _watch(
-        self,
-        session_id: str,
-        on_event: Callable[[str], None] | None,
-        live: asyncio.Event,
-    ) -> None:
-        """Report tool calls, and refuse anything that stops to ask.
-
-        bashOS is non-interactive by construction: the policy in policy.py is
-        the answer, so an approval request is a request the policy did not
-        already allow — and the honest reply is no.
-        """
-        from .client import read_tool_part
-
-        seen: set[str] = set()
-        try:
-            async for event in self.client.events():
-                live.set()  # the stream is open; the prompt may start
-                kind = event.get("type")
-                props = event.get("properties") or {}
-                if props.get("sessionID") not in (session_id, None):
-                    continue  # another session on the same engine
-
-                if kind == "permission.asked":
-                    await self.client.reject_permission(session_id, str(props.get("id")))
-                    self._note(on_event, f"denied by policy: {props.get('permission')}")
-                elif kind == "permission.v2.asked":
-                    await self.client.reject_permission_v2(
-                        str(props.get("id")), _REJECTION
-                    )
-                    self._note(on_event, f"denied by policy: {props.get('action')}")
-                elif kind == "message.part.updated":
-                    part = props.get("part") or {}
-                    if part.get("type") != "tool":
-                        continue
-                    call = read_tool_part(part)
-                    if not call.call_id or call.call_id in seen or call.status in ("pending", ""):
-                        continue
-                    seen.add(call.call_id)
-                    self._note(on_event, call.describe())
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            live.set()  # a broken event stream must never wedge the prompt
-            return
-
-    @staticmethod
-    def _note(on_event: Callable[[str], None] | None, text: str) -> None:
-        if on_event is not None:
-            on_event(text)
+            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="session.deleted"))
 
     def _failure_hint(self) -> str:
         """Point a raw engine error at the two things that actually explain it.

@@ -11,12 +11,14 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from pathlib import Path
 
 import httpx
 import pytest
 
+from bashos import events as events_mod
 from bashos.opencode import auth, policy, project
+from bashos.opencode import client as client_mod
+from bashos.opencode import engine as engine_mod
 from bashos.opencode.client import OpencodeClient, OpencodeError, split_model
 from bashos.registry import find_root, load_registry
 
@@ -422,22 +424,15 @@ def _tool_event(session, call_id, tool, command, status="running"):
     }
 
 
-def _engine_with(client):
-    """A real engine whose handle points at a stub client — no server, no spawn."""
-    from bashos.config import KernelConfig
-    from bashos.opencode.engine import OpencodeEngine
-    from bashos.opencode.server import EngineHandle
-
-    engine = OpencodeEngine(KernelConfig(), root=Path("."), registry={})
-    engine._handle = EngineHandle(url="http://stub", client=client)
-    return engine
-
-
-async def _watch_with(events: list[dict], session="ses_1"):
-    stub = _StubClient(events)
+async def _watch_with(evts: list[dict], session="ses_1"):
+    """Drive the pure watch loop through the legacy string adapter — the
+    string assertions below are the historical output contract."""
+    stub = _StubClient(evts)
     seen: list[str] = []
     live = asyncio.Event()
-    await _engine_with(stub)._watch(session, seen.append, live)
+    await engine_mod.watch_events(
+        stub.events(), session, events_mod.to_legacy(seen.append), live, stub
+    )
     return stub, seen, live
 
 
@@ -484,8 +479,107 @@ async def test_broken_event_stream_never_wedges_the_prompt():
             yield  # pragma: no cover - generator marker
 
     live = asyncio.Event()
-    await _engine_with(Exploding([]))._watch("ses_1", None, live)
+    await engine_mod.watch_events(Exploding([]).events(), "ses_1", None, live, None)
     assert live.is_set(), "a dead stream must release the prompt, not block it"
+
+
+# --------------------------------------------------------------- typed events
+
+
+async def _typed_watch(evts: list[dict], session="ses_1"):
+    stub = _StubClient(evts)
+    typed: list = []
+    live = asyncio.Event()
+    await engine_mod.watch_events(stub.events(), session, typed.append, live, stub)
+    return stub, typed
+
+
+async def test_watch_emits_typed_tool_events_with_status_transitions():
+    _, typed = await _typed_watch(
+        [
+            _tool_event("ses_1", "c1", "bash", "uname -a"),
+            _tool_event("ses_1", "c1", "bash", "uname -a", status="completed"),
+        ]
+    )
+    tools = [e for e in typed if isinstance(e, events_mod.ToolEvent)]
+    assert [e.status for e in tools] == ["running", "completed"]
+    assert tools[0].duration_ms is None
+    assert tools[1].duration_ms is not None
+    assert tools[1].description == "bash(uname -a)"
+    assert tools[1].session_id == "ses_1"
+
+
+async def test_watch_emits_a_typed_permission_event_on_auto_refusal():
+    _, typed = await _typed_watch(
+        [
+            {
+                "type": "permission.v2.asked",
+                "properties": {"sessionID": "ses_1", "id": "per_9", "action": "edit"},
+            }
+        ]
+    )
+    perms = [e for e in typed if isinstance(e, events_mod.PermissionEvent)]
+    assert len(perms) == 1
+    assert perms[0].decision == "auto-rejected"
+    assert perms[0].action == "edit"
+    assert perms[0].protocol == "v2"
+
+
+def test_legacy_adapter_dedupes_and_drops_pending():
+    lines: list[str] = []
+    sink = events_mod.to_legacy(lines.append)
+    tool = dict(session_id="s", tool="bash", title="", input={}, description="bash(x)")
+    sink(events_mod.ToolEvent(call_id="c1", status="pending", **tool))
+    sink(events_mod.ToolEvent(call_id="c1", status="running", **tool))
+    sink(events_mod.ToolEvent(call_id="c1", status="completed", **tool))
+    sink(events_mod.LifecycleEvent(session_id="s", phase="prompt.finished"))
+    assert lines == ["bash(x)"]
+
+
+# --------------------------------------------------------------- typed errors
+
+
+async def test_http_401_raises_engine_auth_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, text="bad password")
+
+    client = _stub_client(handler)
+    with pytest.raises(client_mod.EngineAuthError) as excinfo:
+        await client.health()
+    await client.aclose()
+    assert isinstance(excinfo.value, client_mod.EngineHTTPError)
+    assert isinstance(excinfo.value, OpencodeError)
+    assert excinfo.value.status == 401
+
+
+async def test_transport_failure_raises_engine_unreachable():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    client = _stub_client(handler)
+    with pytest.raises(client_mod.EngineUnreachable, match="engine unreachable"):
+        await client.health()
+    await client.aclose()
+
+
+async def test_aborted_run_is_an_outcome_not_a_failure_type():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "info": {"error": {"name": "MessageAbortedError", "data": {"message": "aborted"}}},
+                "parts": [],
+            },
+        )
+
+    client = _stub_client(handler)
+    result = await client.prompt("ses_1", "hello")
+    await client.aclose()
+    assert result.failed
+    assert result.aborted
+    assert client_mod.classify_result_error({"name": "MessageAbortedError"}) == "aborted"
+    assert client_mod.classify_result_error({"name": "ProviderAuthError"}) == "auth"
+    assert client_mod.classify_result_error({"name": "SomethingElse"}) == "provider"
 
 
 def test_tool_descriptions_are_one_line_and_bounded():
@@ -502,3 +596,23 @@ def test_tool_descriptions_are_one_line_and_bounded():
     assert "\n" not in described
     assert len(described) <= 100
     assert described.startswith("grep(")
+
+
+async def test_react_renders_a_user_abort_as_stopped_not_error(registry, monkeypatch):
+    from bashos.config import KernelConfig
+    from bashos.loops.react import make_react_node
+
+    class _Engine:
+        async def act(self, *args, **kwargs):
+            return client_mod.PromptResult(
+                text="", tool_calls=[], error="aborted", error_name="MessageAbortedError"
+            )
+
+    async def fake_get_engine(config):
+        return _Engine()
+
+    monkeypatch.setattr(engine_mod, "get_engine", fake_get_engine)
+    node = make_react_node(registry, KernelConfig())
+    result = await node({"command": "sys", "args": "why is it slow", "trace": []})
+    assert result["output"] == "stopped."
+    assert result.get("route") != "error"

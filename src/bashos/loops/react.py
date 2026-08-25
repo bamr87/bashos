@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..config import KernelConfig
+from ..events import EventSink
 from ..kernel.context import context_block, session_block, system_prompt
 from ..kernel.state import KernelState
 from ..opencode import policy, project
@@ -34,6 +35,7 @@ def make_react_node(
     registry: dict[str, CommandSpec],
     config: KernelConfig,
     on_event: Callable[[str], None] | None = None,
+    on_engine_event: EventSink | None = None,
 ):
     async def loop_react(state: KernelState) -> dict:
         spec = registry[state["command"]]
@@ -58,8 +60,14 @@ def make_react_node(
             system=system_prompt(spec.system),
             agent=agent,
             on_event=on_event,
+            on_engine_event=on_engine_event,
         )
         steps = len(result.tool_calls)
+        if result.aborted:
+            return {
+                "output": "stopped.",
+                "trace": [f"react: aborted by user after {steps} tool call(s)"],
+            }
         if result.failed:
             return {
                 "error": f"react: engine run failed: {result.error}",
