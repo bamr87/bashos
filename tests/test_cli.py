@@ -24,3 +24,15 @@ def test_run_dry_run_needs_no_auth():
     result = runner.invoke(app, ["run", "-n", "/sh", "find", "big", "files"])
     assert result.exit_code == 0
     assert "dry-run" in result.output
+
+
+def test_run_help_mentions_exec():
+    result = runner.invoke(app, ["run", "--help"])
+    assert result.exit_code == 0
+    assert "--exec" in result.output
+
+
+def test_exec_disabled_in_dry_run():
+    result = runner.invoke(app, ["run", "-n", "-x", "/sh", "find", "big", "files"])
+    assert result.exit_code == 1
+    assert "disabled in dry-run" in result.output

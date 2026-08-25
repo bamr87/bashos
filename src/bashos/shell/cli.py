@@ -3,6 +3,7 @@
     bashos                     interactive REPL (the default)
     bashos run /sh <request>   one-shot command
     bashos run <plain english> routed to the best command by the kernel
+    bashos run -x /sh …        generate, confirm, then run the first bash fence
     bashos list                command table
     bashos doctor              auth + environment checks
     bashos opencode …          the engine: sync · status · auth · serve
@@ -19,8 +20,8 @@ from ..config import KernelConfig
 from ..kernel import build_kernel
 from ..registry import load_registry
 from ..runtime.auth import run_checks
-from ..runtime.llm import get_chat_model
-from . import render
+from ..runtime.llm import models_for
+from . import execute, render
 
 app = typer.Typer(
     add_completion=False,
@@ -36,20 +37,37 @@ async def run_line(
     dry_run: bool = False,
     model: str | None = None,
     verbose: bool = False,
+    do_exec: bool = False,
+    yes: bool = False,
+    history: str = "",
+    last_command: str = "",
+    last_input: str = "",
 ) -> int:
     from ..opencode.engine import shutdown_engine
 
     config = KernelConfig.from_env(model=model, dry_run=dry_run, verbose=verbose)
     registry = load_registry()
-    llm = None if dry_run else get_chat_model(config)
-    kernel = build_kernel(registry, llm, config, on_event=render.print_event)
+    llm = classify_llm = None
+    if not dry_run:
+        llm, classify_llm = models_for(config)
+    kernel = build_kernel(
+        registry, llm, config, on_event=render.print_event, classify_llm=classify_llm
+    )
+
+    payload: dict = {"input": line, "trace": []}
+    if history:
+        payload["history"] = history
+    if last_command:
+        payload["last_command"] = last_command
+    if last_input:
+        payload["last_input"] = last_input
 
     try:
         if dry_run:
-            result = await kernel.ainvoke({"input": line, "trace": []})
+            result = await kernel.ainvoke(payload)
         else:
             with render.status():
-                result = await kernel.ainvoke({"input": line, "trace": []})
+                result = await kernel.ainvoke(payload)
     except Exception as exc:  # render a clean panel, not a traceback
         render.print_error(str(exc))
         return 1
@@ -62,7 +80,17 @@ async def run_line(
     if result.get("route") == "error":
         render.print_error(result.get("output", "unknown kernel error"))
         return 1
-    render.print_output(result.get("output", ""))
+    output = result.get("output", "")
+    render.print_output(output)
+    if do_exec:
+        if dry_run:
+            render.print_error("--exec is disabled in dry-run")
+            return 1
+        command = execute.runnable_from(output)
+        if not command:
+            render.print_error("nothing to exec — no bash fence in the output")
+            return 1
+        return await execute.confirm_and_run(command, yes=yes)
     return 0
 
 
@@ -82,9 +110,20 @@ def run(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="show routing and rendered prompt; no model call"),
     model: str | None = typer.Option(None, "--model", "-m", help="model override (default: claude-opus-5)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="print the kernel trace"),
+    do_exec: bool = typer.Option(False, "--exec", "-x", help="confirm-then-run the first bash fence"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="do not prompt when used with --exec"),
 ) -> None:
     """Run one line through the kernel and exit."""
-    code = asyncio.run(run_line(" ".join(words), dry_run=dry_run, model=model, verbose=verbose))
+    code = asyncio.run(
+        run_line(
+            " ".join(words),
+            dry_run=dry_run,
+            model=model,
+            verbose=verbose,
+            do_exec=do_exec,
+            yes=yes,
+        )
+    )
     raise typer.Exit(code)
 
 

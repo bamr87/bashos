@@ -15,7 +15,6 @@ labeled unverified.
 from __future__ import annotations
 
 import asyncio
-import re
 import shutil
 from typing import NotRequired
 
@@ -24,12 +23,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from ..config import KernelConfig
-from ..kernel.context import context_block, system_prompt
+from ..kernel.context import context_block, session_block, system_prompt
 from ..kernel.state import KernelState
 from ..registry import CommandSpec
-from .common import dry_run_report, usage_or_none
-
-_CODE_FENCE = re.compile(r"```(?:bash|sh|shell)?\s*\n(.*?)```", re.DOTALL)
+from .common import dry_run_report, extract_script, usage_or_none
 
 
 class RefineState(KernelState):
@@ -37,11 +34,6 @@ class RefineState(KernelState):
     critique: NotRequired[str]
     lint_status: NotRequired[str]  # "clean" | "issues" | "unavailable"
     iterations: NotRequired[int]
-
-
-def extract_script(text: str) -> str:
-    match = _CODE_FENCE.search(text)
-    return (match.group(1) if match else text).strip()
 
 
 def find_shellcheck() -> str | None:
@@ -87,7 +79,7 @@ def build_refine_graph(
         args = state.get("args", "")
         if usage := usage_or_none(spec, args):
             return {"output": usage, "trace": ["refine: missing args → usage"]}
-        prompt = f"{spec.render(args)}\n\n{context_block()}"
+        prompt = f"{spec.render(args)}\n\n{context_block()}{session_block(state)}"
         if config.dry_run or llm is None:
             return {"output": dry_run_report(spec, prompt), "trace": ["refine: dry-run"]}
         reply = await llm.ainvoke(

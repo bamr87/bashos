@@ -1,7 +1,7 @@
 ---
-description: Verdict-style machine health check (deterministic floor + investigation; bare /health = full sweep)
+description: Verdict-style health check via bin/os-health ([OK]/[WARN]/[CRIT]) plus causes
 argument-hint: what to focus on (optional)
-allowed-tools: Bash(bin/os-health:*), Bash(./bin/os-health:*), Bash(uname:*), Bash(uptime:*), Bash(df:*), Bash(du:*), Bash(ps:*), Bash(top:*), Bash(vm_stat:*), Bash(free:*), Bash(sysctl:*), Bash(ls:*), Bash(which:*), Bash(date:*), Bash(netstat:*), Bash(stat:*), Bash(tmux list-:*), Bash(tmux capture-pane:*), Bash(tmux has-session:*)
+allowed-tools: Read, Glob, Grep, Bash(bin/os-health:*), Bash(./bin/os-health:*), Bash(uname:*), Bash(uptime:*), Bash(df:*), Bash(du:*), Bash(ps:*), Bash(top:*), Bash(vm_stat:*), Bash(free:*), Bash(sysctl:*), Bash(ls:*), Bash(which:*), Bash(date:*), Bash(netstat:*), Bash(stat:*), Bash(tmux list-:*), Bash(tmux capture-pane:*), Bash(tmux has-session:*), Bash(tmux display-message:*)
 bashos:
   loop: react
   requires-args: false

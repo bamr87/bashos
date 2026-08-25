@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import os
 import platform
+from collections.abc import Mapping
 
 HOUSE_SYSTEM = """\
 You are bashOS — a terminal-native AI runtime for software development and
@@ -34,3 +35,11 @@ def context_block() -> str:
         f"[host] os={platform.system()} {platform.release()} "
         f"arch={platform.machine()} shell={shell} cwd={os.getcwd()} date={today}"
     )
+
+
+def session_block(state: Mapping[str, object] | None) -> str:
+    """Previous-turn context injected so follow-ups can refine the last answer."""
+    if not state:
+        return ""
+    hist = str(state.get("history") or "").strip()
+    return f"\n\n[session]\n{hist}" if hist else ""

@@ -72,7 +72,7 @@ def print_command_table(registry: dict[str, CommandSpec]) -> None:
         )
     console.print(table)
     console.print(
-        "[dim]builtins: help · list · doctor · clear · exit · !<cmd> runs your real shell[/dim]"
+        "[dim]builtins: help · list · doctor · engine · clear · exec · exit · !<cmd> runs your real shell[/dim]"
     )
 
 

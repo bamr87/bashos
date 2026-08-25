@@ -98,20 +98,30 @@ def resolve_backend(config: KernelConfig) -> str:
     return BACKEND_OPENCODE
 
 
-def get_chat_model(config: KernelConfig) -> BaseChatModel:
+def get_chat_model(config: KernelConfig, *, model: str | None = None) -> BaseChatModel:
     backend = resolve_backend(config)
+    name = model or config.model
     if backend == BACKEND_API:
         from langchain_anthropic import ChatAnthropic
 
         return ChatAnthropic(
-            model=config.model,
+            model=name,
             max_tokens=config.max_output_tokens,
             default_request_timeout=300.0,
         )
     if backend == BACKEND_CLAUDE_CODE:
         from .claude_code import ClaudeCodeChatModel
 
-        return ClaudeCodeChatModel(model=config.model)
+        return ClaudeCodeChatModel(model=name)
     from ..opencode.model import OpencodeChatModel
 
-    return OpencodeChatModel(kernel_config=config)
+    cfg = config if name == config.model else config.model_copy(update={"model": name})
+    return OpencodeChatModel(kernel_config=cfg)
+
+
+def models_for(config: KernelConfig) -> tuple[BaseChatModel, BaseChatModel | None]:
+    """Main loop model, plus an optional cheaper classifier."""
+    llm = get_chat_model(config)
+    if config.classify_model and config.classify_model != config.model:
+        return llm, get_chat_model(config, model=config.classify_model)
+    return llm, None

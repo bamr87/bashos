@@ -50,8 +50,14 @@ def test_command_agents_match_their_loop(registry):
 
     assert agent_for(registry["sys"]) == READONLY_AGENT
     assert agent_for(registry["debug"]) == READONLY_AGENT
+    assert agent_for(registry["health"]) == READONLY_AGENT
     assert agent_for(registry["sh"]) == SEALED_AGENT
     assert agent_for(registry["script"]) == SEALED_AGENT
+
+
+def test_react_commands_declare_allowed_tools(registry):
+    for name in ("sys", "health", "debug"):
+        assert registry[name].allowed_tools, f"/{name} should declare allowed-tools"
 
 
 def test_render_substitutes_arguments(registry):

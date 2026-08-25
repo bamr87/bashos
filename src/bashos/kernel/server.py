@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from ..config import KernelConfig
 from ..registry import load_registry
-from ..runtime.llm import get_chat_model
+from ..runtime.llm import models_for
 from ..runtime.tracing import init_tracing
 from .graph import build_kernel
 
 init_tracing()
 
 _config = KernelConfig.from_env()
-graph = build_kernel(load_registry(), get_chat_model(_config), _config)
+_llm, _classify = models_for(_config)
+graph = build_kernel(load_registry(), _llm, _config, classify_llm=_classify)

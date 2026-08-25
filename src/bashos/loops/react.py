@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..config import KernelConfig
-from ..kernel.context import context_block, system_prompt
+from ..kernel.context import context_block, session_block, system_prompt
 from ..kernel.state import KernelState
 from ..opencode import policy, project
 from ..opencode.policy import PROBE_COMMANDS, readonly_policy
@@ -41,7 +41,7 @@ def make_react_node(
         if usage := usage_or_none(spec, args):
             return {"output": usage, "trace": ["react: missing args → usage"]}
 
-        task = f"{spec.render(args)}\n\n{context_block()}"
+        task = f"{spec.render(args)}\n\n{context_block()}{session_block(state)}"
         agent = spec.agent or project.LOOP_AGENTS["react"]
         if config.dry_run:
             report = f"engine agent: {agent}\n{policy.describe_policy()}"

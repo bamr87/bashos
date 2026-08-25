@@ -10,8 +10,12 @@ class KernelState(TypedDict):
     input: str
     command: NotRequired[str]
     args: NotRequired[str]
-    route: NotRequired[str]  # "slash" | "classified" | "fallback" | "error"
+    route: NotRequired[str]  # "slash" | "classified" | "fallback" | "followup" | "error"
     output: NotRequired[str]
     error: NotRequired[str]
+    # REPL session: previous turn, so follow-ups can reuse a command
+    last_command: NotRequired[str]
+    last_input: NotRequired[str]
+    history: NotRequired[str]
     # append-only harness log; every node contributes, reducer merges
     trace: Annotated[list[str], operator.add]

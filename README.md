@@ -38,9 +38,12 @@ npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/in
 
 ```text
 bashos ▸ /sh find files over 100MB modified this week
+bashos ▸ exec                                             # confirm-then-run the last bash fence
 bashos ▸ /script rotate logs in /var/log, keep 7 days     # drafted, shellcheck-verified, repaired
+bashos ▸ /health                                          # verdict floor + causes (bin/os-health)
 bashos ▸ /sys why is this machine slow                    # read-only agent probes the real machine
-bashos ▸ count unique IPs in access.log                   # no slash → kernel classifies → /pipe
+bashos ▸ count unique IPs in access.log                   # no slash → heuristic/classify → /pipe
+bashos ▸ now exclude .venv                                # follow-up reuses the last command
 bashos ▸ !git status                                      # raw passthrough to your real shell
 ```
 
@@ -50,6 +53,7 @@ One-shot, from any terminal or script:
 bashos run /explain "rsync -avz --delete src/ host:/dst"
 bashos run -n /script backup my dotfiles     # -n dry-run: routing + rendered prompt, no model call
 bashos run -v /sh list open ports            # -v prints the kernel trace
+bashos run -x /sh list the 5 largest files   # -x confirm-then-run the first bash fence (-y skips prompt)
 bashos list                                  # command table
 bashos doctor                                # auth + environment checks
 bashos opencode status                       # boot the engine and report what it runs
@@ -90,7 +94,9 @@ the token rides as a bearer header, are in [docs/OPENCODE.md](docs/OPENCODE.md).
 | `/explain` | prompt   | explain any command, pipeline, error, or config like a man page |
 | `/script`  | *refine* | production-grade bash script — drafted, **shellcheck-verified**, auto-repaired |
 | `/debug`   | *react*  | diagnose a failure by **inspecting this machine** (read-only) |
-| `/sys`     | *react*  | system health / questions, answered from **live read-only probes** |
+| `/sys`     | *react*  | answer a system question from **live read-only probes** |
+| `/health`  | *react*  | verdict-style health check (`bin/os-health` floor + causes) |
+| `/dash`    | *refine* | generate a labeled, self-healing tmux monitoring dashboard |
 | `/pipe`    | prompt   | design text/data pipelines (grep · sed · awk · sort · jq) |
 | `/regex`   | prompt   | craft + explain + test regular expressions |
 | `/cron`    | prompt   | build or explain cron expressions and schedules |
@@ -167,7 +173,8 @@ immediately, and reaches the engine on its next start.
   never merged into your own `opencode` credential store.
 - `/script` output is verified by shellcheck when installed, and labeled
   unverified when not.
-- Only `!` lines execute anything by your intent — and that's your own shell.
+- Only `!` lines and explicit `--exec` / REPL `exec` (confirm-then-run) execute
+  anything by your intent — and that's your own shell.
 
 ## Services (Docker)
 
@@ -210,8 +217,8 @@ the registry.
 
 ## Roadmap
 
-- Session memory: reuse engine sessions across REPL lines instead of one per call
-- An `--exec` confirm-then-run mode for `/sh`
+- Reuse engine sessions across REPL lines instead of one per call
+- LangGraph checkpointer so session memory survives process restarts
 - Streaming token output in the REPL
 - More loops: plan-execute, multi-draft panel w/ judge
 - More userland: `/git`, `/docker`, `/net`, `/db`

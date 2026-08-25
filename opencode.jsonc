@@ -155,10 +155,10 @@
     "health": {
       "template": "$ARGUMENTS\n\nYou are the health-verdict loop of bashOS — the forge-health pattern from\ndocs/FORGE.md: a deterministic verdict floor first, judgment layered on top.\n\n1. Run `bin/os-health` (fall back to `./bin/os-health`, then to raw probes if\n   the script is absent). Its `[ OK ]/[WARN]/[CRIT]` lines and exit code are\n   the floor — never contradict a verdict line; you may only add findings.\n2. Investigate every non-OK line with the read-only probes until you can name\n   a cause, not just a symptom. If the request above names a focus, probe that\n   too. If a tmux dashboard session exists (`tmux has-session`), you may read\n   its panes for context.\n3. Report as:\n   - **VERDICT** — the os-health lines, verbatim.\n   - **CAUSES** — one line per non-OK verdict: the cause and the number that\n     proves it.\n   - **ACTIONS** — commands to run, only where something needs fixing.\n\nNever state a number you did not read from a probe. A machine with every\ncheck OK gets exactly one CAUSES line: \"nothing to explain\".",
       "agent": "bashos",
-      "description": "Verdict-style machine health check (deterministic floor + investigation; bare /health = full sweep)"
+      "description": "Verdict-style health check via bin/os-health ([OK]/[WARN]/[CRIT]) plus causes"
     },
     "pipe": {
-      "template": "Design a text-processing pipeline for:\n\n$ARGUMENTS\n\n- Show the final pipeline first, in one ```bash fence.\n- Then a table mapping each stage → what it contributes.\n- Prefer the boring classics (grep, sed, awk, sort, uniq, cut, tr, xargs) and jq for JSON — over clever single-tool tricks.\n- Show a 3–5 line sample of input → output.\n- Note the gotchas that apply here: field separators, locale (LC_ALL), buffering between pipe stages, GNU vs BSD flag differences.",
+      "template": "Design a text-processing pipeline for:\n\n$ARGUMENTS\n\n- Show the final pipeline first, in one ```bash fence.\n- Then a short table mapping each stage → what it contributes.\n- Prefer the boring classics (grep, sed, awk, sort, uniq, cut, tr, xargs) and jq for JSON — over clever single-tool tricks.\n- Show a 3–5 line sample of input → output.\n- Note at most two gotchas that apply here (field separators, locale, buffering, GNU vs BSD).\n- Keep the whole answer under ~40 lines. No essays, no extra variants unless asked.",
       "agent": "bashos-sealed",
       "description": "Design a text/data-processing pipeline (grep/sed/awk/sort/jq)"
     },
@@ -183,9 +183,9 @@
       "description": "Translate natural language into a safe, correct shell command"
     },
     "sys": {
-      "template": "$ARGUMENTS\n\nYou are the system-inspection loop of bashOS, with read-only access to this\nmachine (a whitelist of diagnostic commands plus file reads). If the request\nabove is empty, run a general health check.\n\n- Probe before you speak: OS/kernel, disk, memory, load, and top processes as a baseline, plus whatever the question needs.\n- Compare readings against sane thresholds: disk above ~85%, sustained load above core count, memory pressure / heavy swap.\n- Report as:\n  - **STATUS** — one line: ok / attention / problem.\n  - **FINDINGS** — each with the actual numbers you read.\n  - **ACTIONS** — commands to run, only if something needs fixing.\n\nNever state a number you did not read from a probe.",
+      "template": "$ARGUMENTS\n\nYou are the system-inspection loop of bashOS, with read-only access to this\nmachine (a whitelist of diagnostic commands plus file reads). If the request\nabove is empty, summarize disk, memory, load, and top processes. Verdict-style\nhealth (`[ OK ]/[WARN]/[CRIT]` via `bin/os-health`) is `/health`, not this command.\n\n- Probe before you speak: OS/kernel, disk, memory, load, and top processes as a baseline, plus whatever the question needs.\n- Compare readings against sane thresholds: disk above ~85%, sustained load above core count, memory pressure / heavy swap.\n- Report as:\n  - **STATUS** — one line: ok / attention / problem.\n  - **FINDINGS** — each with the actual numbers you read.\n  - **ACTIONS** — commands to run, only if something needs fixing.\n\nNever state a number you did not read from a probe.",
       "agent": "bashos",
-      "description": "Inspect and diagnose this machine (read-only probes; bare /sys = health check)"
+      "description": "Answer a question about this machine with live read-only probes (disk, memory, load, processes)"
     }
   }
 }

@@ -1,7 +1,7 @@
 import bashos.loops.refine as refine_mod
 from bashos.config import KernelConfig
 from bashos.kernel import build_kernel
-from bashos.loops.refine import extract_script
+from bashos.loops.common import extract_script, first_fence
 
 from .conftest import FakeChat
 
@@ -12,6 +12,8 @@ FIXED_REPLY = "```bash\n#!/usr/bin/env bash\nset -Eeuo pipefail\necho \"fixed\"\
 def test_extract_script_from_fence():
     assert extract_script(SCRIPT_REPLY).startswith("#!/usr/bin/env bash")
     assert extract_script("no fence at all") == "no fence at all"
+    assert first_fence("no fence at all") is None
+    assert first_fence(SCRIPT_REPLY).startswith("#!/usr/bin/env bash")
 
 
 async def test_refine_without_shellcheck_marks_unverified(registry, monkeypatch):

@@ -64,9 +64,10 @@ layers are, what a loop is, and how to extend each one.
 
 - **parse** splits `/command args` deterministically. Unknown commands
   short-circuit to `respond` with a `difflib` did-you-mean.
-- **classify** handles bare natural language: one model call picks the best
-  command from the registry menu, falling back to `/sh` on any doubt. Routing
-  is itself model-driven — the terminal accepts plain English.
+- **classify** handles bare natural language: a conservative keyword heuristic
+  fires first, follow-ups reuse the last command, otherwise one model call
+  (optional cheaper `BASHOS_CLASSIFY_MODEL`) picks from the registry menu,
+  falling back to `/sh` on any doubt. The terminal accepts plain English.
 - **dispatch** is a conditional edge keyed on the command's declared loop.
 - **respond** normalizes errors into output.
 
@@ -171,6 +172,7 @@ to `anthropic/claude-opus-5` for the engine.
 ---
 description: what it does
 argument-hint: <what to pass>
+allowed-tools: Read, Glob, Grep, Bash(uname:*)   # Claude Code / OpenCode TUI
 bashos:
   loop: prompt        # or refine | react
   agent: bashos       # optional; defaults from the loop
@@ -180,7 +182,7 @@ Prompt body with $ARGUMENTS.
 
 It is immediately a Claude Code slash command, a bashOS-routable program, and —
 after the engine re-syncs at next start — an OpenCode command. No registration,
-no code.
+no code. Engine-side blast radius is `opencode/policy.py`, not the frontmatter.
 
 **Add a loop** — one module in `loops/` exposing a node factory, one entry in
 the kernel's `_LOOP_NODES`, and commands can declare it. Candidates: a

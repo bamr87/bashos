@@ -17,6 +17,7 @@ BACKENDS = (BACKEND_OPENCODE, BACKEND_CLAUDE_CODE, BACKEND_API)
 class KernelConfig(BaseModel):
     model: str = DEFAULT_MODEL
     backend: str | None = None  # one of BACKENDS, or None = auto-detect
+    classify_model: str | None = None  # cheaper model for NL routing; None = same as model
     max_output_tokens: int = 16000
     react_max_turns: int = 12
     refine_max_iters: int = 2  # bounded repair passes in the refine loop
@@ -29,8 +30,10 @@ class KernelConfig(BaseModel):
         env_map = {
             "model": "BASHOS_MODEL",
             "backend": "BASHOS_BACKEND",
+            "classify_model": "BASHOS_CLASSIFY_MODEL",
             "max_output_tokens": "BASHOS_MAX_OUTPUT_TOKENS",
             "react_max_turns": "BASHOS_REACT_MAX_TURNS",
+            "refine_max_iters": "BASHOS_REFINE_MAX_ITERS",
         }
         for field, var in env_map.items():
             if value := os.environ.get(var):

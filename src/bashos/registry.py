@@ -7,6 +7,7 @@ one through a kernel orchestration loop declared in its frontmatter:
     ---
     description: one-line summary          # used by Claude Code and bashOS
     argument-hint: <what to pass>
+    allowed-tools: Read, Glob, Grep        # Claude Code / OpenCode TUI
     bashos:
       loop: prompt | refine | react        # which orchestration loop runs it
       requires-args: true                  # optional, default true
@@ -24,7 +25,7 @@ picks which tool policy (opencode/policy.py) the command runs under.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -46,9 +47,10 @@ class CommandSpec:
     system: str | None = None
     requires_args: bool = True
     agent: str | None = None  # engine agent override; None = derived from loop
+    allowed_tools: tuple[str, ...] = field(default_factory=tuple)
 
     def render(self, args: str) -> str:
-        return self.body.replace("$ARGUMENTS", args)
+        return self.body.replace("$ARGUMENTS", args).strip()
 
     @property
     def usage(self) -> str:
@@ -75,9 +77,20 @@ def parse_command_file(path: Path) -> CommandSpec:
         system=bashos_meta.get("system"),
         agent=bashos_meta.get("agent"),
         requires_args=bool(bashos_meta.get("requires-args", True)),
+        allowed_tools=_parse_allowed_tools(meta.get("allowed-tools")),
         body=body.strip(),
         path=path,
     )
+
+
+def _parse_allowed_tools(raw: object) -> tuple[str, ...]:
+    if not raw:
+        return ()
+    if isinstance(raw, str):
+        return tuple(part.strip() for part in raw.split(",") if part.strip())
+    if isinstance(raw, list):
+        return tuple(str(part).strip() for part in raw if str(part).strip())
+    return ()
 
 
 def find_root(start: Path | None = None) -> Path:

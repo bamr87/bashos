@@ -6,7 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..config import KernelConfig
-from ..kernel.context import context_block, system_prompt
+from ..kernel.context import context_block, session_block, system_prompt
 from ..kernel.state import KernelState
 from ..registry import CommandSpec
 from .common import dry_run_report, usage_or_none
@@ -23,7 +23,7 @@ def make_prompt_node(
         if usage := usage_or_none(spec, args):
             return {"output": usage, "trace": ["prompt: missing args → usage"]}
 
-        prompt = f"{spec.render(args)}\n\n{context_block()}"
+        prompt = f"{spec.render(args)}\n\n{context_block()}{session_block(state)}"
         if config.dry_run or llm is None:
             return {"output": dry_run_report(spec, prompt), "trace": ["prompt: dry-run"]}
 
