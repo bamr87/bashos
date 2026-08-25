@@ -98,7 +98,9 @@ def resolve_backend(config: KernelConfig) -> str:
     return BACKEND_OPENCODE
 
 
-def get_chat_model(config: KernelConfig, *, model: str | None = None) -> BaseChatModel:
+def get_chat_model(
+    config: KernelConfig, *, model: str | None = None, event_sink=None
+) -> BaseChatModel:
     backend = resolve_backend(config)
     name = model or config.model
     if backend == BACKEND_API:
@@ -116,12 +118,19 @@ def get_chat_model(config: KernelConfig, *, model: str | None = None) -> BaseCha
     from ..opencode.model import OpencodeChatModel
 
     cfg = config if name == config.model else config.model_copy(update={"model": name})
-    return OpencodeChatModel(kernel_config=cfg)
+    # event_sink is engine-only: the fallback backends have no event stream
+    return OpencodeChatModel(kernel_config=cfg, event_sink=event_sink)
 
 
-def models_for(config: KernelConfig) -> tuple[BaseChatModel, BaseChatModel | None]:
-    """Main loop model, plus an optional cheaper classifier."""
-    llm = get_chat_model(config)
+def models_for(
+    config: KernelConfig, *, event_sink=None
+) -> tuple[BaseChatModel, BaseChatModel | None]:
+    """Main loop model, plus an optional cheaper classifier.
+
+    Only the main model gets the event sink — streaming the classifier's
+    routing deltas would spam the console for no benefit.
+    """
+    llm = get_chat_model(config, event_sink=event_sink)
     if config.classify_model and config.classify_model != config.model:
         return llm, get_chat_model(config, model=config.classify_model)
     return llm, None

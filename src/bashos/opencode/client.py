@@ -193,6 +193,9 @@ class OpencodeClient:
 
     # -------------------------------------------------------------- sessions
 
+    async def list_sessions(self) -> list[dict[str, Any]]:
+        return await self._request("GET", "/session") or []
+
     async def create_session(self, *, title: str, agent: str | None = None) -> str:
         body: dict[str, Any] = {"title": title}
         if agent:

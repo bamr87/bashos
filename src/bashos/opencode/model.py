@@ -33,6 +33,11 @@ class OpencodeChatModel(BaseChatModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kernel_config: KernelConfig
+    # Optional EventSink: sealed completions then stream TextDelta events to
+    # the UI while ainvoke is in flight. Streaming deliberately lives at the
+    # engine layer rather than in a _astream implementation — loops call
+    # ainvoke exactly once per node, and the tests pin those call counts.
+    event_sink: Any = None
 
     @property
     def _llm_type(self) -> str:
@@ -47,7 +52,7 @@ class OpencodeChatModel(BaseChatModel):
 
         system, prompt = flatten_messages(list(messages))
         engine = await get_engine(self.kernel_config)
-        text = await engine.complete(prompt, system=system)
+        text = await engine.complete(prompt, system=system, on_event=self.event_sink)
         return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:

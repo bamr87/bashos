@@ -42,6 +42,7 @@ from .client import (
     OpencodeError,
     PromptResult,
     ProviderError,
+    RunAborted,
 )
 
 STATE_DIR = ".bashos"
@@ -74,6 +75,7 @@ async def watch_events(
     from .client import read_tool_part
 
     started: dict[str, float] = {}
+    emitted: dict[str, int] = {}  # text part id → chars already forwarded
     try:
         async for event in stream:
             live.set()  # the stream is open; the prompt may start
@@ -102,7 +104,24 @@ async def watch_events(
                 ))
             elif kind == "message.part.updated":
                 part = props.get("part") or {}
-                if part.get("type") != "tool":
+                ptype = part.get("type")
+                if ptype == "text" and not part.get("synthetic"):
+                    # OpenCode sends cumulative text snapshots; forward only
+                    # the new suffix. A shrinking part (mid-stream edit)
+                    # resets the counter — the final PromptResult.text is
+                    # authoritative, so the display self-heals.
+                    part_id = str(part.get("id", ""))
+                    text = str(part.get("text", ""))
+                    sent = emitted.get(part_id, 0)
+                    if len(text) < sent:
+                        sent = 0
+                    if len(text) > sent:
+                        emitted[part_id] = len(text)
+                        _emit(sink, events.TextDelta(
+                            session_id=session_id, part_id=part_id, text=text[sent:]
+                        ))
+                    continue
+                if ptype != "tool":
                     continue
                 call = read_tool_part(part)
                 if not call.call_id:
@@ -158,6 +177,8 @@ class OpencodeEngine:
         self.root = root or find_root()
         self._registry = registry
         self._handle: server.EngineHandle | None = None
+        self._bus = None
+        self._sessions: set[str] = set()  # open EngineSessions, swept on stop
         self.auth_status = "not started"
         self.sync_status = "not started"
         self.version = "unknown"
@@ -214,10 +235,27 @@ class OpencodeEngine:
             self.version = await self.client.version()
         return self
 
+    @property
+    def bus(self):
+        """The single live event subscription, shared by every session."""
+        from .bus import EngineEventBus
+
+        if self._bus is None:
+            self._bus = EngineEventBus(self.client)
+        return self._bus
+
     async def stop(self) -> None:
         if self._handle is None:
             return
         handle, self._handle = self._handle, None
+        if self._bus is not None:
+            await self._bus.close()
+            self._bus = None
+        # crash-cleanup: a window that never closed its session must not
+        # leave one behind on the engine
+        for session_id in list(self._sessions):
+            await handle.client.delete_session(session_id)
+        self._sessions.clear()
         await handle.stop()
 
     async def __aenter__(self) -> OpencodeEngine:
@@ -304,6 +342,19 @@ class OpencodeEngine:
         sink = on_engine_event or (events.to_legacy(on_event) if on_event else None)
         return await self._run(prompt, agent=agent, system=system, sink=sink)
 
+    async def open_session(self, agent: str, *, title: str | None = None) -> EngineSession:
+        """Create one engine session and hold it open across turns.
+
+        This is what gives a desktop console window conversational
+        continuity on the engine side. The caller owns `close()`; anything
+        left open is swept by `stop()`.
+        """
+        session_id = await self.client.create_session(
+            title=title or f"bashos:{agent}", agent=agent
+        )
+        self._sessions.add(session_id)
+        return EngineSession(self, session_id, agent)
+
     async def _run(
         self,
         prompt: str,
@@ -312,41 +363,19 @@ class OpencodeEngine:
         system: str | None,
         sink: events.EventSink | None,
     ) -> PromptResult:
-        client = self.client
-        session_id = await client.create_session(title=f"bashos:{agent}", agent=agent)
-        _emit(sink, events.LifecycleEvent(session_id=session_id, phase="session.created"))
-        # The watcher always runs, even with nothing to display: it is what
-        # refuses approval prompts. A rule that resolves to "ask" would
-        # otherwise block a headless run until the request timed out.
-        live = asyncio.Event()
-        watcher = asyncio.create_task(
-            watch_events(client.events(), session_id, sink, live, client)
-        )
+        """One prompt on a fresh session, deleted afterwards — the one-shot
+        semantics `complete()` and `act()` have always had."""
+        session = await self.open_session(agent)
+        _emit(sink, events.LifecycleEvent(
+            session_id=session.session_id, phase="session.created"
+        ))
         try:
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(live.wait(), timeout=5)
-            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="prompt.started"))
-            result = await client.prompt(
-                session_id,
-                prompt,
-                agent=agent,
-                system=system,
-                model=project.qualify_model(self.config.model),
-            )
-            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="prompt.finished"))
-            return result
-        except OpencodeError as exc:
-            await client.abort(session_id)
-            raise _with_hint(exc, self._failure_hint()) from exc
-        except BaseException:
-            await client.abort(session_id)
-            raise
+            return await session.prompt(prompt, system=system, sink=sink)
         finally:
-            watcher.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await watcher
-            await client.delete_session(session_id)
-            _emit(sink, events.LifecycleEvent(session_id=session_id, phase="session.deleted"))
+            await session.close()
+            _emit(sink, events.LifecycleEvent(
+                session_id=session.session_id, phase="session.deleted"
+            ))
 
     def _failure_hint(self) -> str:
         """Point a raw engine error at the two things that actually explain it.
@@ -358,6 +387,70 @@ class OpencodeEngine:
         hint = f"\n  auth: {self.auth_status}\n  check: bashos doctor"
         log = self._handle.log_path if self._handle else None
         return f"{hint}\n  engine log: {log}" if log else hint
+
+
+class EngineSession:
+    """One OpenCode session held open across turns — a console window's handle.
+
+    `prompt()` may be called any number of times; the engine accumulates the
+    conversation server-side. `abort()` is the Stop affordance; `close()`
+    deletes the session and must be called when the window goes away.
+    """
+
+    def __init__(self, engine: OpencodeEngine, session_id: str, agent: str) -> None:
+        self.engine = engine
+        self.session_id = session_id
+        self.agent = agent
+        self._aborted = False
+
+    async def prompt(
+        self,
+        text: str,
+        *,
+        system: str | None = None,
+        sink: events.EventSink | None = None,
+    ) -> PromptResult:
+        self._aborted = False
+        client = self.engine.client
+        live = asyncio.Event()
+        # The registration always runs, even with nothing to display: its
+        # watcher is what refuses approval prompts. A rule that resolves to
+        # "ask" would otherwise block a headless run until it timed out.
+        async with self.engine.bus.run(self.session_id, sink, live):
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(live.wait(), timeout=5)
+            _emit(sink, events.LifecycleEvent(
+                session_id=self.session_id, phase="prompt.started"
+            ))
+            try:
+                result = await client.prompt(
+                    self.session_id,
+                    text,
+                    agent=self.agent,
+                    system=system,
+                    model=project.qualify_model(self.engine.config.model),
+                )
+            except OpencodeError as exc:
+                await client.abort(self.session_id)
+                if self._aborted:
+                    raise RunAborted("stopped by user") from exc
+                raise _with_hint(exc, self.engine._failure_hint()) from exc
+            except BaseException:
+                await client.abort(self.session_id)
+                raise
+            _emit(sink, events.LifecycleEvent(
+                session_id=self.session_id, phase="prompt.finished"
+            ))
+            return result
+
+    async def abort(self) -> None:
+        """Stop the in-flight turn; the session itself stays open."""
+        self._aborted = True
+        await self.engine.client.abort(self.session_id)
+
+    async def close(self) -> None:
+        await self.engine.client.delete_session(self.session_id)
+        self.engine._sessions.discard(self.session_id)
 
 
 _ENGINE: OpencodeEngine | None = None
