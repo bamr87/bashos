@@ -1,0 +1,189 @@
+/* bashOS desktop stylesheet — tokens come from the registered themes. */
+
+Screen {
+    background: $background;
+}
+
+/* ------------------------------------------------------------ tile area */
+
+#desktop {
+    layout: grid;
+    grid-size: 1;
+    grid-gutter: 0 0;
+    height: 1fr;
+    padding: 0;
+}
+
+.window {
+    border: round $panel;
+    background: $surface;
+    height: 100%;
+}
+
+.window.-active {
+    border: round $primary;
+}
+
+.window.-hidden {
+    display: none;
+}
+
+.titlebar {
+    height: 1;
+    background: $panel;
+}
+
+.window.-active .titlebar {
+    background: $primary 25%;
+}
+
+.titlebar-label {
+    width: 1fr;
+    padding: 0 1;
+    text-style: bold;
+    color: $foreground;
+}
+
+.titlebar-btn {
+    width: 3;
+    content-align: center middle;
+    color: $foreground 60%;
+}
+
+.titlebar-btn:hover {
+    background: $accent 50%;
+    color: $foreground;
+}
+
+.window-body {
+    height: 1fr;
+    padding: 0 1;
+    overflow-y: auto;
+}
+
+.placeholder {
+    color: $foreground 50%;
+    padding: 1 1;
+}
+
+.doctor-panel {
+    padding: 0 1;
+}
+
+/* -------------------------------------------------------------- taskbar */
+
+#taskbar {
+    dock: bottom;
+    height: 1;
+    background: $panel;
+}
+
+#apps-button {
+    width: auto;
+    padding: 0 1;
+    background: $primary 30%;
+    text-style: bold;
+}
+
+#apps-button:hover {
+    background: $primary 60%;
+}
+
+#taskbar-tabs {
+    width: auto;
+    height: 1;
+}
+
+.window-tab {
+    width: auto;
+    padding: 0 1;
+    color: $foreground 70%;
+}
+
+.window-tab.-active {
+    background: $primary 40%;
+    color: $foreground;
+    text-style: bold;
+}
+
+.window-tab:hover {
+    background: $accent 40%;
+}
+
+#taskbar-spacer {
+    width: 1fr;
+}
+
+#engine-indicator,
+#model-label {
+    width: auto;
+    padding: 0 1;
+    color: $foreground 55%;
+}
+
+#clock {
+    width: auto;
+    padding: 0 1;
+    color: $foreground 80%;
+}
+
+/* ------------------------------------------------------------- launcher */
+
+LauncherScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#launcher {
+    width: 80%;
+    max-width: 110;
+    height: 75%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#launcher-title {
+    text-style: bold;
+    color: $primary;
+    padding-bottom: 1;
+}
+
+#launcher-list {
+    height: 1fr;
+    background: $surface;
+}
+
+/* --------------------------------------------------------------- modals */
+
+HelpModal, QuitConfirm {
+    align: center middle;
+    background: $background 60%;
+}
+
+.modal-box {
+    width: auto;
+    max-width: 80;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+.modal-buttons {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+
+.modal-buttons Button {
+    margin-left: 2;
+}
+
+.dim {
+    color: $foreground 50%;
+}
+
+#quit-question {
+    padding-bottom: 1;
+}

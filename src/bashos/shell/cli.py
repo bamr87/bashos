@@ -296,6 +296,16 @@ def repl(
     asyncio.run(run_repl(model=model))
 
 
+@app.command("desktop", hidden=True)
+def desktop(
+    model: str | None = typer.Option(None, "--model", "-m", help="model override"),
+) -> None:
+    """Launch the bashOS desktop — the windowed terminal environment."""
+    from ..desktop import run_desktop
+
+    run_desktop(model=model)
+
+
 def main() -> None:
     load_dotenv()
     from ..runtime.tracing import init_tracing
