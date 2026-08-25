@@ -3,8 +3,9 @@
 Terminal-first AI runtime: Claude slash commands routed through a LangGraph
 kernel onto the OpenCode engine, on Claude Code OAuth. Design doc:
 docs/HARNESS.md. The engine (policy, credential bridge, projection):
-docs/OPENCODE.md. The dev-server monitoring pattern (`bin/os-health`,
-`/health`, `/dash`): docs/FORGE.md.
+docs/OPENCODE.md. The desktop (windowed Textual surface): docs/DESKTOP.md.
+The dev-server monitoring pattern (`bin/os-health`, `/health`, `/dash`):
+docs/FORGE.md.
 
 **The core rule: bashOS never implements a reasoning loop.** OpenCode owns the
 agent loop, tool broker, sessions, and permission gate; bashOS owns userland,
@@ -34,7 +35,13 @@ belongs in the engine layer or nowhere.
   fixed read-only probes over ssh, the model reasons locally over the gathered
   text, and the interaction mirrors onto the box's tmux console monitor. Never
   give loops ssh/network tools — extend `remote.PROBES` instead.
-- `src/bashos/shell/` — Typer CLI, prompt-toolkit REPL, Rich rendering.
+- `src/bashos/shell/` — Typer CLI (one-shot `bashos run` and friends) + Rich
+  rendering for it.
+- `src/bashos/desktop/` — the Textual desktop, the interactive surface: tiling
+  window manager, taskbar, launcher, app suite (AI console, health, doctor,
+  engine, commands, trace, OpenCode TUI). A client of the kernel/engine — it
+  renders typed events (`src/bashos/events.py`), it never reasons. Docs:
+  docs/DESKTOP.md.
 - `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
   `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024),
   `bashos` (containerized terminal, profile `cli`). LangChain/LangGraph are
@@ -42,8 +49,11 @@ belongs in the engine layer or nowhere.
 
 ## Conventions
 
-- Everything async; the CLI wraps one `asyncio.run`. Never call sync `invoke`
+- Everything async; the CLI wraps one `asyncio.run` (the desktop is the
+  documented exception — Textual owns its loop). Never call sync `invoke`
   inside the kernel — use `await llm.ainvoke`.
+- The desktop owns the alternate screen: kernel/engine code must never print —
+  emit typed events (`events.py`) and let the surface render them.
 - Loops must short-circuit on missing args (usage) and `config.dry_run`
   (rendered prompt, no model call) — tests rely on the dry-run path.
 - Tool policy is deny-by-default and lives in `opencode/policy.py`. Widening it
@@ -53,7 +63,9 @@ belongs in the engine layer or nowhere.
   `policy.py`, then `bashos opencode sync`; a test fails on drift. It must
   never contain a credential — secrets go in the engine's environment only.
 - Anything that could block on a human must not: approval requests are
-  auto-refused, and a dead event stream releases the prompt.
+  auto-refused, and a dead event stream releases the prompt. The desktop's
+  interactive affordances (exec confirm, Stop) never loosen this — an approval
+  queue would be a new, explicitly named policy profile, off by default.
 - Shell code style everywhere (bin/, generated prompts): `set -Eeuo pipefail`,
   quoted expansions, shellcheck-clean.
 
@@ -61,6 +73,7 @@ belongs in the engine layer or nowhere.
 
 ```bash
 .venv/bin/pytest -q                  # offline tests (fake model, no engine)
+.venv/bin/bashos desktop             # the desktop (bare `bashos` on a TTY too)
 .venv/bin/bashos run -n "/sh ..."    # dry-run: no auth needed
 .venv/bin/bashos doctor              # auth/backend diagnosis (offline)
 .venv/bin/bashos opencode sync       # regenerate opencode.jsonc

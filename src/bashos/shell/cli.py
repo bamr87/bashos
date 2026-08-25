@@ -1,6 +1,7 @@
 """bashOS command line — every capability is reachable from the terminal.
 
-    bashos                     interactive REPL (the default)
+    bashos                     the desktop (the default, on a TTY)
+    bashos desktop             the desktop, explicitly
     bashos run /sh <request>   one-shot command
     bashos run <plain english> routed to the best command by the kernel
     bashos run -x /sh …        generate, confirm, then run the first bash fence
@@ -96,12 +97,30 @@ async def run_line(
 
 @app.callback(invoke_without_command=True)
 def main_callback(ctx: typer.Context) -> None:
-    if ctx.invoked_subcommand is None:
-        # call the implementation, not the typer-decorated command — invoking
-        # that as a plain function would pass OptionInfo defaults through
-        from .repl import run_repl
+    if ctx.invoked_subcommand is not None:
+        return
+    import os
+    import sys
 
-        asyncio.run(run_repl(model=None))
+    capable = (
+        sys.stdin.isatty()
+        and sys.stdout.isatty()
+        and os.environ.get("TERM", "") not in ("", "dumb")
+        and os.environ.get("BASHOS_DESKTOP") != "0"
+    )
+    if not capable:
+        # never boot a full-screen app on a pipe, CI, or a dumb terminal
+        typer.echo(
+            "bashos: the desktop needs an interactive terminal (TTY).\n"
+            '  scripts and CI:    bashos run "<request>"\n'
+            "  force it anyway:   bashos desktop\n"
+            "  BASHOS_DESKTOP=0 set? unset it to re-enable auto-launch",
+            err=True,
+        )
+        raise typer.Exit(2)
+    from ..desktop import run_desktop
+
+    run_desktop(model=None)
 
 
 @app.command("run")
@@ -286,17 +305,23 @@ def remote_ask(
     render.print_output(answer)
 
 
-@app.command("repl")
+@app.command("repl", hidden=True)
 def repl(
     model: str | None = typer.Option(None, "--model", "-m", help="model override"),
 ) -> None:
-    """Start the interactive shell (also the default with no subcommand)."""
-    from .repl import run_repl
+    """Deprecated alias — the REPL became the desktop console."""
+    typer.echo(
+        "bashos repl is deprecated — the REPL became the desktop console "
+        "(docs/DESKTOP.md). Launching the desktop; use `bashos run` for "
+        "one-shot use.",
+        err=True,
+    )
+    from ..desktop import run_desktop
 
-    asyncio.run(run_repl(model=model))
+    run_desktop(model=model)
 
 
-@app.command("desktop", hidden=True)
+@app.command("desktop")
 def desktop(
     model: str | None = typer.Option(None, "--model", "-m", help="model override"),
 ) -> None:

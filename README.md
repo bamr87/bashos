@@ -15,11 +15,12 @@ OAuth — for all things software development and information systems.
 |_.__/\__,_/__/_||_\___/|____/
 ```
 
-The terminal is the core access point: one REPL (and one-shot CLI) reaches
-every capability. Commands are markdown specs in `.claude/commands/` — the
-exact files Claude Code loads as project slash commands — and the bashOS kernel
-routes those same files through AI orchestration loops. One spec, three
-runtimes: Claude Code, the bashOS kernel, and the OpenCode TUI.
+The terminal is the core access point: a windowed **terminal desktop** (and a
+one-shot CLI) reaches every capability. Commands are markdown specs in
+`.claude/commands/` — the exact files Claude Code loads as project slash
+commands — and the bashOS kernel routes those same files through AI
+orchestration loops. One spec, three runtimes: Claude Code, the bashOS
+kernel, and the OpenCode TUI.
 
 bashOS does not implement a reasoning loop. It runs one:
 [OpenCode](https://opencode.ai) — open source, client/server,
@@ -33,19 +34,28 @@ resource-management layer shouldn't.
 
 ```bash
 npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
-./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
+./bin/bashos                 # first run bootstraps .venv, then opens the desktop
 ```
 
+The desktop ([docs/DESKTOP.md](docs/DESKTOP.md)) is a windowed terminal
+environment: tiled windows that adapt to your terminal size, a launcher
+(`F2`) and command palette (`ctrl+p`), and an app suite — AI consoles,
+a live health monitor, the engine inspector, a kernel trace viewer, and the
+real OpenCode TUI a keypress away. In an AI Console window:
+
 ```text
-bashos ▸ /sh find files over 100MB modified this week
-bashos ▸ exec                                             # confirm-then-run the last bash fence
-bashos ▸ /script rotate logs in /var/log, keep 7 days     # drafted, shellcheck-verified, repaired
-bashos ▸ /health                                          # verdict floor + causes (bin/os-health)
-bashos ▸ /sys why is this machine slow                    # read-only agent probes the real machine
-bashos ▸ count unique IPs in access.log                   # no slash → heuristic/classify → /pipe
-bashos ▸ now exclude .venv                                # follow-up reuses the last command
-bashos ▸ !git status                                      # raw passthrough to your real shell
+you ▸ /sh find files over 100MB modified this week
+you ▸ exec                                             # confirm-then-run the last bash fence
+you ▸ /script rotate logs in /var/log, keep 7 days     # drafted, shellcheck-verified, repaired
+you ▸ /health                                          # verdict floor + causes (bin/os-health)
+you ▸ /sys why is this machine slow                    # read-only agent probes, streaming live
+you ▸ count unique IPs in access.log                   # no slash → heuristic/classify → /pipe
+you ▸ now exclude .venv                                # follow-up reuses the last command
+you ▸ !git status                                      # your real shell, output in a window
 ```
+
+Answers stream in as they generate; every tool call ticks by in the
+activity feed; `esc` stops a run mid-flight.
 
 One-shot, from any terminal or script:
 
@@ -110,7 +120,7 @@ TUI. Same file, no duplication.
 ## Architecture
 
 ```
- terminal (REPL / CLI · typer + rich + prompt-toolkit)
+ terminal (desktop · one-shot CLI — textual + typer + rich)
     │
     ▼
  kernel — LangGraph state machine
@@ -173,8 +183,10 @@ immediately, and reaches the engine on its next start.
   never merged into your own `opencode` credential store.
 - `/script` output is verified by shellcheck when installed, and labeled
   unverified when not.
-- Only `!` lines and explicit `--exec` / REPL `exec` (confirm-then-run) execute
-  anything by your intent — and that's your own shell.
+- Only `!` lines and explicit `--exec` / console `exec` (confirm-then-run,
+  Cancel focused by default) execute anything by your intent — and that's
+  your own shell. Approval requests from engine runs are auto-refused
+  everywhere, the desktop included.
 
 ## Services (Docker)
 
@@ -217,8 +229,11 @@ the registry.
 
 ## Roadmap
 
-- Reuse engine sessions across REPL lines instead of one per call
-- LangGraph checkpointer so session memory survives process restarts
-- Streaming token output in the REPL
+- Adopt per-window engine sessions in the desktop console (the
+  `EngineSession` primitive is built and tested; the console still runs
+  one engine session per turn with history injection)
+- An opt-in interactive approval queue as a new, explicitly named policy
+  profile (headless auto-refusal stays the default forever)
+- A pty-embedded OpenCode TUI window (today: suspend/attach)
 - More loops: plan-execute, multi-draft panel w/ judge
 - More userland: `/git`, `/docker`, `/net`, `/db`

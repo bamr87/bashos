@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "bamr87", email = "bamr87@users.noreply.github.com" }]
-keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "repl"]
+keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "desktop", "tui"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -39,7 +39,6 @@ dependencies = [
   # terminal
   "typer>=0.15",
   "rich>=13.9",
-  "prompt-toolkit>=3.0.48",
   # the desktop: windowed terminal UI (shares rich's renderable protocol)
   "textual>=8.2,<9",
   # foundation

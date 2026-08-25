@@ -2,10 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "bashOS: REPL",
+      "name": "bashOS: desktop",
       "type": "debugpy",
       "request": "launch",
       "module": "bashos",
+      "args": ["desktop"],
       "python": "${workspaceFolder}/.venv/bin/python",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",

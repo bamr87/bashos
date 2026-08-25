@@ -1,9 +1,10 @@
-"""Terminal rendering — rich is the display driver.
+"""One-shot CLI rendering — rich is the display driver.
 
-Two layers live here: pure builders that return Rich renderables (shared with
-the Textual desktop, which consumes renderables natively) and thin `print_*`
-wrappers that write them to this module's console for the one-shot CLI and
-the REPL.
+Two layers live here: pure builders that return Rich renderables (shared
+with the Textual desktop, which consumes renderables natively) and thin
+`print_*` wrappers that write them to this module's console for `bashos
+run`/`list`/`doctor`. The desktop renders through Textual, never through
+this console.
 """
 
 from __future__ import annotations
@@ -13,18 +14,10 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from ..config import KernelConfig
 from ..registry import CommandSpec
 from ..runtime.auth import Check
 
 console = Console()
-
-BANNER = r"""
- _             _    ___  ____
-| |__  __ _ __| |_ / _ \/ ___|
-| '_ \/ _` (_-< ' \ (_) \___ \
-|_.__/\__,_/__/_||_\___/|____/
-"""
 
 
 def is_literal_output(text: str) -> bool:
@@ -66,18 +59,6 @@ def engine_table(rows: list[tuple[str, str]]) -> Table:
     for label, detail in rows:
         table.add_row(label, detail)
     return table
-
-
-def print_banner(config: KernelConfig, backend: str) -> None:
-    console.print(BANNER, style="bold cyan", highlight=False)
-    console.print(
-        f"terminal-first AI runtime · backend={backend} · model={config.model}",
-        style="dim",
-    )
-    console.print(
-        "type /<command>, plain english, !<shell>, or help · ctrl-d to exit\n",
-        style="dim",
-    )
 
 
 def print_output(text: str) -> None:

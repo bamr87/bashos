@@ -1,7 +1,8 @@
 # bashOS service stack.
 #
 #   docker compose up -d            → phoenix (observability) + langgraph-dev (kernel API)
-#   docker compose run bashos       → the terminal itself, containerized (profile: cli)
+#   docker compose run bashos       → the desktop, containerized (profile: cli; tty is allocated)
+#   docker compose run bashos run "/sh …"  → one-shot, containerized
 #
 # The terminal remains the core access point — these services are optional
 # infrastructure around it: Phoenix traces every kernel loop, and the LangGraph

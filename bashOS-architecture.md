@@ -155,7 +155,7 @@ $ :: why is /var filling up, and propose a cleanup I can review
   → proposed: prune list (diff attached). approve? [y/N/edit]
 ```
 
-The two languages interleave in one session, one history, one context. Alongside the shell: SSH (it's still the appliance's front door), a terminal user interface (TUI) dashboard for watching agent sessions and pending approvals, and ACP compatibility so Zed, the Microsoft Intelligent Terminal fork, or any ACP client can drive the same kernel. The web console exists for the approval queue on your phone — because the 3 a.m. page where you approve a remediation diff from bed is the actual killer feature.
+The two languages interleave in one session, one history, one context. Alongside the shell: SSH (it's still the appliance's front door), a terminal user interface (TUI) dashboard for watching agent sessions and pending approvals — shipped today as the bashOS desktop (`src/bashos/desktop/`, docs/DESKTOP.md), grown into the primary local surface — and ACP compatibility so Zed, the Microsoft Intelligent Terminal fork, or any ACP client can drive the same kernel. The web console exists for the approval queue on your phone — because the 3 a.m. page where you approve a remediation diff from bed is the actual killer feature.
 
 ## The stack, on one page
 
@@ -187,7 +187,7 @@ The trap in OS projects is building the bottom first and shipping nothing for a 
 
 **Phase 3 — the fleet (when someone actually needs it).** SPIRE rollout for real agent identity, off-box audit shipping, multi-node scheduling ("run this against all staging boxes"), agent-to-agent delegation with policy inheritance. This is where the appliance becomes infrastructure — and where the enterprise conversation (the auditor, the CISO) already has answers because L4 existed from Phase 1.
 
-**Explicit non-goals**, because an MVP is defined by its refusals: no custom reasoning loop (bring an existing agent), no custom model (bring any model), no GUI desktop (it's an appliance), no Kubernetes operator until Phase 3 demands it, and no autonomous-by-default anything — unattended operation is a per-policy, per-target opt-in, forever.
+**Explicit non-goals**, because an MVP is defined by its refusals: no custom reasoning loop (bring an existing agent), no custom model (bring any model), no graphical (pixel) desktop — the terminal desktop is the L6 TUI surface, not a GUI — no Kubernetes operator until Phase 3 demands it, and no autonomous-by-default anything — unattended operation is a per-policy, per-target opt-in, forever.
 
 ## What could kill it, named honestly
 

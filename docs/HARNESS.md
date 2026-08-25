@@ -6,8 +6,9 @@ layers are, what a loop is, and how to extend each one.
 ## Design goals
 
 1. **The terminal is the core access point.** Every capability — commands,
-   agent runs, diagnostics, raw shell — is reachable from one prompt. There is
-   no web UI; the REPL and one-shot CLI are the whole surface.
+   agent runs, diagnostics, raw shell — is reachable from the terminal. There
+   is no web UI; the terminal desktop ([DESKTOP.md](DESKTOP.md)) and the
+   one-shot CLI are the whole surface.
 2. **Bring an existing agent; never build a reasoning loop.** The reasoning
    engine is [OpenCode](OPENCODE.md) — open source, client/server,
    provider-agnostic — running as a supervised local server. It owns the agent
@@ -15,7 +16,7 @@ layers are, what a loop is, and how to extend each one.
    routing, policy, userland, and the terminal. This is the whitepaper's L5
    separation, and it is why swapping engines is a module, not a rewrite.
 3. **Libraries everywhere.** Orchestration is LangGraph, the engine is
-   OpenCode, the terminal is Typer + Rich + prompt-toolkit, config is Pydantic.
+   OpenCode, the terminal is Typer + Rich + Textual, config is Pydantic.
    bashOS writes glue and policy, not infrastructure.
 4. **One spec, three runtimes.** A command is a markdown file in
    `.claude/commands/`. Claude Code loads it as a project slash command, the
@@ -34,7 +35,8 @@ layers are, what a loop is, and how to extend each one.
 
 ```
  ┌─────────────────────────────────────────────────────────────┐
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
+ │ desktop/      terminal desktop: windows · launcher · apps   │  access point
+ │ shell/        one-shot CLI · rich rendering                 │
  ├─────────────────────────────────────────────────────────────┤
  │ kernel/       LangGraph state machine: parse → route → loop │  orchestration
  ├─────────────────────────────────────────────────────────────┤
@@ -222,7 +224,7 @@ portable Python runtime — same layer boundaries, lighter enforcement:
 
 | appliance layer (whitepaper) | shipped today (this repo) |
 |---|---|
-| L6 interface — shell with `::` intent channel | REPL where slash commands, plain English (classified), and `!` POSIX passthrough share one session |
+| L6 interface — shell with `::` intent channel | the terminal desktop (windows, launcher, AI console where slash commands, plain English, and `!` passthrough share a window's session) plus the one-shot CLI — the whitepaper's "TUI dashboard" grown into the primary surface |
 | L5 agent kernel — `bashosd` scheduler/broker | LangGraph kernel: parse → classify/dispatch → loops; the supervised OpenCode server as the tool broker and session store — the whitepaper's "tool broker fronting one existing agent CLI", literally |
 | L4 policy & audit — OPA gate, OTel audit log | `opencode/policy.py` compiled into an engine-enforced deny-by-default ruleset; OpenInference traces to Phoenix; append-only `trace` in state |
 | L3 knowledge — AGENTS.md, git-backed skills | `.claude/commands/*.md` as versioned, three-runtime command specs, compiled to `opencode.jsonc`; CLAUDE.md |
@@ -237,15 +239,17 @@ layer's implementation, not the architecture.
 ## Failure semantics
 
 - Unknown command, agent-loop failure, and runtime errors all land in
-  `route="error"` and render as a red panel with exit code 1.
-- The REPL catches everything per-line; a failed command never kills the shell.
+  `route="error"` and render as a red panel (exit code 1 in the CLI).
+- The desktop console catches everything per-turn; a failed command never
+  kills a window, and a stopped turn renders as "stopped.", not an error.
 - With no working auth, commands fail with a pointer to `bashos doctor`, which
   reports exactly what is missing.
 - Engine errors carry their own context: the resolved credential, `bashos
   doctor`, and the path to `.bashos/opencode.log` — because the engine reports
   most provider problems as an opaque 500, and the log is where the real cause
   is.
-- A supervised engine is stopped in a `finally`: one-shot runs and REPL exits
-  never leave a server behind.
+- A supervised engine is stopped in a `finally`: one-shot runs never leave a
+  server behind, and the desktop owns one app-scoped engine stopped exactly
+  once on exit.
 - Nothing waits on a human. Approval requests are auto-refused, and a broken
   event stream releases the prompt rather than wedging it.
