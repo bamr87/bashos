@@ -41,7 +41,7 @@ dependencies = [
   "rich>=13.9",
   "prompt-toolkit>=3.0.48",
   # foundation
-  "pydantic>=2.9",
+  "pydantic>=2.13.4",
   "pyyaml>=6.0.3",
   "python-dotenv>=1.0",
 ]
