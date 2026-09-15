@@ -35,7 +35,7 @@ PostHog’s product bet (multi-window, dense apps, keyboard-first) maps cleanly 
 ## 2. Goals
 
 1. Ship an L6 **web shell** that hosts multiple apps as windows or panes bound to runtime sessions.  
-2. Make **navigation intents explicit**: `replace` | `new` | `focus` (| `sideBySide` in Phase 2). Implement consumers, not docs-only flags.  
+2. Make **navigation intents explicit**: `replace` | `new` | `focus` | `sideBySide`. Implement consumers, not docs-only flags. Prefer **side-by-side panes** over free-floating drag for MVP multitasking (live PostHog evidence).  
 3. Provide **three experience modes**: `os` | `tiling` | `plain` — each with a real shell consumer that mounts or unmounts chrome.  
 4. Expose an **app template API** so Terminal, Agent, Editor, Files, Logs, Settings, Inbox ship as first-class surfaces.  
 5. Stay **keyboard-first**; mouse polish is secondary.  
@@ -109,28 +109,35 @@ else:
 
 ### Must
 
-- Multi-window **or** multi-pane with focus, z-order (os) / layout tree (tiling), minimize (os), close  
-- Navigation intents: `replace` | `new` | `focus` — all implemented in the nav reducer  
-- Documented, testable keyboard map (core set; see SPEC)  
+- Multi-window **or** multi-pane with **focus**, z-order (os) / layout tree (tiling), **maximize/restore**, **close**  
+- **Side-by-side panes** + focus switching (close one → single window) — primary multitasking path for MVP  
+- Desktop / pinned entry points: **single-click select**, **double-click open**, Ctrl multi-select (icon drag optional)  
+- **Context menus** on apps/links: Open in new window, Open side-by-side, Open in new browser tab, Copy link  
+- Navigation intents: `replace` | `new` | `focus` | `sideBySide` — all implemented in the nav reducer  
+- Documented, testable keyboard map aligned to **live-proven** shortcuts (search/chat/settings/Esc + toasts); see SPEC  
+- Command / search palette + Esc closes overlays; toast feedback for settings changes  
+- Browser-tab fallback when in-shell multitasking is insufficient  
 - App Template API: chrome slots `title`, `toolbar`, `sidebar`, `main`, `status`  
 - Initial apps: **Terminal**, **Agent**, **Editor**, **Files**, **Logs/trace**, **Settings**, **Inbox/approvals**  
 - Deep-linkable URLs per window/pane content  
-- `plain` mode without window chrome  
+- `plain` mode without window chrome (real unmount consumer — do not ship docs-only “boring”)  
 - Attribution fields on window/session metadata (actor, runId)  
 - Inbox as the human-approval surface for irreversible acts  
 
 ### Should
 
-- Snap / split (`sideBySide`) and expand/minimize shortcuts  
 - Shareable workspace layout serialization (`?windows=` or workspace JSON)  
-- Command palette over agents, skills, files, slash commands  
+- Command palette depth over agents, skills, files, slash commands  
 - Per-app min/max size and modal policies (`appSettings[appId]`)  
 - Narrow / mobile fallback (simplify chrome or force `plain`)  
-- Split React (or equivalent) contexts so drag does not re-render Terminal/Logs  
+- Split React (or equivalent) contexts so layout updates do not re-render Terminal/Logs  
 - Status bar: host, agent count, model id, session cost (**Proposal:** fed by kernel)  
 
 ### Could
 
+- Free-floating **drag / resize** polish (PostHog live: unreliable; optional after side-by-side)  
+- Snap-edge keyboard shortcuts (PostHog `Shift+Arrow` had **no effect** live — re-evaluate after motion spike)  
+- Minimize + taskbar / active-windows restore (**only if** restore path is complete end-to-end)  
 - Nostalgic theme pack (optional skin; off by default)  
 - In-window back/forward history  
 - Animated open-from-icon origins  
@@ -140,6 +147,10 @@ else:
 
 ### Won’t (near term)
 
+- Fake minimize / taskbar without working restore  
+- Trash-style restore/delete metaphors without real actions  
+- Bookmarks app without a clear operator purpose  
+- Conflicting cheatsheet shortcuts copied from handbook fiction (`.`, `|` vs live `m` / `\`)  
 - Hedgehog / confetti / custom face cursors as product surface  
 - Merch / marketing Explorer metaphors  
 - Replacing SSH or TUI paths  
@@ -188,7 +199,7 @@ else:
 ## 10. Out-of-scope decisions deferred to SPEC / ROADMAP
 
 - Exact SPA framework (Vite+React vs Next) — SPEC recommends with justification  
-- Floating-first vs tiling-first default — ROADMAP Phase 1 = floating MVP; Phase 2 = tiling  
+- Floating-first vs tiling-first default — ROADMAP Phase 0/1 prioritize **side-by-side + context menus**; free drag/resize is polish, not MVP  
 - Websocket protocol to LangGraph / OpenCode — **Proposal** surfaces only  
 - Whether TUI and web shell share a pane-session protocol — open question  
 
@@ -209,7 +220,7 @@ else:
 |---|---|
 | Desktop wallpaper + left/right icon catalogs (Home, Self-driving, Context warehouse, Pricing, Docs, Demo; About, Changelog, Handbook, Store, Careers, Trash) | Icon rail as pinned entry points is viable; map to agents/skills/workspaces, not merch |
 | Fixed top taskbar | MenuBar/StatusBar should be persistent chrome in `os` / `tiling` |
-| Routes render inside AppWindow panels: rounded chrome, scrollbars, close + maximize/restore (**maximize verified**) | Window chrome + expand/restore are real; include in Must |
+| Routes render inside AppWindow panels: rounded chrome, scrollbars, close + maximize/restore (**maximize verified**; deep pass reconfirmed) | Window chrome + expand/restore are real; include in Must |
 | Standard navigation **replaces** the active window | Matches “replace focused” default; bashOS must still implement explicit `new` / `focus` |
 | Blog / handbook show multi-pane reader (sidebar + article + jump panel) | Reader/dense multi-column template informs Editor/Docs-like apps |
 | `/` opens centered global search; Esc closes | Command palette as global overlay (not a managed window) is proven UX |
@@ -217,19 +228,33 @@ else:
 | Screensaver preview works; click exits; wallpaper changeable | Personalization via `shellSettings` is fine; keep off critical path |
 | Visible apps: merch/File Explorer, trash, docs hub, blog reader, handbook, changelog spreadsheet/timeline, product carousel, presentation/slides, product detail | App-template diversity works; prefer Terminal/Agent/Files/Logs metaphors for bashOS |
 
-### Not independently verified live
+### Deep interaction pass (2026-09-15) — refined live truth
+
+Hands-on second pass after the first tour. Full detail: research brief §13.
+
+| Observation | bashOS stance |
+|---|---|
+| Icon select / double-click open / Ctrl multi-select / icon drag | Must: selection + double-click open |
+| Context menu: new window, side-by-side, new browser tab, copy link | Must intents + browser-tab fallback |
+| Maximize / restore / close; side-by-side panes + focus; close → single | Must chrome; **prefer side-by-side over free drag** |
+| `/` search, `?` chat, `,` display options, Esc closes, `m` color+toast, `\` wallpaper+toast | Must overlay + toast patterns; keymap from **live**, not handbook |
+| `Ctrl+K` did **not** open search; `Shift+Arrow` / `Shift+W` / `Shift+X` no effect; `.` / `|` no | Do not copy failing shortcuts; document PostHog drift |
+| Internal window drag/resize unreliable (selects content) | Defer free drag/resize; Phase 0 optional polish |
+| No minimize / taskbar restore found | Won’t fake minimize without restore |
+| “Enter boring mode” in search — no visible change | `plain` needs a real consumer |
+| No Bookmarks app; Trash no real restore/delete; long-press Store just opens | Skip empty metaphors |
+
+### Still open / earlier tour gaps
 
 | Claim (docs / code) | Live status | bashOS stance |
 |---|---|---|
-| Drag / resize / snap / minimize | Not verified in tour (only maximize/restore + docs/code) | Spec them; spike in Phase 0 before committing Framer-heavy path |
-| `experience: boring` unmounts desktop | Not observed as working consumer | Implement `plain` with a real unmount gate |
-| `newWindow` appends a second content window | Standard nav replaces; append not confirmed from tour | Spec + test `NavIntent.new` → append explicitly |
+| `experience: boring` unmounts desktop | Spotlight action present; **no visible unmount** | Implement `plain` with a real unmount gate |
 | Mobile boring auto-switch | Not toured | Narrow → simplify or force `plain` |
 
 ### URLs toured (evidence set)
 
-`/`, `/self-driving`, `/pricing`, `/products`, `/docs`, `/merch`, `/trash`, `/changelog`, `/display-options`, `/blog/why-os`, handbook technical-architecture, handbook presentations.
+`/`, `/self-driving`, `/pricing`, `/products`, `/docs`, `/merch`, `/trash`, `/changelog`, `/display-options`, `/blog/why-os`, handbook technical-architecture, handbook presentations; plus deep interaction on desktop icons, context menus, side-by-side, overlays, and keyboard map.
 
 ---
 
-*End of PRD (incl. live evidence).*
+*End of PRD (incl. live evidence + deep interaction pass).*

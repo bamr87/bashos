@@ -542,10 +542,13 @@ package.json
 | Types (AppWindow, SiteSettings, AppSetting) | High | Window.tsx + App.tsx |
 | Keyboard map | High | App.tsx handler |
 | App template inventory | High | agents/apps.md + page imports scan |
-| Experience boring mode | Low–medium | Docs vs missing consumer |
-| newWindow append semantics | Medium | Docs vs updatePages implementation |
-| Exact Framer drag props / resize UX | Medium | AppWindow large; dragControls confirmed; live feel unchecked |
-| Visual polish / animations | Low | Needs live UI |
+| Experience boring mode | Low | Spotlight “Enter boring mode” present; **no visible mode change** on Enter (deep pass 2026-09-15) |
+| newWindow append semantics | High (via context menu) | Context menu “Open in new PostHog window” / side-by-side **works** live; standard nav still replaces |
+| Exact Framer drag props / resize UX | Medium–low live | Code has dragControls; **live internal drag/resize unreliable** (selects content) |
+| Visual polish / animations | Medium | Deep pass confirmed toasts, wallpaper cycle toast, hedgehog overlay |
+| Keyboard map (live) | High for subset | `/` `?` `,` `m` `\` `Esc` `d` work; Shift+Arrow/W/X, `.`, `|`, Ctrl+K **failed** live — see §13 |
+| Side-by-side panes | High | Confirmed Merch+Home split, focus switch, close→single |
+| Minimize / taskbar restore | Low | Not found in deep interaction pass |
 
 ---
 
@@ -577,7 +580,78 @@ Public marketing site only; no `app.posthog.com` login.
 - Screensaver preview (black animated); click to exit; wallpaper can change after
 - Apps seen: merch File Explorer, trash archive, docs hub, blog/handbook readers, changelog spreadsheet/timeline, product marketing carousel, presentation/slides, product detail
 
-**Not verified live**
-- Drag, resize, snap, minimize-to-taskbar (documented; not independently exercised)
+**Not verified in this first tour** (resolved or refined in §13 deep interaction pass)
+- Drag, resize, snap, minimize-to-taskbar — see §13: side-by-side & maximize work; free drag/resize unreliable; minimize not found
 
 **Key screenshots** (captured during the 2026-09-15 browser tour (not committed; available in research notes)): homepage OS shell, pricing, blog article, technical architecture, search modal, display options, screensaver, trash, merch store + product, docs, products, changelog spreadsheet.
+
+---
+
+## 13. Deep interaction pass (live)
+
+**Date:** 2026-09-15 (same research window; second pass after §12 tour)  
+**Scope:** Public `posthog.com` marketing OS shell only — no `app.posthog.com` login.  
+**Method:** Hands-on icon, window, menu, keyboard, and overlay interactions (not code-only inference).
+
+### A. Works (confirmed live)
+
+| Area | Observation |
+|---|---|
+| **Icons** | Single-click select; double-click open; Ctrl multi-select; drag to reposition |
+| **Icon context menu** | Open in new PostHog window; Open in side-by-side view; Open in new browser tab; Copy link |
+| **Windows** | Maximize / restore / close work |
+| **Side-by-side** | Split panes (e.g. Merch + Home); focus switching between panes; closing one pane collapses to a single window |
+| **Menus** | Products / Tools / Community / Company / More present |
+| **Shell menu** | Home, About, Display options — **no** active-window list in that menu |
+| **Search** | `/` opens search overlay |
+| **Chat** | `?` opens chat overlay |
+| **Display options** | `,` opens display options; controls present (theme, wallpaper, etc.) |
+| **Esc** | Closes overlays |
+| **Color mode** | `m` cycles color mode + toast feedback |
+| **Wallpaper** | `\` cycles wallpaper + toast feedback |
+| **Hedgehog** | `d` toggles hedgehog; search “hedgehog” shows overlay |
+| **Store** | Unread badge visible |
+| **Other surfaces** | Merch cart/video; Trash recently-deleted vs archive tabs; changelog filters; `/paint`; `/demo` player |
+
+### B. Fails / docs drift (live)
+
+| Claim or expectation | Live result |
+|---|---|
+| Internal window **drag / resize** | Unreliable — often selects content instead of moving/resizing chrome |
+| **Minimize** / taskbar restore | Not found |
+| `Shift+Arrow` snap | No effect |
+| `Shift+W` close focused | No effect |
+| `Shift+X` close all | No effect |
+| `\|` wallpaper (handbook) | No — live uses `\` |
+| `.` cheatsheet (handbook) | No effect |
+| `m` as cheatsheet | No — `m` is color mode |
+| `Ctrl+K` open search | Did **not** open search ( `/` did) |
+| Spotlight “Enter boring mode” | Action appears; **no visible mode change** on Enter |
+| Bookmarks app | Not found as a usable desktop app in this pass |
+| Trash restore / delete | No real restore or delete actions observed |
+| Long-press Store | Just opens (no special long-press affordance) |
+
+### C. bashOS implications (revised MoSCoW seeds)
+
+**Must-have (proven useful live)**
+- Double-click open + selection (single / Ctrl multi) for desktop apps
+- Context menus: new window, side-by-side, new browser tab, copy link
+- Maximize / restore / close
+- Side-by-side panes + focus switching (+ close → single)
+- Search / chat / display shortcuts; Esc closes overlays
+- Toast feedback for settings changes
+- Browser-tab fallback (“open in new tab”) when in-shell multitasking is insufficient
+
+**Defer / skip**
+- Fake minimize / taskbar restore unless the full restore path is complete
+- Unreliable free-floating drag / resize / snap keyboard shortcuts as MVP bets
+- Restore / delete metaphors (Trash) without real actions
+- Conflicting cheatsheet shortcuts (handbook `.` / `|` vs live `m` / `\`)
+- Bookmarks app without a clear operator purpose
+
+**Phase 0 priority shift:** Validate **side-by-side + context menus + maximize/close + palette** first. Treat floating drag/resize/snap as optional polish / later risk — not MVP blockers.
+
+### Revised confidence notes
+
+See updated §10 table. Net: **side-by-side and context-menu multitasking are high-confidence transferable patterns**; free drag/resize and handbook keyboard folklore are **lower confidence** than the first tour assumed. Boring mode remains an unresolved docs/code/live gap.
+

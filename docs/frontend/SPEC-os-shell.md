@@ -2,7 +2,7 @@
 
 **Status:** Draft for review  
 **Related:** [PRD-os-shell.md](./PRD-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md)  
-**Evidence:** PostHog research brief + live browser tour (2026-09-15). Proposals labeled **Proposal**.
+**Evidence:** PostHog research brief + live browser tour + **deep interaction pass** (2026-09-15). Proposals labeled **Proposal**.
 
 ---
 
@@ -74,7 +74,7 @@ ShellRoot
 └── NotificationDock       # toasts; irreversible prompts may deep-link to Inbox
 ```
 
-**Live PostHog parallel (confirmed):** fixed top taskbar; routes inside rounded AppWindow chrome; `/` → centered search overlay; Esc closes; Display Options as a settings surface; maximize/restore verified. Drag/resize/snap/minimize claimed in code/docs, **not** independently verified in the live tour — treat motion stack as Phase 0 risk.
+**Live PostHog parallel (confirmed):** fixed top taskbar; routes inside rounded AppWindow chrome; `/` → search overlay; `?` chat; `,` display options; Esc closes; maximize/restore/close; **side-by-side panes + focus**; icon context menus (new window / side-by-side / new tab / copy link); toast on color/wallpaper. Deep pass: **free drag/resize unreliable**; minimize not found; several handbook/code shortcuts (`Ctrl+K`, `Shift+Arrow/W/X`, `.`, `|`) failed live — treat free motion as polish risk, side-by-side as Phase 0 goal.
 
 ### 2.4 Context split (performance)
 
@@ -91,7 +91,7 @@ Mirror PostHog’s split-context pattern so Terminal/Logs do not re-render on ev
 
 ## 3. Window / pane JSON schema
 
-Serializable for deep-links and workspace files. Geometry as **percent of viewport** when persisted (PostHog `?windows=` pattern).
+Serializable for deep-links and workspace files. Geometry as **percent of viewport** when persisted (PostHog `?windows=` pattern). Fields `minimized` / free `position`+`size` remain in the schema for Phase 2+; MVP may persist side-by-side / maximized layouts without relying on free drag.
 
 ```json
 {
@@ -190,14 +190,15 @@ interface AppSetting {
 
 ## 4. Navigation intents
 
-PostHog handbook claimed `newWindow` / focus / replace; live tour confirmed **standard nav replaces** the active window; append-on-`newWindow` was **not** verified live; code lacked an explicit `newWindow` branch in `updatePages` (research brief). bashOS implements intents in the reducer with tests.
+PostHog handbook claimed `newWindow` / focus / replace. Live: **standard nav replaces** the active window; **context menu** “Open in new PostHog window” and “Open in side-by-side view” **work** (deep pass 2026-09-15); code historically lacked an explicit `newWindow` branch in `updatePages` (research brief). bashOS implements intents in the reducer with tests — including `sideBySide` as a **Phase 0/1** consumer, not a docs-only flag.
 
 | Intent | Behavior | Trigger examples |
 |---|---|---|
 | `replace` | Mutate focused window’s `appId` / `resourceUri` / `path`; preserve others | Default in-app link, address bar submit |
-| `new` | **Append** a window/pane; bring to front | Pinned icon open, “Open in new pane”, palette “new …” |
-| `focus` | If same `path` or `(appId, resourceUri)` exists → bringToFront only; no duplicate | Second click on same agent, taskbar entry |
-| `sideBySide` | Phase 2: snap/split focused + open target on opposite edge | Context menu “Open side by side” |
+| `new` | **Append** a window/pane; bring to front | Context “Open in new window”, pinned icon open (policy), palette “new …” |
+| `focus` | If same `path` or `(appId, resourceUri)` exists → bringToFront only; no duplicate | Second activation of same agent/resource |
+| `sideBySide` | Split focused + open target opposite (or as second pane); focus switching; close one → single | Context menu “Open side by side” — **Must** (live-proven) |
+| *(browser)* | Open target in a new browser tab (escape hatch) | Context “Open in new browser tab” — Must fallback, not a shell intent enum |
 
 ```ts
 function navigate(target: { path: string; appId: AppId; resourceUri: string }, intent: NavIntent) {
@@ -275,24 +276,42 @@ Registry: `appSettings: Record<AppId, AppSetting>` keyed by `appId`, not marketi
 
 Ignore when focus is in `INPUT` / `TEXTAREA` / contenteditable / terminal xterm (terminal owns keys when focused).
 
-| Shortcut | Action | Mode |
-|---|---|---|
-| `Ctrl/Cmd+K` or `/` | Open Command Palette | all |
-| `Esc` | Close palette / modal / cancel | all |
-| `Ctrl/Cmd+Shift+T` | New Terminal | os, tiling |
-| `Ctrl/Cmd+Shift+A` | New / focus Agent for current run | os, tiling |
-| `Ctrl/Cmd+Shift+I` | Focus Inbox | all |
-| `Ctrl/Cmd+W` | Close focused window/pane | os, tiling |
-| `Ctrl/Cmd+Shift+W` | Close all | os, tiling |
-| `Ctrl/Cmd+`` ` | Cycle next window/pane | os, tiling |
-| `Ctrl/Cmd+Shift+`` ` | Cycle previous | os, tiling |
-| `Ctrl/Cmd+← / →` | Snap left / right (**Should**; Phase 2 if drag unverified) | os |
-| `Ctrl/Cmd+↑` | Expand / restore | os |
-| `Ctrl/Cmd+↓` | Minimize | os |
-| `Ctrl/Cmd+,` | Open Settings | all |
-| `?` | Shortcuts cheatsheet | all |
+### 6.1 bashOS core map (normative)
 
-PostHog live: `/` opens search, Esc closes — retained. Snap/minimize shortcuts follow PostHog docs; live tour only verified maximize/restore — implement expand first in MVP.
+Prefer **live-proven** PostHog behaviors over handbook fiction. bashOS may remap chords for IDE familiarity, but each Must entry needs a tested consumer.
+
+| Shortcut | Action | Mode | Priority |
+|---|---|---|---|
+| `/` | Open Command Palette / search | all | Must |
+| `Esc` | Close palette / modal / overlay | all | Must |
+| `Ctrl/Cmd+,` or `,` | Open Settings / display options | all | Must |
+| `?` | Agent chat dock **or** shortcuts help (pick one; document) | all | Must (single meaning) |
+| Toast on settings change | Non-blocking feedback (theme, wallpaper, etc.) | all | Must |
+| `Ctrl/Cmd+Shift+T` | New Terminal | os, tiling | Must |
+| `Ctrl/Cmd+Shift+A` | New / focus Agent for current run | os, tiling | Must |
+| `Ctrl/Cmd+Shift+I` | Focus Inbox | all | Must |
+| `Ctrl/Cmd+W` | Close focused window/pane | os, tiling | Must |
+| `Ctrl/Cmd+`` ` | Cycle next window/pane | os, tiling | Should |
+| `Ctrl/Cmd+↑` | Maximize / restore | os | Must |
+| `Ctrl/Cmd+K` | Open palette (**optional alias**) | all | Should — **do not assume** browser Ctrl+K works; PostHog live: Ctrl+K failed, `/` worked |
+
+### 6.2 PostHog live vs handbook/code drift (do not copy blindly)
+
+| Shortcut | Handbook / code claim | Live deep pass (2026-09-15) |
+|---|---|---|
+| `/` | Open Spotlight | **Works** |
+| `Ctrl/Cmd+K` | Open search | **Did not open** search |
+| `?` | Ask Max chat (code) / sometimes “help” in folklore | **Opens chat** |
+| `,` | Display options | **Works** |
+| `m` | Cycle color mode (code); some docs imply cheatsheet | **Color mode + toast** (not cheatsheet) |
+| `\` | Cycle wallpaper (code) | **Works + toast** |
+| `\|` | Wallpaper (handbook) | **No effect** |
+| `.` | Cheatsheet (handbook) | **No effect** |
+| `Shift+←/→` | Snap | **No effect** |
+| `Shift+W` / `Shift+X` | Close focused / close all | **No effect** |
+| Minimize (`Shift+↓` in code) | Minimize focused | **Minimize UI not found** |
+
+**Hard rule:** Documented shortcut ⇒ tested consumer. Do not ship a cheatsheet that lists non-working keys.
 
 ---
 
@@ -351,7 +370,7 @@ Mark any stub with `// Proposal` and feature-flag off by default until Phase 1 b
 | Optional SSR | Next only if public docs share the shell later | Avoid premature SSG complexity |
 | Styling | Tailwind + `data-experience` / `data-color-mode` | Matches PostHog token approach without CSS-in-JS cost |
 | Primitives | Radix UI (menus, dialogs, focus traps) | A11y baseline for chrome |
-| Window motion | Phase 0 spike: CSS + pointer events **or** Framer Motion | Live tour did not verify drag/snap cost; prefer lighter path if agent UIs are heavy |
+| Window motion | Phase 0: **side-by-side + maximize** first; optional CSS/Framer free drag later | Deep pass: free drag/resize unreliable on PostHog; side-by-side is the proven multitasking path |
 | Terminal | xterm.js | Standard for web PTYs |
 | State | React context split (+ optional Zustand for layout tree) | PostHog split-context lesson |
 | Search/palette | cmdk or custom over local registry | No Algolia dependency for operator console |
@@ -396,7 +415,10 @@ Mark any stub with `// Proposal` and feature-flag off by default until Phase 1 b
 | `/` search + Esc | Palette global overlay |
 | Display Options surface | Settings app owns theme/experience/performance |
 | Explorer / slides / changelog density | Validates dense apps; map to Files / Agent report / Logs |
-| Drag/resize/snap/minimize unverified | Phase 0 motion spike; don’t block MVP on snap |
+| Side-by-side panes + context menus (deep pass) | `sideBySide` + `new` are Must; Phase 0 validates first |
+| Free drag/resize unreliable; snap shortcuts no effect; minimize not found | Defer free drag/resize/snap/minimize; don’t block MVP |
+| Ctrl+K failed; `/` worked; handbook `.`/`|` failed | Keymap from live truth; note PostHog drift in cheatsheet |
+| Boring mode action with no visible change | `plain` requires real unmount consumer |
 | No app.posthog.com | Spec ignores product-app auth; local daemon first |
 
 ---

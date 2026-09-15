@@ -11,7 +11,7 @@ Documentation for an **OS-style web frontend** at bashOS layer **L6 (INTERFACE)*
 bashOS already treats the agent as a system service (approval gates, attributable actions, immutable base OS, model-agnostic). L6 today is CLI/REPL-centric. As multi-agent sessions, terminals, edits, and approvals grow, a linear REPL alone does not solve **multitasking and context**. These docs define an optional **windowed / tiling web shell** that:
 
 - Keeps several agent and tool surfaces open without tab explosion
-- Makes navigation intents (`replace` | `new` | `focus`) explicit — a cautionary lesson from PostHog handbook drift (`boring` mode, `newWindow`)
+- Makes navigation intents (`replace` | `new` | `focus` | `sideBySide`) explicit — a cautionary lesson from PostHog handbook drift (`boring` mode, failing shortcuts, docs-only flags)
 - Stays keyboard-first and dense, not landing-page chrome
 - Remains a proposal until Phase 0 spike validates stack and kernel wiring
 
@@ -36,3 +36,5 @@ Research basis: [posthog-os-research.md](./posthog-os-research.md) (PostHog.com 
 ## Status
 
 **Documentation only.** No runtime APIs are claimed to exist beyond CLI/REPL and architecture whitepaper layers. Kernel / OpenCode integrations in the SPEC are labeled **Proposal**.
+
+**Research refresh (2026-09-15):** Deep interaction pass on public PostHog.com refined live truth — side-by-side panes, context menus, maximize/close, and `/`/`?`/`,`/`Esc` overlays confirmed; free drag/resize unreliable; minimize and several handbook shortcuts not found. PRD MoSCoW, SPEC keymap/intents, and ROADMAP Phase 0 updated accordingly (see [posthog-os-research.md](./posthog-os-research.md) §13).
