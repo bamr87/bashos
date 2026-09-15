@@ -745,6 +745,155 @@ details[open] > summary::before { content: "▾"; }
 }
 .seg-btn:active { transform: translateY(2px); box-shadow: none; }
 
+/* ────────────────────────────────────────────── the desktop (os mode) */
+
+.scene--desktop { padding: 0; overflow: hidden; display: flex; }
+
+.desktop { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.desktop-surface {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(ellipse 120% 80% at 50% 0%, var(--surface-2), transparent 70%),
+    var(--paper-sunk);
+}
+
+.icons {
+  position: absolute;
+  inset: 14px auto 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 92px;
+}
+.icon {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 9px 4px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: none; color: var(--ink-2); font: inherit; cursor: pointer;
+}
+.icon:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.icon[data-selected="true"] {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+}
+.icon-glyph {
+  display: grid; place-items: center;
+  width: 38px; height: 38px;
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--sticker-sm);
+}
+.icon-label { font-size: 10.5px; font-weight: 600; letter-spacing: -0.01em; }
+
+.window {
+  position: absolute;
+  display: flex; flex-direction: column;
+  min-width: 200px; min-height: 120px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: -3px 4px 0 color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.window[data-focus="true"] {
+  border-color: var(--accent);
+  box-shadow: -4px 5px 0 color-mix(in srgb, var(--accent) 32%, transparent);
+}
+/* an explicit display beats the hidden attribute — minimized must still hide */
+.window[hidden] { display: none; }
+.window[data-dragging="true"] { user-select: none; cursor: grabbing; }
+
+.win-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 6px 6px 11px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.window[data-focus="true"] .win-head .ic { color: var(--accent); }
+.win-title { font-size: 12.5px; font-weight: 600; }
+.win-resource {
+  font-size: 11px; color: var(--muted);
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.win-btn {
+  display: inline-flex; padding: 4px;
+  border: 1px solid transparent; border-radius: 5px;
+  background: none; color: var(--muted); cursor: pointer;
+}
+.win-btn:hover { background: var(--paper); color: var(--ink); border-color: var(--line); }
+.win-btn--close:hover { background: var(--red-soft); color: var(--red); border-color: transparent; }
+
+.win-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 14px 22px; }
+.win-body--flush { padding: 0; display: flex; overflow: hidden; }
+
+.win-grip {
+  position: absolute; right: 0; bottom: 0;
+  width: 18px; height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--line) 50% 62%, transparent 62% 74%,
+                    var(--line) 74% 86%, transparent 86%);
+}
+
+.snap-preview {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+  z-index: 9998;
+}
+.snap-preview[hidden] { display: none; }
+
+.taskbar {
+  flex: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.task-start {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); box-shadow: 0 2px 0 var(--line);
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer;
+}
+.task-start:active { transform: translateY(2px); box-shadow: none; }
+.tasks { display: flex; gap: 6px; overflow-x: auto; min-width: 0; }
+.task {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 190px; padding: 5px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--ink-2);
+  font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.task-label { overflow: hidden; text-overflow: ellipsis; }
+.task:hover { background: var(--paper); }
+.task[data-active="true"] {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600;
+}
+.task[data-minimized="true"] { opacity: .62; font-style: italic; }
+.task-tool {
+  display: inline-flex; padding: 5px;
+  border: 1px solid var(--line); border-radius: 5px;
+  background: var(--surface-2); color: var(--muted); cursor: pointer;
+}
+.task-tool:hover { color: var(--ink); background: var(--paper); }
+.task-status, .task-clock { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.task-clock { font-weight: 600; color: var(--ink-2); }
+
+[data-experience="os"] .sidebar { display: none; }
+[data-experience="os"] .shell { grid-template-columns: minmax(0, 1fr); }
+
 /* ──────────────────────────────────────────────────────────── overlay */
 
 .overlay {

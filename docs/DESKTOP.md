@@ -115,17 +115,26 @@ whatever `app.js` draws.
 |---|---|
 | `single` | one scene mounted, as it always was |
 | `tiling` | two panes, each a scene instance, focus follows the click |
+| `os` | floating windows over a desktop: icons, drag, resize, snap, a taskbar |
 | `plain` | one scene, sidebar and top bar unmounted |
 
 Four navigation intents move between them — `replace` (a click, unchanged),
 `new`, `focus` and `sideBySide` — each with a consumer in the reducer and a
 test. A mode or an intent with nothing behind it is the drift
-[frontend/](frontend/README.md) exists to avoid, so there is no `os` mode until
-floating windows are real.
+[frontend/](frontend/README.md) exists to avoid; `os` arrived only when windows
+you can actually drag, snap, minimize and restore did.
+
+Window geometry is percentages of the desktop, so a layout survives a resize,
+and `minimize` exists only because the taskbar genuinely restores.
 
 Layout lives in the client: no route was added, and `/api/*` is untouched.
+`encodeLayout`/`decodeLayout` serialize it into `?windows=` for a shareable
+workspace and into `sessionStorage` so a reload puts the windows back. A layout
+carries scene ids, resource ids and geometry — never a token, never run output,
+and `decodeLayout` drops any scene this build does not have.
+
 The Console is a singleton — it owns persistent DOM and an event stream, so a
-split focuses it instead of mounting a second one.
+split or a new window focuses it instead of mounting a second one.
 
 ## Runs are not history
 

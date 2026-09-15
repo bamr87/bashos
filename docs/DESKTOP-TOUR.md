@@ -114,10 +114,9 @@ any two scenes can share the window.
   any row in the Runs table.
 - **Focus follows the click.** The focused pane is outlined, its hash is the
   one in the address bar, and the sidebar marks every open scene with a dot.
-- **Pane chrome** is deliberately small: split, maximize/restore, close. There
-  is no free drag, no minimize, and no fake taskbar — see
-  [frontend/ROADMAP-os-shell.md](frontend/ROADMAP-os-shell.md) for why those
-  are later phases rather than MVP decoration.
+- **Pane chrome** is deliberately small: split, maximize/restore, close. Free
+  drag, minimize and a taskbar live in [Desktop](#desktop--windows-icons-a-taskbar),
+  where they have somewhere to go.
 - **The Console is a singleton.** It owns a persistent DOM and a live event
   stream, so it is focused rather than mounted twice.
 - **Two run details** can sit side by side, because a run id distinguishes
@@ -133,6 +132,50 @@ windows have, on ours:
 | Open in new browser tab | same origin, same hash, carrying this process's token |
 | Copy link | the same URL **without** the token — a layout never carries a credential |
 
+---
+
+## Desktop — windows, icons, a taskbar
+
+![The desktop with three windows open](media/desktop.png)
+
+Two panes cover most of the work. When it isn't enough, the whole window
+becomes a desktop: scenes float as windows over a wallpaper, icons sit down the
+left, and a taskbar along the bottom lists everything open.
+
+![Opening a window, dragging it, snapping it, minimizing and restoring](media/desktop.gif)
+
+- **Icons open windows.** Double-click one (or right-click for the usual four
+  actions). The sidebar steps aside — the icons and the taskbar are the
+  navigation here.
+- **Drag by the title bar, resize from the corner.** Geometry is stored as
+  percentages, so a layout survives a resized browser.
+- **Snap** by dragging to an edge: left half, right half, or the top for full
+  screen. A dashed preview shows where it will land before you let go.
+- **Minimize really minimizes**, because the taskbar really restores. A
+  minimized window keeps its place in the list, in italics; clicking the
+  focused window's task minimizes it again.
+- **Tile** or **cascade** every open window from the two buttons at the right
+  of the taskbar, or from the palette.
+- Up to eight windows. Past that, opening one reuses the window you are not
+  looking at rather than growing forever.
+
+The Console is still a singleton, and the guards are still the guards: nothing
+about a window manager widens what a run may touch.
+
+### Workspace links
+
+The palette's **Copy workspace link** produces a URL that reopens this exact
+layout — which scenes, where, which one is focused:
+
+```
+http://127.0.0.1:7800/?windows=%7B%22v%22%3A1%2C%22e%22%3A%22os%22…#/runs
+```
+
+It carries scene ids, resource ids and geometry, and **never the token** — a
+layout is not a credential, and a shared one must not become one. Opening it
+needs your own session's token, exactly as any other page does. The layout also
+persists per browser tab, so a reload puts your windows back.
+
 ### Experience modes
 
 ![Experience modes in Settings](media/settings.png)
@@ -143,11 +186,11 @@ Settings → Workspace, or the palette, switches the whole window:
 |---|---|
 | **Single** | one scene, full width — the default, and what every earlier version did |
 | **Side by side** | two scenes, focus follows the click |
+| **Desktop** | floating windows over a wallpaper, with icons and a taskbar |
 | **Plain** | one scene with the sidebar and top bar *unmounted* — for screenshots, automation and narrow reading. `⌘K` still works, so you can always switch back |
 
-A narrow window is always single, whatever is set. The choice persists per
-browser; the pane layout itself does not (yet — layout serialization is
-Phase 2).
+A narrow window is always single, whatever is set. The mode persists per
+browser, and so does the layout.
 
 ---
 
@@ -291,8 +334,10 @@ persists per browser.
 | `↑` / `↓` | completion or palette | move the selection |
 | `↑` | empty composer | recall the previous line |
 | `Esc` | completion, palette or menu | dismiss |
-| `⌘\` / `Ctrl-\` | side by side | cycle the focused pane |
-| `⌘W` / `Ctrl-W` | side by side | close the focused pane — browsers reserve this for the tab, so it lands in the native window; the pane's ✕ and the palette work everywhere |
+| `⌘\` / `Ctrl-\` | side by side, desktop | cycle the focused window |
+| `⌘W` / `Ctrl-W` | side by side, desktop | close the focused window — browsers reserve this for the tab, so it lands in the native window; the ✕ and the palette work everywhere |
+| double-click | a desktop icon | open it in a window |
+| double-click | a title bar | maximize or restore |
 
 Nothing here steals a bare key: the composer keeps `/` for slash completion,
 which is why the palette is `⌘K` and not `/` as on posthog.com.

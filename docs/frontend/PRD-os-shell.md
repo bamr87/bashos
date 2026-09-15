@@ -1,6 +1,6 @@
 # PRD: bashOS L6 OS Shell (evolution of desktop GUI)
 
-**Status:** Phase 0 implemented — ships with the desktop GUI in [PR #20](https://github.com/bamr87/bashos/pull/20)  
+**Status:** Phases 0–2 implemented, plus Phase 3's windowing — `bashos gui` on main  
 **Audience:** bashOS maintainers, L6 implementers  
 **Related:** [SPEC-os-shell.md](./SPEC-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
 **Foundation:** [`docs/DESKTOP.md`](../DESKTOP.md), [`docs/DESKTOP-TOUR.md`](../DESKTOP-TOUR.md) (paths when #20 merges)  
@@ -9,7 +9,7 @@
 ---
 
 
-> **Status update — Phase 0 landed.** The shell described below is implemented
+> **Status update — Phases 0–2 landed, with Phase 3's windows.** The shell described below is implemented
 > in this branch (PR #20): experiences `single` | `tiling` | `plain`, the four
 > nav intents, pane chrome, context menus, palette actions and the keymap.
 > The reducer is `src/bashos/gui/web/shell.js` with unit tests in

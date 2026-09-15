@@ -26,8 +26,11 @@ const SCENES = [
 const EXPERIENCES = [
   { id: "single", label: "Single", hint: "one scene, full width" },
   { id: "tiling", label: "Side by side", hint: "two scenes, focus follows click" },
+  { id: "os", label: "Desktop", hint: "floating windows, icons, a taskbar" },
   { id: "plain", label: "Plain", hint: "one scene, no chrome" },
 ];
+
+const SNAP_EDGE = 28; // px from a desktop edge that arms a snap
 
 const store = {
   token: "",
@@ -1068,10 +1071,20 @@ function sceneSettings() {
         el("p", {
           class: "card-sub mt",
           text:
-            "Side by side opens a second pane of any other scene; the Console keeps its " +
-            "own DOM and its event stream, so it is never mounted twice. Narrow windows " +
-            "fall back to a single scene whatever is set here.",
+            "Side by side opens a second pane of any other scene; Desktop floats them over " +
+            "a wallpaper with a taskbar that really restores what it minimizes. The Console " +
+            "keeps its own DOM and its event stream, so it is never mounted twice, and narrow " +
+            "windows fall back to a single scene whatever is set here.",
         }),
+        el("div", { class: "mt" }, [
+          el("button", { class: "btn btn--sm", dataset: { action: "workspace-link" } }, [
+            icon("i-copy", "ic ic--sm"), "Copy workspace link",
+          ]),
+          el("span", {
+            class: "card-sub",
+            text: " — reopens this layout; carries scenes and geometry, never the token.",
+          }),
+        ]),
       ]),
     ]),
     el("div", { class: "card" }, [
@@ -1267,6 +1280,144 @@ function paneNode(win, state) {
   );
 }
 
+/* ─────────────────────────────────────────────── the desktop (os mode) */
+
+function sceneIcon(win) {
+  return SCENES.find((scene) => scene.id === win.sceneId)?.icon || "i-grid";
+}
+
+/** Geometry is written through CSSOM — the CSP forbids style attributes. */
+function applyGeometry(node, win) {
+  node.style.left = `${win.position.xPct}%`;
+  node.style.top = `${win.position.yPct}%`;
+  node.style.width = `${win.size.wPct}%`;
+  node.style.height = `${win.size.hPct}%`;
+  node.style.zIndex = String(win.zIndex);
+  node.hidden = Boolean(win.minimized);
+}
+
+function windowNode(win, state) {
+  const body = el("div", { class: "win-body" }, [buildSceneNode(win)]);
+  if (win.sceneId === "console" && !win.resourceId) body.classList.add("win-body--flush");
+  const maximized = win.snapped === "max";
+  const node = el(
+    "section",
+    {
+      class: "window",
+      dataset: {
+        win: win.id,
+        scene: win.sceneId,
+        focus: String(win.id === state.focusId),
+      },
+    },
+    [
+      el("header", { class: "win-head", dataset: { action: "win-drag", win: win.id } }, [
+        icon(sceneIcon(win), "ic ic--sm"),
+        el("span", { class: "win-title", text: sceneLabel(win) }),
+        win.resourceId ? el("span", { class: "win-resource mono", text: win.resourceId }) : null,
+        el("span", { class: "spacer" }),
+        el("button", {
+          class: "win-btn", title: "Minimize",
+          dataset: { action: "win-min", win: win.id },
+        }, [icon("i-minus", "ic ic--sm")]),
+        el("button", {
+          class: "win-btn", title: maximized ? "Restore" : "Maximize",
+          dataset: { action: "win-max", win: win.id },
+        }, [icon(maximized ? "i-restore" : "i-maximize", "ic ic--sm")]),
+        el("button", {
+          class: "win-btn win-btn--close", title: "Close",
+          dataset: { action: "win-close", win: win.id },
+        }, [icon("i-x", "ic ic--sm")]),
+      ]),
+      body,
+      el("span", { class: "win-grip", dataset: { action: "win-resize", win: win.id } }),
+    ]
+  );
+  applyGeometry(node, win);
+  return node;
+}
+
+function desktopIcons() {
+  return el(
+    "div",
+    { class: "icons" },
+    SCENES.map((scene) =>
+      el(
+        "button",
+        {
+          class: "icon",
+          dataset: { action: "icon", value: scene.id },
+          title: `${scene.label} — double-click to open a window`,
+        },
+        [
+          el("span", { class: "icon-glyph" }, [icon(scene.icon, "ic")]),
+          el("span", { class: "icon-label", text: scene.label }),
+        ]
+      )
+    )
+  );
+}
+
+function clockText() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function taskbarNode(state) {
+  const openWindows = shell.taskbarWindows(state);
+  return el("footer", { class: "taskbar" }, [
+    el("button", { class: "task-start", dataset: { action: "palette" }, title: "Search (⌘K)" }, [
+      el("span", { class: "brand-prompt", text: "▸" }),
+      el("span", { text: "bashOS" }),
+    ]),
+    el(
+      "div",
+      { class: "tasks" },
+      openWindows.map((win) =>
+        el(
+          "button",
+          {
+            class: "task",
+            title: win.minimized ? "Restore" : "Focus — click again to minimize",
+            dataset: {
+              action: "task",
+              win: win.id,
+              active: String(win.id === state.focusId && !win.minimized),
+              minimized: String(Boolean(win.minimized)),
+            },
+          },
+          [
+            icon(sceneIcon(win), "ic ic--sm"),
+            el("span", { class: "task-label", text: sceneLabel(win) }),
+          ]
+        )
+      )
+    ),
+    el("span", { class: "spacer" }),
+    el("button", {
+      class: "task-tool", title: "Tile windows",
+      dataset: { action: "arrange", value: "tile" },
+    }, [icon("i-grid", "ic ic--sm")]),
+    el("button", {
+      class: "task-tool", title: "Cascade windows",
+      dataset: { action: "arrange", value: "cascade" },
+    }, [icon("i-layers", "ic ic--sm")]),
+    el("span", {
+      class: "task-status mono",
+      text: `${store.state?.backend || ""} · ${store.prefs.model || store.state?.model || ""}`,
+    }),
+    el("span", { class: "task-clock mono", dataset: { bind: "clock" }, text: clockText() }),
+  ]);
+}
+
+function desktopNode(state) {
+  const surface = el("div", { class: "desktop-surface", dataset: { bind: "surface" } }, [
+    desktopIcons(),
+    ...shell.taskbarWindows(state).map((win) => windowNode(win, state)),
+    el("div", { class: "snap-preview", dataset: { bind: "snap-preview" }, hidden: true }),
+  ]);
+  return el("div", { class: "desktop" }, [surface, taskbarNode(state)]);
+}
+
 function render() {
   const state = store.shell;
   const mode = shell.effectiveExperience(state, viewportWidth());
@@ -1279,8 +1430,14 @@ function render() {
   paintNav();
 
   const tiling = mode === "tiling" && state.windows.length > 1;
+  const desktop = mode === "os";
   container.classList.toggle("scene--panes", tiling);
-  if (tiling) {
+  container.classList.toggle("scene--desktop", desktop);
+
+  if (desktop) {
+    container.classList.remove("scene--flush");
+    container.replaceChildren(desktopNode(state));
+  } else if (tiling) {
     container.classList.remove("scene--flush");
     const grid = el("div", { class: "panes" }, state.windows.map((w) => paneNode(w, state)));
     grid.dataset.expanded = String(state.windows.some((w) => w.expanded));
@@ -1294,10 +1451,26 @@ function render() {
   if (state.windows.some((w) => w.sceneId === "engine") && !store.doctor) void loadDoctor();
 }
 
+const LAYOUT_KEY = "bashos.layout." + location.port;
+
+function saveLayout() {
+  try {
+    sessionStorage.setItem(LAYOUT_KEY, JSON.stringify(shell.encodeLayout(store.shell)));
+  } catch (_) {}
+}
+
+function workspaceLink() {
+  const layout = encodeURIComponent(JSON.stringify(shell.encodeLayout(store.shell)));
+  const hash = shell.hashFor(shell.focused(store.shell));
+  // no token: a shared workspace is scenes and geometry, never a credential
+  return `${location.origin}${location.pathname}?windows=${layout}${hash}`;
+}
+
 function dispatch(action) {
   const next = shell.reduce(store.shell, action);
   if (next === store.shell) return;
   store.shell = next;
+  saveLayout();
   if (next.experience !== store.prefs.experience) {
     store.prefs.experience = next.experience;
     savePrefs();
@@ -1335,6 +1508,100 @@ function fromHash() {
   if (head === "runs" && tail) return navigate("run", tail);
   const scene = SCENES.find((entry) => entry.id === head);
   navigate(scene ? scene.id : "overview");
+}
+
+/* ───────────────────────────────────────────── dragging on the desktop */
+
+function snapEdgeFor(x, y, rect) {
+  if (y - rect.top < SNAP_EDGE) return "max";
+  if (x - rect.left < SNAP_EDGE) return "left";
+  if (rect.right - x < SNAP_EDGE) return "right";
+  return null;
+}
+
+function showSnapPreview(edge) {
+  const preview = bind("snap-preview");
+  if (!preview) return;
+  if (!edge) {
+    preview.hidden = true;
+    return;
+  }
+  const geometry = {
+    left: { left: "0%", top: "0%", width: "50%", height: "100%" },
+    right: { left: "50%", top: "0%", width: "50%", height: "100%" },
+    max: { left: "0%", top: "0%", width: "100%", height: "100%" },
+  }[edge];
+  Object.assign(preview.style, geometry);
+  preview.hidden = false;
+}
+
+/** Live drag writes geometry straight to the node; the reducer hears once, on
+ *  release. Re-rendering per pointermove would fight the pointer. */
+function installDesktopPointer() {
+  let drag = null;
+
+  document.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const handle = event.target.closest('[data-action="win-drag"], [data-action="win-resize"]');
+    if (!handle || event.target.closest(".win-btn")) return;
+    const surface = bind("surface");
+    const win = store.shell.windows.find((w) => w.id === handle.dataset.win);
+    if (!surface || !win) return;
+
+    dispatch({ type: "focus", id: win.id }); // raising re-renders, so re-query
+    const node = document.querySelector(`.window[data-win="${win.id}"]`);
+    if (!node) return;
+    const rect = surface.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    drag = {
+      id: win.id,
+      node,
+      rect,
+      mode: handle.dataset.action === "win-resize" ? "resize" : "move",
+      dx: event.clientX - box.left,
+      dy: event.clientY - box.top,
+      left: box.left,
+      top: box.top,
+      next: null,
+      edge: null,
+    };
+    node.dataset.dragging = "true";
+    node.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const { rect } = drag;
+    if (drag.mode === "move") {
+      const xPct = ((event.clientX - drag.dx - rect.left) / rect.width) * 100;
+      const yPct = ((event.clientY - drag.dy - rect.top) / rect.height) * 100;
+      drag.next = { xPct, yPct };
+      drag.node.style.left = `${xPct}%`;
+      drag.node.style.top = `${yPct}%`;
+      drag.edge = snapEdgeFor(event.clientX, event.clientY, rect);
+      showSnapPreview(drag.edge);
+    } else {
+      const wPct = ((event.clientX - drag.left) / rect.width) * 100;
+      const hPct = ((event.clientY - drag.top) / rect.height) * 100;
+      drag.next = { wPct, hPct };
+      drag.node.style.width = `${Math.max(wPct, 18)}%`;
+      drag.node.style.height = `${Math.max(hPct, 14)}%`;
+    }
+  });
+
+  const finish = () => {
+    if (!drag) return;
+    const { id, mode, next, edge, node } = drag;
+    node.dataset.dragging = "false";
+    showSnapPreview(null);
+    drag = null;
+    if (mode === "move" && edge) return dispatch({ type: "snap", id, edge });
+    if (!next) return render(); // nothing moved: put the node back where state says
+    dispatch(mode === "move" ? { type: "move", id, ...next } : { type: "resize", id, ...next });
+  };
+  document.addEventListener("pointerup", finish);
+  document.addEventListener("pointercancel", finish);
 }
 
 /* ─────────────────────────────────────────────────────── context menus */
@@ -1437,14 +1704,55 @@ function paletteItems() {
       run: () => navigate(scene.id, null, "sideBySide"),
     });
   }
+  for (const scene of SCENES) {
+    items.push({
+      label: `Open in new window: ${scene.label}`,
+      hint: "desktop",
+      run: () => navigate(scene.id, null, "new"),
+    });
+  }
+  for (const run of store.runs.slice(0, 8)) {
+    items.push({
+      label: run.input,
+      hint: `run · ${run.command ? "/" + run.command : run.route} · ${fmt.duration(run.duration)}`,
+      badge: run.loop || undefined,
+      run: () => navigate("run", run.id, "focus"),
+    });
+  }
   if (store.shell.windows.length > 1) {
     items.push({
-      label: "Close focused pane",
+      label: "Close focused window",
       hint: "workspace",
       run: () => dispatch({ type: "close", id: store.shell.focusId }),
     });
-    items.push({ label: "Cycle panes", hint: "workspace", run: () => dispatch({ type: "cycle" }) });
+    items.push({ label: "Cycle windows", hint: "workspace", run: () => dispatch({ type: "cycle" }) });
+    items.push({
+      label: "Tile windows",
+      hint: "workspace",
+      run: () => dispatch({ type: "arrange", mode: "tile" }),
+    });
+    items.push({
+      label: "Cascade windows",
+      hint: "workspace",
+      run: () => dispatch({ type: "arrange", mode: "cascade" }),
+    });
   }
+  if (store.shell.experience === "os") {
+    items.push({
+      label: "Minimize focused window",
+      hint: "desktop",
+      run: () => dispatch({ type: "minimize", id: store.shell.focusId }),
+    });
+  }
+  items.push({
+    label: "Copy workspace link",
+    hint: "scenes and layout, without the token",
+    run: () =>
+      navigator.clipboard.writeText(workspaceLink()).then(
+        () => toast("workspace link copied — scenes and layout, no token"),
+        () => toast("copy blocked by the browser")
+      ),
+  });
   for (const mode of EXPERIENCES) {
     items.push({
       label: `Experience: ${mode.label}`,
@@ -1616,10 +1924,40 @@ document.addEventListener("click", (event) => {
     if (pane && pane.dataset.pane !== store.shell.focusId) {
       dispatch({ type: "focus", id: pane.dataset.pane });
     }
+    const floating = event.target.closest(".window");
+    if (floating && floating.dataset.win !== store.shell.focusId) {
+      dispatch({ type: "focus", id: floating.dataset.win });
+    }
     return;
   }
   const action = node.dataset.action;
 
+  if (action === "icon") {
+    for (const other of document.querySelectorAll(".icon")) other.dataset.selected = "false";
+    node.dataset.selected = "true";
+    return;
+  }
+  if (action === "task") {
+    const win = store.shell.windows.find((w) => w.id === node.dataset.win);
+    if (!win) return;
+    if (win.minimized) return dispatch({ type: "restore", id: win.id });
+    if (win.id === store.shell.focusId) return dispatch({ type: "minimize", id: win.id });
+    return dispatch({ type: "focus", id: win.id });
+  }
+  if (action === "win-min") return dispatch({ type: "minimize", id: node.dataset.win });
+  if (action === "win-close") return dispatch({ type: "close", id: node.dataset.win });
+  if (action === "win-max") {
+    const win = store.shell.windows.find((w) => w.id === node.dataset.win);
+    const edge = win?.snapped === "max" ? null : "max";
+    return dispatch({ type: "snap", id: node.dataset.win, edge });
+  }
+  if (action === "arrange") return dispatch({ type: "arrange", mode: node.dataset.value });
+  if (action === "workspace-link") {
+    return navigator.clipboard.writeText(workspaceLink()).then(
+      () => toast("workspace link copied — scenes and layout, no token"),
+      () => toast("copy blocked by the browser")
+    );
+  }
   if (action === "pane-focus") return dispatch({ type: "focus", id: node.dataset.win });
   if (action === "pane-close") return dispatch({ type: "close", id: node.dataset.win });
   if (action === "pane-expand") {
@@ -1714,6 +2052,19 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("dblclick", (event) => {
+  const desktopIcon = event.target.closest('[data-action="icon"]');
+  if (desktopIcon) {
+    event.preventDefault();
+    return navigate(desktopIcon.dataset.value, null, "new");
+  }
+  const head = event.target.closest('[data-action="win-drag"]');
+  if (head && !event.target.closest(".win-btn")) {
+    const win = store.shell.windows.find((w) => w.id === head.dataset.win);
+    dispatch({ type: "snap", id: head.dataset.win, edge: win?.snapped === "max" ? null : "max" });
+  }
+});
+
 document.addEventListener("contextmenu", (event) => {
   const hit = event.target.closest("[data-action]");
   if (!hit) return;
@@ -1726,6 +2077,11 @@ document.addEventListener("contextmenu", (event) => {
     if (win) target = { sceneId: win.sceneId, resourceId: win.resourceId };
   } else if (action === "prefill" && hit.dataset.value) {
     target = { sceneId: "console", resourceId: null };
+  } else if (action === "icon") {
+    target = { sceneId: hit.dataset.value, resourceId: null };
+  } else if (action === "task" || action === "win-drag") {
+    const win = store.shell.windows.find((w) => w.id === hit.dataset.win);
+    if (win) target = { sceneId: win.sceneId, resourceId: win.resourceId };
   }
   if (!target) return;
   event.preventDefault();
@@ -1744,6 +2100,36 @@ window.addEventListener("resize", () => {
 });
 
 /* ──────────────────────────────────────────────────────────────── boot */
+
+/** A shared `?windows=` layout wins; otherwise this tab's own last layout. */
+function hydrateLayout() {
+  const url = new URL(location.href);
+  let payload = null;
+  const shared = url.searchParams.get("windows");
+  if (shared) {
+    try {
+      payload = JSON.parse(shared);
+    } catch (_) {
+      payload = null;
+    }
+    url.searchParams.delete("windows");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+  if (!payload) {
+    try {
+      payload = JSON.parse(sessionStorage.getItem(LAYOUT_KEY) || "null");
+    } catch (_) {
+      payload = null;
+    }
+  }
+  // a layout may only name scenes this build actually has
+  const restored = payload && shell.decodeLayout(payload, SCENES.map((scene) => scene.id));
+  if (!restored) return false;
+  store.shell = restored;
+  store.prefs.experience = restored.experience;
+  savePrefs();
+  return true;
+}
 
 function lockedScreen(message) {
   document.body.replaceChildren(
@@ -1785,8 +2171,19 @@ async function boot() {
       experience: store.prefs.experience,
     });
   }
-  fromHash();
-  render();
+  const restored = hydrateLayout();
+  installDesktopPointer();
+  setInterval(() => {
+    const clock = bind("clock");
+    if (clock) clock.textContent = clockText();
+  }, 30_000);
+  if (restored) {
+    render();
+    syncHash();
+  } else {
+    fromHash();
+    render();
+  }
 }
 
 boot();

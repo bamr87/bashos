@@ -1,6 +1,6 @@
 # ROADMAP: bashOS L6 OS Shell (on desktop GUI)
 
-**Status:** Prerequisite and Phase 0 complete — see "What landed" below  
+**Status:** Phases 0–2 complete and Phase 3's windowing delivered — see "What landed"  
 **Related:** [PRD-os-shell.md](./PRD-os-shell.md), [SPEC-os-shell.md](./SPEC-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
 **Prerequisite:** Merge [PR #20](https://github.com/bamr87/bashos/pull/20) (`bashos gui`) — or rebase OS-shell implementation onto that branch. Desktop docs: [`DESKTOP.md`](../DESKTOP.md), [`DESKTOP-TOUR.md`](../DESKTOP-TOUR.md) when present.  
 **Evidence note:** PostHog live pass = inspiration for side-by-side / menus; stack and guards come from #20.
@@ -32,9 +32,36 @@ a singleton; two run details may share the screen because a resource id
 distinguishes them; and the capture tool grew multi-pane scenarios now, in
 Phase 0.
 
-**Still open for Phase 1–2:** window list / taskbar, `?windows=` layout
-serialization, more than two panes, and whether the default should ever become
-`tiling` on wide viewports.
+### Phases 1–3 (2026-09-15, same day)
+
+| Deliverable | Phase | Where |
+|---|---|---|
+| Window / open-instance list | 1 (Should) | the taskbar — focus, minimize, restore, per window |
+| `tiling` usable, default still `single` | 1 | unchanged |
+| Workspace serialize / restore (`?windows=`, schema v1) | 2 | `encodeLayout` / `decodeLayout`, plus per-tab `sessionStorage` |
+| Window list polish: focus, close, order | 2 | taskbar, in open order |
+| Palette depth: scenes, runs, commands, dry-run, side-by-side | 2 | recent runs and per-scene window actions added |
+| More than two surfaces | 2 | the desktop holds up to eight; `tiling` stays two by design |
+| Floating drag / resize / desktop icons | 3 (Could) | pointer-driven drag, corner resize, edge snapping, icons |
+| Minimize + restore **only if** restore works end to end | 3 (Could) | it does: the taskbar restores, and a test proves it |
+| `prefers-reduced-motion` | 3 | honoured — the desktop animates nothing |
+
+Free drag was the PostHog failure mode this roadmap flagged. It works here
+because it is pointer-capture based, writes geometry straight to the node during
+the gesture, and commits to the reducer once on release — the browser never
+fights a re-render mid-drag. A Playwright pass drags, snaps, minimizes,
+restores and tiles on every capture run, so a regression fails the docs build.
+
+**Still not built, deliberately:** the nostalgia theme pack (Phase 3 Could, off
+by default — no product reason yet), a full a11y audit (Phase 3), and remote
+auth (out of scope; the loopback + token model stands). The React/Vite tradeoff
+was never triggered: the whole desktop is still one HTML file, one stylesheet
+and two ES modules, with no bundler and no npm.
+
+**Open, for whoever picks it up:** should a wide viewport ever default to
+`tiling` or `os` rather than `single`; desktop icons for slash commands as well
+as scenes; and whether a tiling *tree* (beyond two panes) earns its complexity
+now that the desktop exists.
 
 ---
 
