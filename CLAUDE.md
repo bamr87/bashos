@@ -42,6 +42,9 @@ belongs in the engine layer or nowhere.
   guard; `web/` is the front end, hand-written and unbundled (no npm, no build
   step). The GUI is a VIEW: it runs kernel lines only — no shell passthrough,
   no policy of its own, and never a loop.
+- `tools/capture_desktop.py` — drives the GUI with a real browser and writes
+  the stills/GIFs in `docs/DESKTOP-TOUR.md`. Not packaged, not in CI; re-run it
+  when the front end changes (`pip install playwright pillow`).
 - `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
   `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024),
   `bashos` (containerized terminal, profile `cli`). LangChain/LangGraph are

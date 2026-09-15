@@ -108,6 +108,9 @@ TUI. Same file, no duplication.
 `bashos gui` opens a GUI front end on the same kernel — a native window with
 `pip install "bashos[gui]"`, your browser without it:
 
+[![The bashOS desktop](docs/media/overview.png)](docs/DESKTOP-TOUR.md)
+
+
 | scene | what it is |
 |---|---|
 | **Overview** | session stats, quick-run chips, recent runs, the path a line takes |
@@ -123,7 +126,10 @@ token-guarded, `!` shell passthrough is refused (that stays in your terminal,
 where it is your own shell by your own keystroke), and the tool policy is
 unchanged — the Health scene renders the allowlist, it does not widen it. No
 bundler, no npm, no web framework in the dependency tree: one HTML file, one
-stylesheet, one ES module, served by ~300 lines of asyncio. Details in
+stylesheet, one ES module, served by ~300 lines of asyncio.
+
+**[Take the tour](docs/DESKTOP-TOUR.md)** — every scene, with screenshots and
+recordings of the real thing. The architecture and guard model are in
 [docs/DESKTOP.md](docs/DESKTOP.md).
 
 ## Architecture

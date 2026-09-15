@@ -134,6 +134,10 @@ code, pre, kbd, .mono { font-family: var(--mono); }
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .brand-text strong { font-size: 15px; letter-spacing: -0.01em; }
+.brand-version {
+  font-family: var(--mono); font-size: 9.5px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 20px; padding: 0 5px; margin-left: 5px;
+}
 .brand-text span {
   font-size: 10.5px; color: var(--muted); text-transform: uppercase;
   letter-spacing: 0.07em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -257,12 +261,24 @@ code, pre, kbd, .mono { font-family: var(--mono); }
 .grid--cards { grid-template-columns: repeat(auto-fill, minmax(288px, 1fr)); }
 
 .stat {
+  position: relative;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--sticker);
-  padding: 14px 16px;
+  padding: 16px;
 }
+.stat::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+}
+.stat:nth-child(2)::before { background: var(--blue); }
+.stat:nth-child(3)::before { background: var(--purple); }
+.stat:nth-child(4)::before { background: var(--green); }
 .stat-label {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--muted); font-weight: 600;
@@ -270,6 +286,31 @@ code, pre, kbd, .mono { font-family: var(--mono); }
 .stat-value { font-size: 27px; font-weight: 700; letter-spacing: -0.03em; margin-top: 4px; line-height: 1.15; }
 .stat-value small { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 3px; }
 .stat-note { font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+
+.masthead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  padding: 26px 28px;
+  margin-bottom: 20px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 17px 17px,
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--sticker);
+}
+.masthead h1 {
+  font-size: 29px; line-height: 1.12; letter-spacing: -0.035em; margin: 0 0 9px;
+}
+.masthead h1 .mark { color: var(--accent); }
+.masthead p { margin: 0 0 16px; color: var(--muted); max-width: 58ch; }
+.masthead-actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+
+.mascot { width: 128px; height: auto; transform: rotate(4deg); flex: none; }
+.mascot--sm { width: 84px; transform: rotate(-4deg); margin: 0 auto 10px; display: block; }
+.mascot--xs { width: 92px; transform: rotate(5deg); }
 
 h1.title { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 4px; }
 p.subtitle { margin: 0 0 20px; color: var(--muted); max-width: 70ch; }
@@ -371,6 +412,7 @@ p.subtitle { margin: 0 0 20px; color: var(--muted); max-width: 70ch; }
 .table tbody tr[data-action] { cursor: pointer; }
 .table tbody tr[data-action]:hover { background: var(--surface-2); }
 .table .mono { font-family: var(--mono); font-size: 12px; }
+.table .nowrap { white-space: nowrap; }
 .table .num { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .truncate { max-width: 1px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -391,12 +433,17 @@ p.subtitle { margin: 0 0 20px; color: var(--muted); max-width: 70ch; }
 .console-inner { max-width: 940px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
   border: 1.5px dashed var(--line);
   border-radius: var(--radius);
   padding: 22px;
   background:
     repeating-linear-gradient(-45deg, var(--surface-2) 0 10px, transparent 10px 20px);
 }
+.hero-text { min-width: 0; }
 .hero h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -0.02em; }
 .hero p { margin: 0 0 14px; color: var(--muted); max-width: 62ch; }
 .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -641,6 +688,11 @@ details[open] > summary::before { content: "▾"; }
 .locked .card { max-width: 480px; padding: 26px; }
 
 /* ───────────────────────────────────────────────────────── responsive */
+
+@media (max-width: 820px) {
+  .masthead, .hero { grid-template-columns: minmax(0, 1fr); }
+  .masthead .mascot, .hero .mascot { display: none; }
+}
 
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }

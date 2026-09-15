@@ -2,7 +2,9 @@
 
 A GUI front end on the same kernel the terminal runs. Read
 [HARNESS.md](HARNESS.md) for the core architecture — this document covers the
-window: what it is, what it deliberately is not, and how it is wired.
+window: what it is, what it deliberately is not, and how it is wired. For the
+feature-by-feature walkthrough with screenshots and recordings, see
+[DESKTOP-TOUR.md](DESKTOP-TOUR.md).
 
 ```bash
 bashos gui                 # native window if bashos[gui] is installed, else browser
@@ -118,6 +120,18 @@ hundred runs are kept; older ones fall off.
 3. Build DOM with `el()`, never `innerHTML` — the one exception is
    `renderMarkdown()`, which escapes before it structures.
 4. No inline `style` attributes: the CSP forbids them. Use a class.
+
+## Keeping the docs honest
+
+[`tools/capture_desktop.py`](../tools/capture_desktop.py) starts `bashos gui`
+on a private port, drives every scene with a real browser, and writes the
+stills and GIFs in [DESKTOP-TOUR.md](DESKTOP-TOUR.md), reporting any console
+error the page produced. It needs `playwright` and `pillow`, is not part of the
+package, and is not run by CI — run it when the front end changes:
+
+```bash
+python tools/capture_desktop.py     # writes docs/media/
+```
 
 ## Design notes
 

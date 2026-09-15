@@ -57,6 +57,11 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
+/** Tty, the bashOS prompt — a shell with a face. Lives in web/mascot.svg. */
+function mascot(cls = "mascot") {
+  return el("img", { class: cls, src: "/mascot.svg", alt: "", width: 220, height: 200 });
+}
+
 function icon(name, cls = "ic") {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", cls);
@@ -310,20 +315,27 @@ function buildConsole() {
 function consoleHero() {
   const picks = ["/sh", "/script", "/sys", "/explain", "/pipe", "/audit"];
   return el("div", { class: "hero" }, [
-    el("h2", { text: "One line reaches everything" }),
-    el("p", {
-      text:
-        "Slash commands route straight to their loop. Plain english goes through the " +
-        "kernel's classifier first. The react loop touches the real machine — read-only, " +
-        "gated by the engine's policy, with every tool call shown here as it happens.",
-    }),
-    el(
-      "div",
-      { class: "hero-chips" },
-      picks.map((name) =>
-        el("button", { class: "chip", dataset: { action: "prefill", value: name + " " }, text: name })
-      )
-    ),
+    el("div", { class: "hero-text" }, [
+      el("h2", { text: "One line reaches everything" }),
+      el("p", {
+        text:
+          "Slash commands route straight to their loop. Plain english goes through the " +
+          "kernel's classifier first. The react loop touches the real machine — read-only, " +
+          "gated by the engine's policy, with every tool call shown here as it happens.",
+      }),
+      el(
+        "div",
+        { class: "hero-chips" },
+        picks.map((name) =>
+          el("button", {
+            class: "chip",
+            dataset: { action: "prefill", value: name + " " },
+            text: name,
+          })
+        )
+      ),
+    ]),
+    mascot("mascot mascot--xs"),
   ]);
 }
 
@@ -540,19 +552,39 @@ function dlRows(pairs) {
   return nodes;
 }
 
+function masthead(state) {
+  return el("div", { class: "masthead" }, [
+    el("div", {}, [
+      el("h1", {}, [
+        "Every capability, ",
+        el("span", { class: "mark", text: "one line" }),
+        " away.",
+      ]),
+      el("p", {
+        text:
+          "Slash commands route through a LangGraph kernel onto the OpenCode engine, on your " +
+          "Claude Code login. This window is a view of that runtime: your terminal runs the " +
+          "same kernel, and nothing here widens what it can touch.",
+      }),
+      el("div", { class: "masthead-actions" }, [
+        el("button", { class: "btn btn--primary", dataset: { action: "scene:console" } }, [
+          icon("i-play", "ic ic--fill"), "Open console",
+        ]),
+        el("button", { class: "btn", dataset: { action: "scene:commands" } }, ["Browse commands"]),
+        el("span", { class: "pill", text: state.backend || "…" }),
+        el("span", { class: "pill", text: store.prefs.model || state.model || "" }),
+      ]),
+    ]),
+    mascot(),
+  ]);
+}
+
 function sceneOverview() {
   const state = store.state || {};
   const runs = state.runs || {};
   const wrap = el("div", { class: "wrap" });
   wrap.append(
-    el("h1", { class: "title", text: "Overview" }),
-    el("p", {
-      class: "subtitle",
-      text:
-        "bashOS routes Claude slash commands through a LangGraph kernel onto the OpenCode " +
-        "engine, on your Claude Code login. This window is a view of that runtime — your " +
-        "terminal runs the same kernel.",
-    }),
+    masthead(state),
     el("div", { class: "grid grid--stats" }, [
       statTile("Commands", (state.commands || []).length, "userland in .claude/commands"),
       statTile("Runs this session", runs.total || 0, `${runs.ok || 0} ok · ${runs.failed || 0} failed`),
@@ -608,13 +640,14 @@ function flowCard(state) {
 function runsTable(runs) {
   if (!runs.length) {
     return el("div", { class: "empty" }, [
+      mascot("mascot mascot--sm"),
       el("strong", { text: "No runs yet" }),
       "Every line this window sends through the kernel is recorded here with its trace.",
     ]);
   }
   const rows = runs.map((run) =>
     el("tr", { dataset: { action: "run:" + run.id } }, [
-      el("td", { class: "mono", text: fmt.clock(run.started_at) }),
+      el("td", { class: "mono nowrap", text: fmt.clock(run.started_at) }),
       el("td", { class: "truncate mono", text: run.input }),
       el("td", {}, [run.command ? el("span", { class: "pill", text: "/" + run.command }) : "—"]),
       el("td", {}, [run.loop ? el("span", { class: "pill pill--" + run.loop, text: run.loop }) : "—"]),
@@ -1104,6 +1137,8 @@ function paintChrome() {
     composerModel.textContent =
       (store.prefs.model || state.model || "") + (store.prefs.dryRun ? " · dry run" : "");
   }
+  const version = bind("brand-version");
+  if (version) version.textContent = state.version ? "v" + state.version : "";
   const mac = (navigator.platform || "").toLowerCase().includes("mac");
   bind("palette-key").textContent = mac ? "⌘K" : "^K";
 }
