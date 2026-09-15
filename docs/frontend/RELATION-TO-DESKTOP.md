@@ -6,7 +6,7 @@
 
 | | PR #20 — desktop GUI | This PR — OS-shell docs |
 |---|---|---|
-| Status | Open feature PR (merge first) | Documentation / product proposal |
+| Status | Open feature PR — now carries both | Merged into it; Phase 0 implemented |
 | Command | `bashos gui` | N/A (docs only until implemented on top of #20) |
 | Code | `src/bashos/gui/` + `gui/web/` (one HTML + CSS + ES module) | Proposes changes to that stack |
 | Surface | Seven hash-routed **scenes**, sidebar chrome, ⌘K palette | Treat scenes as **apps/windows**; add chrome, side-by-side, layouts |
@@ -14,9 +14,11 @@
 | Stack philosophy | **No npm, no bundler, no web framework** | Phases 0–2 **stay** on that stack; framework migration only Phase 3+ tradeoff |
 | Security | Normative refusals & guards (see DESKTOP.md) | OS-shell **must preserve** them — never widen policy or add shell passthrough |
 
-## Dependency
+## Dependency — resolved
 
-OS-shell implementation work **assumes PR #20 merges first** (or this branch rebases onto it). Until then, cite desktop paths as “as proposed/landed in PR #20.”
+The dependency was resolved by merging **this** documentation into PR #20, so
+the docs and the surface they describe review and ship together. Phase 0 of the
+roadmap is implemented there; desktop paths below are live, not proposed.
 
 ## One-line rule
 

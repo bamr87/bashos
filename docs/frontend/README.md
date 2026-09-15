@@ -3,7 +3,7 @@
 Documentation for an **OS-shell evolution** of the bashOS L6 web/native surface: multi-window / side-by-side / desktop metaphors on top of the existing desktop GUI — preferring IDE / tmux density over marketing nostalgia.
 
 **Repo:** [bamr87/bashos](https://github.com/bamr87/bashos)  
-**Prerequisite surface:** [PR #20 — desktop GUI](https://github.com/bamr87/bashos/pull/20) (`bashos gui`) — treat as **current L6 web/native surface** (as proposed/landed in that PR).  
+**Surface:** `bashos gui` — [`../DESKTOP.md`](../DESKTOP.md), [`../DESKTOP-TOUR.md`](../DESKTOP-TOUR.md). These docs and that surface now ship together in [PR #20](https://github.com/bamr87/bashos/pull/20); **Phase 0 of the roadmap is implemented**.  
 **Canonical desktop docs (when #20 merges):** [`../DESKTOP.md`](../DESKTOP.md), [`../DESKTOP-TOUR.md`](../DESKTOP-TOUR.md)  
 **Relationship one-pager:** [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
 **Stack today (#20):** `src/bashos/gui/` — asyncio HTTP + routes/SSE + in-memory runs + optional pywebview; front end `gui/web/` = one HTML + one CSS + one ES module (**no npm, no bundler, no web framework**). Seven hash-routed scenes over the same kernel as the CLI (`build_kernel(...)`).
@@ -36,6 +36,21 @@ Research basis: [posthog-os-research.md](./posthog-os-research.md) (PostHog.com 
 
 ## Status
 
-**Documentation only** for the OS-shell evolution. The desktop GUI itself is proposed/landed in [PR #20](https://github.com/bamr87/bashos/pull/20). New endpoints or chrome beyond existing `/api/*` + SSE are labeled **Proposal**. OS-shell work assumes **#20 merges first** (or rebase onto it).
+**Phase 0 is implemented** in PR #20, which now carries both these docs and the
+code they describe:
+
+| Capability | State |
+|---|---|
+| Experiences `single` \| `tiling` \| `plain` (each with a real consumer) | **Landed** — Settings → Workspace, or the palette |
+| Nav intents `replace` \| `new` \| `focus` \| `sideBySide` | **Landed** — `gui/web/shell.js`, 19 unit tests |
+| Pane chrome: focus, split, maximize/restore, close | **Landed** |
+| Context menus: open, side by side, new browser tab, copy link | **Landed** |
+| Palette: side-by-side per scene, close/cycle pane, experience | **Landed** |
+| Keymap: `⌘K`, `⌘\` cycle, `⌘W` close (native window) | **Landed** |
+| Narrow viewport → single; Console singleton | **Landed** |
+| Floating windows (`os`), `?windows=` layouts, window list, >2 panes | **Proposal** — Phases 2–3 |
+
+No new server endpoints were needed: layout state is client-only, exactly as
+§8.2 of the SPEC proposed. Every #20 guard and refusal is unchanged.
 
 **Research refresh (2026-09-15):** PostHog deep interaction pass refined live truth — side-by-side panes, context menus, maximize/close, overlays; free drag/resize unreliable. See [posthog-os-research.md](./posthog-os-research.md) §13. Alignment pass: these docs no longer assume a greenfield L6 stack; they build on #20’s scenes and no-build philosophy.

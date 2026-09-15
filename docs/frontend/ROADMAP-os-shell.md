@@ -1,13 +1,44 @@
 # ROADMAP: bashOS L6 OS Shell (on desktop GUI)
 
-**Status:** Draft for review  
+**Status:** Prerequisite and Phase 0 complete — see "What landed" below  
 **Related:** [PRD-os-shell.md](./PRD-os-shell.md), [SPEC-os-shell.md](./SPEC-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
 **Prerequisite:** Merge [PR #20](https://github.com/bamr87/bashos/pull/20) (`bashos gui`) — or rebase OS-shell implementation onto that branch. Desktop docs: [`DESKTOP.md`](../DESKTOP.md), [`DESKTOP-TOUR.md`](../DESKTOP-TOUR.md) when present.  
 **Evidence note:** PostHog live pass = inspiration for side-by-side / menus; stack and guards come from #20.
 
 ---
 
-## Prerequisite — Merge PR #20
+## What landed (2026-09-15)
+
+The prerequisite and Phase 0 are **done**, in the same PR as the desktop GUI —
+these docs were merged into that branch rather than waiting on it.
+
+| Phase 0 deliverable | Where |
+|---|---|
+| Layout state for two scene instances | `gui/web/shell.js` — pure reducer, no DOM |
+| Intents `replace` \| `new` \| `focus` \| `sideBySide` | same, 19 unit tests in `tests/shell.test.mjs` (run by `pytest -q` through `tests/test_shell.py`) |
+| Scene-as-window chrome: focus, split, maximize/restore, close | `gui/web/app.js` `paneNode()`, `app.css` `.pane*` |
+| Context / palette actions | right-click any scene or run row; palette gained side-by-side, close, cycle, experience |
+| Palette baseline unchanged | ⌘K still opens it; composer `/` untouched |
+| No new deps | still one HTML + one CSS + two ES modules; no bundler |
+| `tools/capture_desktop.py` | new side-by-side still and reel, **plus** `check_shell()` asserting the intents against the DOM |
+| Guard regression | `!` still 403; token/CSP/Host/Origin unchanged; no new endpoints |
+
+Exit criteria met: two scenes open side by side from palette or context menu,
+maximize/close work, the focused pane's hash still deep-links, and the capture
+tool regenerates the tour. Free drag/resize deliberately absent.
+
+**Also settled while implementing** (open questions 2, 3 and 5): the Console is
+a singleton; two run details may share the screen because a resource id
+distinguishes them; and the capture tool grew multi-pane scenarios now, in
+Phase 0.
+
+**Still open for Phase 1–2:** window list / taskbar, `?windows=` layout
+serialization, more than two panes, and whether the default should ever become
+`tiling` on wide viewports.
+
+---
+
+## Prerequisite — Merge PR #20 *(done — merged into that branch instead)*
 
 | Deliverable | Done when |
 |---|---|

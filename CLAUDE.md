@@ -40,8 +40,10 @@ belongs in the engine layer or nowhere.
   a ~300-line asyncio HTTP/SSE server (no web framework — never add one);
   `server.py` routes onto the kernel behind a loopback + per-process-token
   guard; `web/` is the front end, hand-written and unbundled (no npm, no build
-  step). The GUI is a VIEW: it runs kernel lines only — no shell passthrough,
-  no policy of its own, and never a loop.
+  step) — `app.js` draws, `shell.js` is a pure layout reducer (experience
+  modes, nav intents) tested by `tests/shell.test.mjs`. The GUI is a VIEW: it
+  runs kernel lines only — no shell passthrough, no policy of its own, and
+  never a loop. Window/OS-shell direction: docs/frontend/.
 - `tools/capture_desktop.py` — drives the GUI with a real browser and writes
   the stills/GIFs in `docs/DESKTOP-TOUR.md`. Not packaged, not in CI; re-run it
   when the front end changes (`pip install playwright pillow`).

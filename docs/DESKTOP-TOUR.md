@@ -2,7 +2,8 @@
 
 Everything `bashos gui` does, scene by scene, with the real thing on screen.
 For the architecture, the guard model and how to extend it, read
-[DESKTOP.md](DESKTOP.md); this page is the feature reference.
+[DESKTOP.md](DESKTOP.md); for where the window metaphors are going, read
+[frontend/](frontend/README.md). This page is the feature reference.
 
 ![Every scene in the bashOS desktop](media/scene-tour.gif)
 
@@ -95,6 +96,58 @@ terminal prints them.
 
 When a run fails — a bad command name, an engine that will not start — the card
 turns red and carries the error the kernel produced, in full.
+
+---
+
+## Side by side — the OS shell
+
+![Console beside Health](media/side-by-side.png)
+
+One scene at a time is right for one line of work. Watching a run stream while
+the policy allowlist or a run's trace stays on screen is a different job, so
+any two scenes can share the window.
+
+![Opening a pane, maximizing it, and closing it](media/side-by-side.gif)
+
+- **Open one** from the palette (`Side by side: …`), from the pane's split
+  button, or by right-clicking any scene in the sidebar, any quick-run chip, or
+  any row in the Runs table.
+- **Focus follows the click.** The focused pane is outlined, its hash is the
+  one in the address bar, and the sidebar marks every open scene with a dot.
+- **Pane chrome** is deliberately small: split, maximize/restore, close. There
+  is no free drag, no minimize, and no fake taskbar — see
+  [frontend/ROADMAP-os-shell.md](frontend/ROADMAP-os-shell.md) for why those
+  are later phases rather than MVP decoration.
+- **The Console is a singleton.** It owns a persistent DOM and a live event
+  stream, so it is focused rather than mounted twice.
+- **Two run details** can sit side by side, because a run id distinguishes
+  them.
+
+Right-clicking anything that opens a scene gives the four actions PostHog's
+windows have, on ours:
+
+| Action | What it does |
+|---|---|
+| Open | replaces the focused pane — what a click has always done |
+| Open side by side | opens it beside the focused pane, turning side-by-side on |
+| Open in new browser tab | same origin, same hash, carrying this process's token |
+| Copy link | the same URL **without** the token — a layout never carries a credential |
+
+### Experience modes
+
+![Experience modes in Settings](media/settings.png)
+
+Settings → Workspace, or the palette, switches the whole window:
+
+| Mode | What it is |
+|---|---|
+| **Single** | one scene, full width — the default, and what every earlier version did |
+| **Side by side** | two scenes, focus follows the click |
+| **Plain** | one scene with the sidebar and top bar *unmounted* — for screenshots, automation and narrow reading. `⌘K` still works, so you can always switch back |
+
+A narrow window is always single, whatever is set. The choice persists per
+browser; the pane layout itself does not (yet — layout serialization is
+Phase 2).
 
 ---
 
@@ -237,7 +290,12 @@ persists per browser.
 | `Tab` / `Enter` | completion open | accept the highlighted command |
 | `↑` / `↓` | completion or palette | move the selection |
 | `↑` | empty composer | recall the previous line |
-| `Esc` | completion or palette | dismiss |
+| `Esc` | completion, palette or menu | dismiss |
+| `⌘\` / `Ctrl-\` | side by side | cycle the focused pane |
+| `⌘W` / `Ctrl-W` | side by side | close the focused pane — browsers reserve this for the tab, so it lands in the native window; the pane's ✕ and the palette work everywhere |
+
+Nothing here steals a bare key: the composer keeps `/` for slash completion,
+which is why the palette is `⌘K` and not `/` as on posthog.com.
 
 ---
 

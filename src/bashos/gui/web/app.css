@@ -640,6 +640,111 @@ details[open] > summary::before { content: "▾"; }
 .flow-row span { color: var(--muted); font-family: var(--font); font-size: 12.5px; }
 .flow-arrow { color: var(--faint); padding: 3px 0 3px 20px; font-size: 13px; }
 
+/* ───────────────────────────────────────────────── panes (os shell) */
+
+.scene--panes { padding: 0; overflow: hidden; display: flex; }
+
+.panes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 0;
+}
+.panes[data-expanded="true"] { grid-template-columns: 1fr; }
+.panes[data-expanded="true"] .pane[data-expanded="false"] { display: none; }
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--sticker-sm);
+}
+.pane[data-focus="true"] {
+  border-color: var(--accent);
+  box-shadow: -2px 2px 0 color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.pane-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  cursor: pointer;
+  user-select: none;
+}
+.pane-head .ic { color: var(--muted); }
+.pane[data-focus="true"] .pane-head .ic { color: var(--accent); }
+.pane-title { font-size: 12.5px; font-weight: 600; }
+.pane-resource {
+  font-size: 11px; color: var(--muted);
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pane-btn {
+  display: inline-flex; padding: 4px;
+  border: 1px solid transparent; border-radius: 5px;
+  background: none; color: var(--muted); cursor: pointer;
+}
+.pane-btn:hover { background: var(--paper); color: var(--ink); border-color: var(--line); }
+
+.pane-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 16px 28px; }
+.pane-body--flush { padding: 0; display: flex; overflow: hidden; }
+
+.ic--sm { width: 14px; height: 14px; }
+
+/* plain: the chrome is genuinely unmounted, not hidden behind a dead flag */
+[data-experience="plain"] .sidebar,
+[data-experience="plain"] .topbar { display: none; }
+[data-experience="plain"] .shell { grid-template-columns: minmax(0, 1fr); }
+
+.nav-item[data-open="true"]:not([aria-current="true"])::after {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin-left: 6px; flex: none;
+}
+
+.menu-layer { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.menu-layer[hidden] { display: none; }
+.menu {
+  position: absolute;
+  min-width: 232px;
+  padding: 4px;
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: -3px 3px 0 color-mix(in srgb, var(--ink) 20%, transparent);
+}
+.menu-item {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: 5px;
+  background: none; color: var(--ink);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.menu-item:hover { background: var(--accent-soft); color: var(--accent); }
+
+.seg { display: flex; gap: 9px; flex-wrap: wrap; }
+.seg-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-width: 158px; padding: 9px 12px;
+  border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); box-shadow: 0 2px 0 var(--line);
+  font: inherit; color: var(--ink); cursor: pointer;
+  transition: transform .06s ease, box-shadow .06s ease;
+}
+.seg-btn strong { font-size: 13px; }
+.seg-btn small { font-size: 11px; color: var(--muted); }
+.seg-btn[data-active="true"] {
+  border-color: var(--accent-dk); background: var(--accent-soft);
+  box-shadow: 0 2px 0 var(--accent-dk);
+}
+.seg-btn:active { transform: translateY(2px); box-shadow: none; }
+
 /* ──────────────────────────────────────────────────────────── overlay */
 
 .overlay {

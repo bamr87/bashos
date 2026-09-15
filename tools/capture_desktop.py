@@ -171,6 +171,12 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         await page.click('[data-bind="dry-run"] + .switch-track')  # no model needed
         await page.wait_for_timeout(300)
 
+        shell_failures = await check_shell(page)
+        if shell_failures:
+            errors.extend(f"shell check failed: {name}" for name in shell_failures)
+        else:
+            print("shell intents verified against the DOM")
+
         # 1. a line through the kernel, from keystroke to answer
         reel = Reel(page, "console-run", out, tmp)
         await goto_scene(page, "console")
@@ -233,7 +239,34 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         await reel.snap(14)
         written.append(reel.write(frame_ms=150))
 
-        # 6. a run, from the table to its full trace
+        # 6. the OS shell: two scenes side by side, chrome, and back to one
+        reel = Reel(page, "side-by-side", out, tmp)
+        await goto_scene(page, "console")
+        await reel.snap(8)
+        await page.keyboard.press("Control+k")
+        await page.wait_for_timeout(250)
+        await page.fill('[data-bind="palette-query"]', "Side by side: Health")
+        await page.wait_for_timeout(250)
+        await reel.snap(10)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(700)
+        await reel.snap(14)
+        await page.click('[data-action="scene:runs"]', button="right")
+        await page.wait_for_timeout(350)
+        await reel.snap(12)
+        await page.keyboard.press("Escape")
+        await page.click('.pane[data-focus="true"] [data-action="pane-expand"]')
+        await page.wait_for_timeout(400)
+        await reel.snap(10)
+        await page.click('.pane[data-focus="true"] [data-action="pane-expand"]')
+        await page.wait_for_timeout(400)
+        await reel.snap(6)
+        await page.click('.pane[data-focus="true"] [data-action="pane-close"]')
+        await page.wait_for_timeout(500)
+        await reel.snap(12)
+        written.append(reel.write(frame_ms=150))
+
+        # 7. a run, from the table to its full trace
         reel = Reel(page, "run-detail", out, tmp)
         await goto_scene(page, "runs")
         await reel.snap(10)
@@ -284,6 +317,21 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         written.append(await still(page, out, "palette"))
         await page.keyboard.press("Escape")
 
+        # the shell: Console beside Health, with a run in the left pane
+        await goto_scene(page, "console")
+        await page.fill("textarea", "/sh find files over 100MB modified this week")
+        await page.click('[data-action="submit"]')
+        await page.wait_for_timeout(1400)
+        await page.keyboard.press("Control+k")
+        await page.wait_for_timeout(250)
+        await page.fill('[data-bind="palette-query"]', "Side by side: Health")
+        await page.wait_for_timeout(250)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(900)
+        written.append(await still(page, out, "side-by-side"))
+        await page.click('.pane[data-focus="true"] [data-action="pane-close"]')
+        await page.wait_for_timeout(500)
+
         await page.click('[data-action="theme"]')
         await page.wait_for_timeout(350)
         written.append(await still(page, out, "overview-dark"))
@@ -298,6 +346,50 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
     else:
         print("\nno browser console errors")
     return written
+
+
+async def check_shell(page) -> list[str]:
+    """Assert the nav intents against the real DOM (SPEC §4 consumers).
+
+    The reducer has unit tests (tests/shell.test.mjs); this is the other half —
+    that what it decides is what the page actually mounts.
+    """
+    failures: list[str] = []
+
+    def expect(name: str, condition: bool) -> None:
+        if not condition:
+            failures.append(name)
+
+    await goto_scene(page, "console")
+    expect("starts single", await page.locator(".pane").count() == 0)
+
+    await page.keyboard.press("Control+k")
+    await page.wait_for_timeout(250)
+    await page.fill('[data-bind="palette-query"]', "Side by side: Health")
+    await page.wait_for_timeout(250)
+    await page.keyboard.press("Enter")
+    await page.wait_for_timeout(700)
+    scenes = await page.locator(".pane").evaluate_all("els => els.map(e => e.dataset.scene)")
+    expect("sideBySide opens two panes", sorted(scenes) == ["console", "health"])
+
+    await page.click('[data-action="scene:console"]', button="right")
+    await page.wait_for_timeout(300)
+    await page.click('.menu-item:has-text("Open side by side")')
+    await page.wait_for_timeout(600)
+    scenes = await page.locator(".pane").evaluate_all("els => els.map(e => e.dataset.scene)")
+    expect("the console is a singleton", scenes.count("console") == 1)
+    expect("console composer survives", await page.locator(".pane[data-scene=console] textarea").count() == 1)
+
+    await page.click('.pane[data-focus="true"] [data-action="pane-expand"]')
+    await page.wait_for_timeout(350)
+    expect("maximize hides the other pane", await page.locator(".pane:visible").count() == 1)
+    await page.click('.pane[data-focus="true"] [data-action="pane-expand"]')
+    await page.wait_for_timeout(350)
+
+    await page.click('.pane[data-focus="true"] [data-action="pane-close"]')
+    await page.wait_for_timeout(500)
+    expect("closing returns to one scene", await page.locator(".pane").count() <= 1)
+    return failures
 
 
 # ----------------------------------------------------------------------- main

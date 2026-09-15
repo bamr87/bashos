@@ -119,6 +119,7 @@ TUI. Same file, no duplication.
 | **Runs** | every line this window ran, with its trace, its tool calls, and its answer |
 | **Health** | host facts, the react-loop sweeps, and the probe allowlist a sweep may use |
 | **Engine** | `doctor` checks, live engine state, the tool policy, the generated `opencode.jsonc` |
+| **Side by side** | any two scenes in one window — focus, maximize, close; Console stays a singleton |
 
 It is a *view*, not a second runtime: a console line goes through the same
 `build_kernel(...)` call `bashos run` makes. The socket is loopback-only and
@@ -130,7 +131,8 @@ stylesheet, one ES module, served by ~300 lines of asyncio.
 
 **[Take the tour](docs/DESKTOP-TOUR.md)** — every scene, with screenshots and
 recordings of the real thing. The architecture and guard model are in
-[docs/DESKTOP.md](docs/DESKTOP.md).
+[docs/DESKTOP.md](docs/DESKTOP.md); where the window metaphors are going is in
+[docs/frontend/](docs/frontend/README.md).
 
 ## Architecture
 

@@ -1,9 +1,19 @@
 # SPEC: bashOS L6 OS Shell (evolution of `gui/web`)
 
-**Status:** Draft for review — builds on [PR #20](https://github.com/bamr87/bashos/pull/20)  
+**Status:** Phase 0 implemented — ships with the desktop GUI in [PR #20](https://github.com/bamr87/bashos/pull/20)  
 **Related:** [PRD-os-shell.md](./PRD-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
 **Foundation:** [`docs/DESKTOP.md`](../DESKTOP.md) (when #20 merges) — stack, scenes, guards  
 **Evidence:** PostHog research = **inspiration only**. Proposals beyond #20 APIs labeled **Proposal**.
+
+---
+
+
+> **Status update — Phase 0 landed.** The shell described below is implemented
+> in this branch (PR #20): experiences `single` | `tiling` | `plain`, the four
+> nav intents, pane chrome, context menus, palette actions and the keymap.
+> The reducer is `src/bashos/gui/web/shell.js` with unit tests in
+> `tests/shell.test.mjs`; the DOM consumers are asserted by
+> `tools/capture_desktop.py`. What is still proposed is marked below.
 
 ---
 
@@ -221,7 +231,19 @@ function navigate(target, intent = 'replace') {
 }
 ```
 
-**Hard rule:** Documented intent ⇒ tested consumer. Single-scene mode may ignore `new`/`sideBySide` by falling back to `replace` or browser tab until multi-pane ships.
+**Hard rule:** Documented intent ⇒ tested consumer. Every row above has one, in
+`gui/web/shell.js`, asserted by `tests/shell.test.mjs` (unit) and
+`tools/capture_desktop.py` (DOM).
+
+### 4.1 What the implementation settled
+
+| Question the table left open | Decision, as implemented |
+|---|---|
+| What does a split do in `single`? | Asking for a split **is** the consumer of `tiling`: the mode turns on and the pane opens. `plain` is the deliberate exception — there a split falls back to `replace`, because `plain` exists to unmount chrome. |
+| What happens at the pane cap? | `MAX_PANES = 2` in Phase 0. At the cap, a split replaces **the pane you are not watching** and focuses it; the pane you were reading survives. |
+| Two instances of one scene? | Allowed where a resource distinguishes them — two run details (`#/runs/a` ‖ `#/runs/b`) are two windows. |
+| Console? | **Singleton.** Any intent that targets an open Console focuses it instead of mounting a second composer and a second event stream. |
+| Which hash wins with two panes? | The focused pane's, so every existing deep link still means what it did. |
 
 ---
 
@@ -293,8 +315,8 @@ Ignore OS-shell chords when focus is in composer `textarea` (and future inputs),
 |---|---|---|---|
 | `⌘K` / `Ctrl+K` | Palette (baseline) | all | Must |
 | `Esc` | Close palette / overlays | all | Must |
-| `Ctrl/Cmd+W` | Close focused pane/window | tiling, os | Must |
-| `Ctrl/Cmd+\\` or `Ctrl/Cmd+Shift+\\` | Cycle panes | tiling | Should |
+| `Ctrl/Cmd+W` | Close focused pane/window | tiling, os | Must — **caveat:** browsers reserve it for the tab, so it lands only in the native window. The pane's ✕ and the palette's "Close focused pane" always work. Documenting it without that caveat would be exactly the folklore §6.3 warns about. |
+| `Ctrl/Cmd+\\` | Cycle panes | tiling | Landed |
 | Context / palette “Side by side” | `sideBySide` intent | tiling | Must (discoverable without new chord if needed) |
 | `Ctrl/Cmd+,` | Focus Settings scene | all | Should — verify no conflict |
 

@@ -6,6 +6,8 @@
  * learned from /api — there is no client-side model of the machine.
  */
 
+import * as shell from "/shell.js";
+
 const TOKEN_KEY = "bashos.token." + location.port;
 const THEME_KEY = "bashos.theme";
 const PREFS_KEY = "bashos.prefs";
@@ -21,6 +23,12 @@ const SCENES = [
   { id: "settings", label: "Settings", icon: "i-sliders", group: "System" },
 ];
 
+const EXPERIENCES = [
+  { id: "single", label: "Single", hint: "one scene, full width" },
+  { id: "tiling", label: "Side by side", hint: "two scenes, focus follows click" },
+  { id: "plain", label: "Plain", hint: "one scene, no chrome" },
+];
+
 const store = {
   token: "",
   state: null,
@@ -29,9 +37,10 @@ const store = {
   doctor: null,
   runs: [],
   scene: "overview",
-  prefs: { dryRun: false, model: "" },
+  prefs: { dryRun: false, model: "", experience: "single" },
   history: [],
   historyAt: -1,
+  shell: shell.initialState(),
 };
 
 /* ───────────────────────────────────────────────────────────── plumbing */
@@ -425,7 +434,7 @@ function onComposerKey(event) {
 }
 
 function prefill(value) {
-  showScene("console");
+  navigate("console", null, "focus");
   consoleView.textarea.value = value;
   onComposerInput();
   consoleView.textarea.focus();
@@ -1044,6 +1053,28 @@ function sceneSettings() {
       ]),
     ]),
     el("div", { class: "card" }, [
+      el("div", { class: "card-head" }, [
+        el("h2", { text: "Workspace" }),
+        el("span", { class: "spacer" }),
+        el("span", { class: "card-sub", text: "docs/frontend/SPEC-os-shell.md" }),
+      ]),
+      el("div", { class: "card-body" }, [
+        el("div", { class: "seg" }, EXPERIENCES.map((mode) =>
+          el("button", {
+            class: "seg-btn",
+            dataset: { action: "experience", value: mode.id, active: String(store.shell.experience === mode.id) },
+          }, [el("strong", { text: mode.label }), el("small", { text: mode.hint })])
+        )),
+        el("p", {
+          class: "card-sub mt",
+          text:
+            "Side by side opens a second pane of any other scene; the Console keeps its " +
+            "own DOM and its event stream, so it is never mounted twice. Narrow windows " +
+            "fall back to a single scene whatever is set here.",
+        }),
+      ]),
+    ]),
+    el("div", { class: "card" }, [
       el("div", { class: "card-head" }, [el("h2", { text: "About this runtime" })]),
       el("div", { class: "card-body" }, [
         el(
@@ -1104,12 +1135,15 @@ function paintNav() {
       group = scene.group;
       nav.append(el("div", { class: "nav-label", text: group }));
     }
+    const open = store.shell.windows.filter((w) => w.sceneId === scene.id);
+    const isFocused = shell.focused(store.shell).sceneId === scene.id;
     const item = el(
       "button",
       {
         class: "nav-item",
-        dataset: { action: "scene:" + scene.id },
-        "aria-current": String(scene.id === store.scene),
+        dataset: { action: "scene:" + scene.id, open: String(open.length > 0) },
+        "aria-current": String(isFocused),
+        title: open.length ? "open — right-click for pane actions" : scene.label,
       },
       [icon(scene.icon), el("span", { text: scene.label })]
     );
@@ -1143,27 +1177,31 @@ function paintChrome() {
   bind("palette-key").textContent = mac ? "⌘K" : "^K";
 }
 
-function showScene(id, param) {
-  store.scene = id;
-  const container = bind("scene");
-  const scene = SCENES.find((entry) => entry.id === id);
-  bind("crumb").textContent = scene ? scene.label : "Run";
-  container.classList.toggle("scene--flush", id === "console");
-  paintNav();
+/* The shell — experience modes over the same scene builders.
+ * docs/frontend/SPEC-os-shell.md: `replace` is what #20 always did; `new`,
+ * `focus` and `sideBySide` are the intents this adds, each with a consumer. */
 
-  if (id === "console") {
-    container.replaceChildren(consoleView.root || buildConsole());
-    setTimeout(() => consoleView.textarea.focus(), 0);
-    return;
-  }
-  if (id === "run") {
-    container.replaceChildren(
-      el("div", { class: "wrap" }, [el("div", { class: "empty", text: "loading run…" })])
-    );
-    sceneRunDetail(param).then((node) => {
-      if (store.scene === "run") container.replaceChildren(node);
-    });
-    return;
+let hashLock = false;
+
+function viewportWidth() {
+  return window.innerWidth || document.documentElement.clientWidth || 1200;
+}
+
+function sceneLabel(win) {
+  const scene = SCENES.find((entry) => entry.id === win.sceneId);
+  if (win.resourceId) return "Run";
+  return scene ? scene.label : "Overview";
+}
+
+/** Build the DOM for one window. Console hands back its persistent node. */
+function buildSceneNode(win) {
+  if (win.sceneId === "console") return consoleView.root || buildConsole();
+  if (win.resourceId) {
+    const host = el("div", { class: "wrap" }, [
+      el("div", { class: "empty", text: "loading run…" }),
+    ]);
+    sceneRunDetail(win.resourceId).then((node) => host.replaceChildren(...node.childNodes));
+    return host;
   }
   const builders = {
     overview: sceneOverview,
@@ -1173,23 +1211,205 @@ function showScene(id, param) {
     engine: sceneEngine,
     settings: sceneSettings,
   };
-  container.replaceChildren((builders[id] || sceneOverview)());
-  container.scrollTop = 0;
-  if (id === "engine" && !store.doctor) void loadDoctor();
+  return (builders[win.sceneId] || sceneOverview)();
 }
 
-function navigate(id, param) {
-  const hash = id === "run" ? `#/runs/${param}` : `#/${id}`;
-  if (location.hash !== hash) location.hash = hash;
-  else showScene(id, param);
+function paneActions(win, state) {
+  const many = state.windows.length > 1;
+  const actions = [
+    el("button", {
+      class: "pane-btn",
+      title: "Open a scene beside this one",
+      dataset: { action: "pane-split", win: win.id },
+    }, [icon("i-columns", "ic ic--sm")]),
+  ];
+  if (many) {
+    actions.push(
+      el("button", {
+        class: "pane-btn",
+        title: win.expanded ? "Restore" : "Maximize",
+        dataset: { action: "pane-expand", win: win.id },
+      }, [icon(win.expanded ? "i-restore" : "i-maximize", "ic ic--sm")]),
+      el("button", {
+        class: "pane-btn",
+        title: "Close pane",
+        dataset: { action: "pane-close", win: win.id },
+      }, [icon("i-x", "ic ic--sm")])
+    );
+  }
+  return actions;
+}
+
+function paneNode(win, state) {
+  const body = el("div", { class: "pane-body" }, [buildSceneNode(win)]);
+  if (win.sceneId === "console" && !win.resourceId) body.classList.add("pane-body--flush");
+  return el(
+    "section",
+    {
+      class: "pane",
+      dataset: {
+        pane: win.id,
+        scene: win.sceneId,
+        focus: String(win.id === state.focusId),
+        expanded: String(Boolean(win.expanded)),
+      },
+    },
+    [
+      el("header", { class: "pane-head", dataset: { action: "pane-focus", win: win.id } }, [
+        icon(SCENES.find((s) => s.id === win.sceneId)?.icon || "i-grid", "ic ic--sm"),
+        el("span", { class: "pane-title", text: sceneLabel(win) }),
+        win.resourceId ? el("span", { class: "pane-resource mono", text: win.resourceId }) : null,
+        el("span", { class: "spacer" }),
+        ...paneActions(win, state),
+      ]),
+      body,
+    ]
+  );
+}
+
+function render() {
+  const state = store.shell;
+  const mode = shell.effectiveExperience(state, viewportWidth());
+  const win = shell.focused(state);
+  const container = bind("scene");
+
+  document.documentElement.dataset.experience = mode;
+  store.scene = win.resourceId ? "run" : win.sceneId;
+  bind("crumb").textContent = sceneLabel(win);
+  paintNav();
+
+  const tiling = mode === "tiling" && state.windows.length > 1;
+  container.classList.toggle("scene--panes", tiling);
+  if (tiling) {
+    container.classList.remove("scene--flush");
+    const grid = el("div", { class: "panes" }, state.windows.map((w) => paneNode(w, state)));
+    grid.dataset.expanded = String(state.windows.some((w) => w.expanded));
+    container.replaceChildren(grid);
+  } else {
+    container.classList.toggle("scene--flush", win.sceneId === "console" && !win.resourceId);
+    container.replaceChildren(buildSceneNode(win));
+    container.scrollTop = 0;
+    if (win.sceneId === "console") setTimeout(() => consoleView.textarea.focus(), 0);
+  }
+  if (state.windows.some((w) => w.sceneId === "engine") && !store.doctor) void loadDoctor();
+}
+
+function dispatch(action) {
+  const next = shell.reduce(store.shell, action);
+  if (next === store.shell) return;
+  store.shell = next;
+  if (next.experience !== store.prefs.experience) {
+    store.prefs.experience = next.experience;
+    savePrefs();
+  }
+  render();
+  syncHash();
+}
+
+function syncHash() {
+  const hash = shell.hashFor(shell.focused(store.shell));
+  if (location.hash !== hash) {
+    hashLock = true;
+    location.hash = hash;
+  }
+}
+
+/** Legacy shape kept: navigate("run", id) still means the run detail. */
+function navigate(id, param, intent = "replace") {
+  const sceneId = id === "run" ? "runs" : id;
+  const resourceId = id === "run" ? param : param || null;
+  dispatch({ type: "navigate", sceneId, resourceId, intent });
+}
+
+function showScene(id, param) {
+  navigate(id, param);
 }
 
 function fromHash() {
+  if (hashLock) {
+    hashLock = false;
+    return;
+  }
   const raw = location.hash.replace(/^#\/?/, "");
   const [head, tail] = raw.split("/");
-  if (head === "runs" && tail) return showScene("run", tail);
+  if (head === "runs" && tail) return navigate("run", tail);
   const scene = SCENES.find((entry) => entry.id === head);
-  showScene(scene ? scene.id : "overview");
+  navigate(scene ? scene.id : "overview");
+}
+
+/* ─────────────────────────────────────────────────────── context menus */
+
+function closeMenu() {
+  const layer = bind("menu-layer");
+  layer.replaceChildren();
+  layer.hidden = true;
+}
+
+function openMenu(x, y, items) {
+  const layer = bind("menu-layer");
+  const menu = el(
+    "div",
+    { class: "menu", role: "menu" },
+    items.map((item) =>
+      el("button", {
+        class: "menu-item",
+        role: "menuitem",
+        text: item.label,
+        onclick: () => {
+          closeMenu();
+          item.run();
+        },
+      })
+    )
+  );
+  layer.replaceChildren(menu);
+  layer.hidden = false;
+  // CSSOM, not a style attribute: the CSP forbids the latter
+  const width = 232;
+  menu.style.left = Math.min(x, viewportWidth() - width - 8) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - 8 - items.length * 34) + "px";
+}
+
+function targetUrl(sceneId, resourceId, { token = false } = {}) {
+  const hash = shell.hashFor({ sceneId, resourceId });
+  const base = location.origin + location.pathname;
+  return token ? `${base}?k=${encodeURIComponent(store.token)}${hash}` : base + hash;
+}
+
+/** The actions PostHog offers on a window, on our scenes. */
+function targetMenu(sceneId, resourceId = null) {
+  return [
+    { label: "Open", run: () => navigate(sceneId, resourceId) },
+    {
+      label: "Open side by side",
+      run: () => navigate(sceneId, resourceId, "sideBySide"),
+    },
+    {
+      label: "Open in new browser tab",
+      // the token is per process, and a new tab has no sessionStorage of ours
+      run: () => window.open(targetUrl(sceneId, resourceId, { token: true }), "_blank"),
+    },
+    {
+      label: "Copy link",
+      run: () =>
+        navigator.clipboard.writeText(targetUrl(sceneId, resourceId)).then(
+          () => toast("link copied — without the token"),
+          () => toast("copy blocked by the browser")
+        ),
+    },
+  ];
+}
+
+function splitMenu(winId) {
+  const state = store.shell;
+  const open = new Set(state.windows.map((w) => w.sceneId));
+  return SCENES.filter((scene) => !open.has(scene.id)).map((scene) => ({
+    label: `Side by side: ${scene.label}`,
+    run: () => {
+      dispatch({ type: "focus", id: winId });
+      navigate(scene.id, null, "sideBySide");
+    },
+  }));
 }
 
 /* ─────────────────────────────────────────────────────────────  palette */
@@ -1208,6 +1428,28 @@ function paletteItems() {
       hint: command.description,
       badge: command.loop,
       run: () => prefill("/" + command.name + " "),
+    });
+  }
+  for (const scene of SCENES) {
+    items.push({
+      label: `Side by side: ${scene.label}`,
+      hint: "open beside the focused scene",
+      run: () => navigate(scene.id, null, "sideBySide"),
+    });
+  }
+  if (store.shell.windows.length > 1) {
+    items.push({
+      label: "Close focused pane",
+      hint: "workspace",
+      run: () => dispatch({ type: "close", id: store.shell.focusId }),
+    });
+    items.push({ label: "Cycle panes", hint: "workspace", run: () => dispatch({ type: "cycle" }) });
+  }
+  for (const mode of EXPERIENCES) {
+    items.push({
+      label: `Experience: ${mode.label}`,
+      hint: mode.hint,
+      run: () => dispatch({ type: "experience", experience: mode.id }),
     });
   }
   items.push({ label: "Toggle theme", hint: "appearance", run: toggleTheme });
@@ -1312,7 +1554,10 @@ async function refreshRuns() {
     return;
   }
   paintNav();
-  if (store.scene === "runs" || store.scene === "overview") showScene(store.scene);
+  const showsRuns = store.shell.windows.some(
+    (w) => !w.resourceId && (w.sceneId === "runs" || w.sceneId === "overview")
+  );
+  if (showsRuns) render();
 }
 
 async function loadDoctor() {
@@ -1362,10 +1607,32 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (palette.open && !event.target.closest(".palette")) closePalette();
+  if (!event.target.closest(".menu")) closeMenu();
 
   const node = event.target.closest("[data-action]");
-  if (!node) return;
+  if (!node) {
+    // clicking into a pane focuses it — but never steal a click from a control
+    const pane = event.target.closest(".pane");
+    if (pane && pane.dataset.pane !== store.shell.focusId) {
+      dispatch({ type: "focus", id: pane.dataset.pane });
+    }
+    return;
+  }
   const action = node.dataset.action;
+
+  if (action === "pane-focus") return dispatch({ type: "focus", id: node.dataset.win });
+  if (action === "pane-close") return dispatch({ type: "close", id: node.dataset.win });
+  if (action === "pane-expand") {
+    const win = store.shell.windows.find((w) => w.id === node.dataset.win);
+    return dispatch({ type: "expand", id: node.dataset.win, expanded: !win?.expanded });
+  }
+  if (action === "pane-split") {
+    const box = node.getBoundingClientRect();
+    return openMenu(box.left, box.bottom + 6, splitMenu(node.dataset.win));
+  }
+  if (action === "experience") {
+    return dispatch({ type: "experience", experience: node.dataset.value });
+  }
 
   if (action === "theme") return toggleTheme();
   if (action === "palette") return openPalette();
@@ -1378,7 +1645,7 @@ document.addEventListener("click", (event) => {
   if (action === "prefill") return prefill(node.dataset.value);
   if (action === "suggest") return acceptSuggestion(node.dataset.value);
   if (action === "run") {
-    showScene("console");
+    navigate("console", null, "focus");
     return void startRun(node.dataset.value.trim());
   }
   if (action === "copy") {
@@ -1396,12 +1663,23 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+  const mod = event.metaKey || event.ctrlKey;
+  if (mod && event.key.toLowerCase() === "k") {
     event.preventDefault();
     if (palette.open) closePalette();
     else openPalette();
     return;
   }
+  if (mod && event.key === "\\") {
+    event.preventDefault();
+    return dispatch({ type: "cycle" });
+  }
+  if (mod && event.key.toLowerCase() === "w" && store.shell.windows.length > 1) {
+    // browsers reserve ⌘W for the tab; it lands in the native window
+    event.preventDefault();
+    return dispatch({ type: "close", id: store.shell.focusId });
+  }
+  if (event.key === "Escape" && !bind("menu-layer").hidden) return closeMenu();
   if (!palette.open) return;
   if (event.key === "Escape") return closePalette();
   const found = palette.filtered;
@@ -1436,7 +1714,34 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("contextmenu", (event) => {
+  const hit = event.target.closest("[data-action]");
+  if (!hit) return;
+  const action = hit.dataset.action || "";
+  let target = null;
+  if (action.startsWith("scene:")) target = { sceneId: action.slice(6), resourceId: null };
+  else if (action.startsWith("run:")) target = { sceneId: "runs", resourceId: action.slice(4) };
+  else if (action === "pane-focus") {
+    const win = store.shell.windows.find((w) => w.id === hit.dataset.win);
+    if (win) target = { sceneId: win.sceneId, resourceId: win.resourceId };
+  } else if (action === "prefill" && hit.dataset.value) {
+    target = { sceneId: "console", resourceId: null };
+  }
+  if (!target) return;
+  event.preventDefault();
+  openMenu(event.clientX, event.clientY, targetMenu(target.sceneId, target.resourceId));
+});
+
 window.addEventListener("hashchange", fromHash);
+
+let narrow = viewportWidth() < shell.NARROW_WIDTH;
+window.addEventListener("resize", () => {
+  const isNarrow = viewportWidth() < shell.NARROW_WIDTH;
+  if (isNarrow !== narrow) {
+    narrow = isNarrow;
+    render();
+  }
+});
 
 /* ──────────────────────────────────────────────────────────────── boot */
 
@@ -1474,7 +1779,14 @@ async function boot() {
   buildConsole();
   await Promise.all([loadPolicy(), refreshRuns()]);
   paintChrome();
+  if (store.prefs.experience && store.prefs.experience !== store.shell.experience) {
+    store.shell = shell.reduce(store.shell, {
+      type: "experience",
+      experience: store.prefs.experience,
+    });
+  }
   fromHash();
+  render();
 }
 
 boot();

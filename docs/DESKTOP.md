@@ -92,9 +92,9 @@ cannot set headers. It dies with the process — there is no persisted session.
   static files, server-sent events. bashOS has no web framework in its
   dependency tree and the desktop does not add one, so `pip install bashos`
   followed by `bashos gui` works with nothing else installed.
-- `gui/web/` — the front end: one HTML file, one stylesheet, one ES module. No
-  bundler, no npm, no build step. Editing `app.js` and reloading is the whole
-  development loop.
+- `gui/web/` — the front end: one HTML file, one stylesheet, two ES modules
+  (`app.js` draws, `shell.js` decides the layout). No bundler, no npm, no build
+  step. Editing and reloading is the whole development loop.
 - `gui/desktop.py` — the native window. `pip install "bashos[gui]"` adds
   pywebview, which drives the platform's own webview (WebKit on macOS,
   WebKit2GTK/Qt on Linux, WebView2 on Windows) — no bundled browser, no second
@@ -103,6 +103,29 @@ cannot set headers. It dies with the process — there is no persisted session.
 The window toolkit owns the main thread on macOS, so the native path runs the
 asyncio server on a background loop and blocks the main thread in the toolkit.
 The browser path is a plain `asyncio.run`, the shape the rest of bashOS uses.
+
+## Experience modes
+
+`shell.js` is a pure reducer over one piece of state — which scenes are open,
+which is focused, which mode the window is in — with no DOM and no fetch, so it
+can be unit-tested (`tests/shell.test.mjs`, run by `pytest -q`) apart from
+whatever `app.js` draws.
+
+| Mode | Consumer |
+|---|---|
+| `single` | one scene mounted, as it always was |
+| `tiling` | two panes, each a scene instance, focus follows the click |
+| `plain` | one scene, sidebar and top bar unmounted |
+
+Four navigation intents move between them — `replace` (a click, unchanged),
+`new`, `focus` and `sideBySide` — each with a consumer in the reducer and a
+test. A mode or an intent with nothing behind it is the drift
+[frontend/](frontend/README.md) exists to avoid, so there is no `os` mode until
+floating windows are real.
+
+Layout lives in the client: no route was added, and `/api/*` is untouched.
+The Console is a singleton — it owns persistent DOM and an event stream, so a
+split focuses it instead of mounting a second one.
 
 ## Runs are not history
 
@@ -116,7 +139,8 @@ hundred runs are kept; older ones fall off.
 
 1. Add a route in `gui/server.py` that returns JSON from something that already
    exists. If it needs new state, it probably belongs elsewhere.
-2. Add a `scene*()` builder in `web/app.js` and an entry in `SCENES`.
+2. Add a `scene*()` builder in `web/app.js` and an entry in `SCENES`. It works
+   in a pane for free — panes host the same builders.
 3. Build DOM with `el()`, never `innerHTML` — the one exception is
    `renderMarkdown()`, which escapes before it structures.
 4. No inline `style` attributes: the CSP forbids them. Use a class.
