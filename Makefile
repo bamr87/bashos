@@ -1,4 +1,4 @@
-.PHONY: install test lint repl run doctor up down clean
+.PHONY: install test lint repl gui run doctor up down clean
 
 VENV := .venv
 
@@ -16,6 +16,9 @@ lint:
 
 repl:
 	$(VENV)/bin/bashos
+
+gui:      ## the desktop window (browser fallback without the [gui] extra)
+	$(VENV)/bin/bashos gui
 
 doctor:
 	$(VENV)/bin/bashos doctor

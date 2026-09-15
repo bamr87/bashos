@@ -10,10 +10,11 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "bamr87", email = "bamr87@users.noreply.github.com" }]
-keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "repl"]
+keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "repl", "gui", "desktop"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
+  "Environment :: Web Environment",
   "Intended Audience :: Developers",
   "Intended Audience :: System Administrators",
   "Programming Language :: Python :: 3.11",
@@ -48,6 +49,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
+# the desktop window. The GUI itself needs nothing beyond the base install —
+# `bashos gui` serves it and falls back to your browser; this adds the native
+# window (platform webview, no bundled runtime).
+gui = ["pywebview>=5.0"]
 # observability: OpenInference spans exported to Arize Phoenix
 trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.29"]
 

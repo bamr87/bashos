@@ -34,6 +34,7 @@ resource-management layer shouldn't.
 ```bash
 npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
 ./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
+./bin/bashos gui             # …or the desktop window, on the same kernel
 ```
 
 ```text
@@ -53,6 +54,7 @@ bashos run -v /sh list open ports            # -v prints the kernel trace
 bashos list                                  # command table
 bashos doctor                                # auth + environment checks
 bashos opencode status                       # boot the engine and report what it runs
+bashos gui                                   # the desktop: same kernel, GUI front end
 ```
 
 ## Auth — Claude Code OAuth, wired into the engine
@@ -101,10 +103,42 @@ Every one of these also works as a plain slash command inside Claude Code when
 you open this repo, and — after `bashos opencode sync` — inside the OpenCode
 TUI. Same file, no duplication.
 
+## Desktop
+
+`bashos gui` opens a GUI front end on the same kernel — a native window with
+`pip install "bashos[gui]"`, your browser without it:
+
+[![The bashOS desktop](docs/media/overview.png)](docs/DESKTOP-TOUR.md)
+
+
+| scene | what it is |
+|---|---|
+| **Overview** | session stats, quick-run chips, recent runs, the path a line takes |
+| **Console** | the terminal as a GUI — slash completion, live kernel trace, tool calls as they happen |
+| **Commands** | userland: every `.claude/commands/*.md` with its loop, agent, and prompt spec |
+| **Runs** | every line this window ran, with its trace, its tool calls, and its answer |
+| **Health** | host facts, the react-loop sweeps, and the probe allowlist a sweep may use |
+| **Engine** | `doctor` checks, live engine state, the tool policy, the generated `opencode.jsonc` |
+| **Side by side** | any two scenes in one window — focus, maximize, close; Console stays a singleton |
+
+It is a *view*, not a second runtime: a console line goes through the same
+`build_kernel(...)` call `bashos run` makes. The socket is loopback-only and
+token-guarded, `!` shell passthrough is refused (that stays in your terminal,
+where it is your own shell by your own keystroke), and the tool policy is
+unchanged — the Health scene renders the allowlist, it does not widen it. No
+bundler, no npm, no web framework in the dependency tree: one HTML file, one
+stylesheet, one ES module, served by ~300 lines of asyncio.
+
+**[Take the tour](docs/DESKTOP-TOUR.md)** — every scene, with screenshots and
+recordings of the real thing. The architecture and guard model are in
+[docs/DESKTOP.md](docs/DESKTOP.md); where the window metaphors are going is in
+[docs/frontend/](docs/frontend/README.md).
+
 ## Architecture
 
 ```
  terminal (REPL / CLI · typer + rich + prompt-toolkit)
+ desktop  (`bashos gui` · loopback HTTP + SSE → one page, no build step)
     │
     ▼
  kernel — LangGraph state machine
@@ -168,6 +202,8 @@ immediately, and reaches the engine on its next start.
 - `/script` output is verified by shellcheck when installed, and labeled
   unverified when not.
 - Only `!` lines execute anything by your intent — and that's your own shell.
+  The desktop has no `!` at all: it runs kernel lines, on a loopback socket
+  guarded by a per-process token, and widens no policy.
 
 ## Services (Docker)
 
@@ -215,3 +251,4 @@ the registry.
 - Streaming token output in the REPL
 - More loops: plan-execute, multi-draft panel w/ judge
 - More userland: `/git`, `/docker`, `/net`, `/db`
+- Desktop: token streaming into the console, packaged app bundles

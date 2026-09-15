@@ -35,6 +35,7 @@ layers are, what a loop is, and how to extend each one.
 ```
  ┌─────────────────────────────────────────────────────────────┐
  │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
+ │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
  ├─────────────────────────────────────────────────────────────┤
  │ kernel/       LangGraph state machine: parse → route → loop │  orchestration
  ├─────────────────────────────────────────────────────────────┤
@@ -193,6 +194,12 @@ generated config, the dry-run report, and the tests all follow from it.
 
 **Add a backend** — one branch in `get_chat_model()` returning any
 `BaseChatModel`. Loops never know which backend they run on.
+
+**Add a desktop scene** — one route in `gui/server.py` over state that already
+exists, one builder in `gui/web/app.js`. The GUI is an access layer beside
+`shell/`, not above the kernel: it calls `build_kernel(...)` exactly as
+`bashos run` does, and holds no policy, no history file, and no loop of its
+own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
 
 **Swap the engine** — implement `complete()`/`act()` against another
 client/server agent and point `opencode/engine.py` at it. Nothing above

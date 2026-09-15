@@ -3,6 +3,7 @@
     bashos                     interactive REPL (the default)
     bashos run /sh <request>   one-shot command
     bashos run <plain english> routed to the best command by the kernel
+    bashos gui                 the desktop window (same kernel, GUI front end)
     bashos list                command table
     bashos doctor              auth + environment checks
     bashos opencode …          the engine: sync · status · auth · serve
@@ -253,6 +254,29 @@ def remote_ask(
         remote.ask(host, " ".join(words or []), config, do_mirror=not no_mirror)
     )
     render.print_output(answer)
+
+
+@app.command("gui")
+def gui(
+    port: int = typer.Option(0, "--port", "-p", help="port to serve on (0 = pick a free one)"),
+    host: str = typer.Option("127.0.0.1", "--host", help="interface to bind — loopback by default"),
+    browser: bool = typer.Option(
+        False, "--browser", help="use the default browser instead of a native window"
+    ),
+    open_page: bool = typer.Option(True, "--open/--no-open", help="open the page on start"),
+    model: str | None = typer.Option(None, "--model", "-m", help="model override"),
+) -> None:
+    """Open the bashOS desktop — a GUI front end over this same kernel."""
+    from ..gui import GuiServer, launch, window_available
+
+    config = KernelConfig.from_env(model=model)
+    server = GuiServer(config, host=host, port=port)
+    native = window_available() and not browser
+
+    def announce(started: GuiServer) -> None:
+        render.print_gui_banner(started.entry_url, native=native)
+
+    launch(server, window=not browser, open_browser=open_page, announce=announce)
 
 
 @app.command("repl")
