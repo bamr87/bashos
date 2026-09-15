@@ -54,7 +54,7 @@ dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
 # window (platform webview, no bundled runtime).
 gui = ["pywebview>=5.0"]
 # observability: OpenInference spans exported to Arize Phoenix
-trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.29"]
+trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.76"]
 
 [project.urls]
 Repository = "https://github.com/bamr87/bashos"
