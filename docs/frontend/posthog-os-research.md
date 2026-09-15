@@ -5,6 +5,8 @@
 **Audience:** Cloud agent drafting a PRD/spec/roadmap for **bashOS** L6 OS-style frontend.  
 **Date researched:** 2026-09-15
 
+> **Relation to bashOS desktop GUI (PR #20):** This brief remains PostHog.com research for **inspiration only**. bashOS’s current L6 web/native surface is `bashos gui` as proposed/landed in [PR #20](https://github.com/bamr87/bashos/pull/20) — no-build `gui/web`, seven scenes, and the security refusals in `docs/DESKTOP.md`. The OS-shell PRD/SPEC/ROADMAP in this folder **evolve that foundation** (multi-pane / window metaphors); they must not be read as a greenfield Vite/Next replacement for #20. See [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md).
+
 ---
 
 ## 1. Product intent (why an OS UI)

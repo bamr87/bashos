@@ -1,71 +1,75 @@
-# PRD: bashOS L6 OS Shell
+# PRD: bashOS L6 OS Shell (evolution of desktop GUI)
 
-**Status:** Draft for review  
+**Status:** Draft for review — aligned with [PR #20](https://github.com/bamr87/bashos/pull/20) desktop GUI  
 **Audience:** bashOS maintainers, L6 implementers  
-**Related:** [SPEC-os-shell.md](./SPEC-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md)  
-**Inspiration:** PostHog.com OS-style site (research brief 2026-09-15) — patterns adapted; nostalgia optional  
+**Related:** [SPEC-os-shell.md](./SPEC-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
+**Foundation:** [`docs/DESKTOP.md`](../DESKTOP.md), [`docs/DESKTOP-TOUR.md`](../DESKTOP-TOUR.md) (paths when #20 merges)  
+**Inspiration:** PostHog.com OS-style site (research brief 2026-09-15) — **inspiration only**; nostalgia optional  
 
 ---
 
 ## 1. Problem
 
-bashOS is a terminal-first AI runtime. Operators already juggle:
+[PR #20](https://github.com/bamr87/bashos/pull/20) proposes/lands `bashos gui`: a GUI access layer **beside** the terminal, not above it. One page, seven hash-routed scenes (Overview, Console, Commands, Runs, Health, Engine, Settings), same kernel as the CLI, no-build front end.
 
-- One or more agent runs (transcripts, tool calls, costs)
-- PTYs / shells attached to those runs
-- Specs, diffs, and editable buffers
-- Workspace files and artifacts
-- Approval queues for irreversible actions
-- Logs / traces for attribution and debug
-
-Today’s L6 surface is primarily **CLI/REPL + slash commands**. That works for a single linear session. It breaks down when:
+That **single-scene SPA** is great for one console line of work. Operators still hit friction when multitasking:
 
 | Pain | Consequence |
 |---|---|
-| Tab / pane explosion across terminals and browsers | Lost context; no shareable layout |
-| Approvals buried in scrollback | Missed or delayed irreversible gates |
-| No first-class multitasking model | Users invent ad-hoc tmux + browser stacks |
-| Deep links point at “the CLI,” not a concrete pane | Hard to reproduce multi-agent setups |
-| Docs and marketing sites that *look* like OS shells often ship incomplete intents | Handbook says `newWindow` / boring mode; code drifts — operators cannot rely on behavior |
+| Only one scene visible at a time | Console + run detail + Health require hash hopping or extra browser tabs |
+| Scene switcher ≠ window list | No durable “what’s open” model for side-by-side work |
+| Approvals / policy visibility stay in Health / engine surfaces | Easy to miss when buried behind the active scene |
+| Deep links are scene hashes (`#/runs/<id>`) | Strong start; lacks multi-pane layout serialization |
+| PostHog-style marketing OS docs often ship incomplete intents | Handbook vs live drift — bashOS must implement consumers, not folklore |
 
-PostHog’s product bet (multi-window, dense apps, keyboard-first) maps cleanly to this operational problem. Their brand nostalgia does **not** — bashOS users already live in IDE/tmux mental models.
+PostHog’s transferable bet (multi-window, dense apps, keyboard-first, side-by-side) addresses **that** multitasking gap. Their brand nostalgia does **not**. bashOS already has the right L6 foundation in #20 — these docs evolve it.
 
 ---
 
 ## 2. Goals
 
-1. Ship an L6 **web shell** that hosts multiple apps as windows or panes bound to runtime sessions.  
-2. Make **navigation intents explicit**: `replace` | `new` | `focus` | `sideBySide`. Implement consumers, not docs-only flags. Prefer **side-by-side panes** over free-floating drag for MVP multitasking (live PostHog evidence).  
-3. Provide **three experience modes**: `os` | `tiling` | `plain` — each with a real shell consumer that mounts or unmounts chrome.  
-4. Expose an **app template API** so Terminal, Agent, Editor, Files, Logs, Settings, Inbox ship as first-class surfaces.  
-5. Stay **keyboard-first**; mouse polish is secondary.  
-6. Preserve bashOS design goals: approval gates, attribution, immutable base, model-agnostic UI.  
-7. Keep deep links and workspace layouts **serializable** (URL and/or workspace file).
+1. Evolve the **existing** `gui/web` scene system into an L6 **OS shell**: scenes become apps/windows or panes, still bound to the same kernel and `/api/*` + SSE.  
+2. Make **navigation intents explicit**: `replace` | `new` | `focus` | `sideBySide`, aligned with #20 hash routing (`#/console`, `#/runs/<id>`). Prefer **side-by-side of existing scenes** over free-floating drag for MVP.  
+3. Provide experience modes that **wrap** #20 chrome: e.g. single-scene (today), multi-pane / tiling, optional floating later — each with a real mount consumer.  
+4. Extend the **scene builder** pattern already in `app.js` (`scene*()`, `SCENES`) — do not invent a parallel app framework.  
+5. Stay **keyboard-first**; baseline = #20 map (⌘K/Ctrl-K palette, composer `/` slash completion); add OS-shell keys carefully without colliding.  
+6. Preserve bashOS design goals **and honor #20 refusals/guards** (see §9).  
+7. Keep deep links and workspace layouts **serializable** (hash / URL / workspace file) without requiring a history file on disk.
 
 ---
 
 ## 3. Non-goals
 
-- Replicating PostHog marketing whimsy (hedgehog, confetti, MS Paint, WordArt, custom face cursors) as MVP features.  
+- **Replacing PR #20** or shipping a second L6 web console beside `bashos gui`.  
+- **Shell passthrough** (`!` or arbitrary host commands via HTTP).  
+- **npm / bundler / web framework as MVP requirement** — Phases 0–2 stay on #20’s one HTML/CSS/JS stack.  
+- **Widening tool policy** beyond what Health already renders from the engine allowlist.  
+- **Persisting run history** to disk (runs stay in-memory, cap 200, process-lifetime).  
+- **Credentials on the wire** or a reasoning loop inside `gui/`.  
+- Replicating PostHog marketing whimsy (hedgehog, confetti, MS Paint, WordArt) as MVP features.  
 - Replacing the CLI/REPL or TUI; those remain supported L6 surfaces.  
-- Claiming existing kernel/OpenCode HTTP APIs that are not yet specified — integrations are **proposals** (see SPEC).  
+- Claiming new kernel/OpenCode HTTP APIs that #20 does not already expose — extras are **Proposal**.  
 - Building a general-purpose window manager for arbitrary websites.  
-- SEO marketing SSG as a primary driver (bashOS shell is an operator console, not a brochure site).  
-- Account-gated personalization in Phase 0–1 (local/workspace settings only).
+- SEO marketing SSG as a primary driver.
 
 ---
 
 ## 4. Jobs to be done (JTBD)
 
-| Actor | Job | Outcome |
+Map jobs onto **existing #20 scenes** becoming apps/windows — not an invented Terminal/Agent/Editor set.
+
+| Actor | Job | Outcome (on #20 foundation) |
 |---|---|---|
-| Operator | Run an agent while watching its PTY and logs | Side-by-side Agent + Terminal + Logs without losing either |
-| Operator | Approve or reject an irreversible action | Inbox surfaces the gate with actor, tool, and blast radius |
-| Operator | Resume yesterday’s multi-pane setup | Open a workspace deep-link / saved layout |
-| Operator | Find a command, skill, file, or agent | Command palette (`Ctrl+K`) — not a marketing Spotlight clone |
-| Contributor | Add a new L6 app | Implement against App Template API; register `appId` + chrome slots |
-| Automator / a11y user | Use bashOS without window chrome | `plain` mode: linear console, no drag/snap |
-| Mobile / narrow viewport | Still reach Agent + Inbox | Degraded layout or forced `plain` / single-pane |
+| Operator | Run a line while watching its run card / detail | **Console** + **Runs** (or `#/runs/<id>`) side-by-side |
+| Operator | Check policy / allowlist while a run streams | **Console** + **Health** side-by-side |
+| Operator | Inspect engine/doctor without losing console | **Engine** in a second pane; Console stays mounted |
+| Operator | Jump to a command or scene quickly | Existing ⌘K/Ctrl-K palette — **extend** (Spotlight analogue), don’t replace |
+| Operator | Resume a multi-pane setup | Workspace deep-link / saved layout of scene instances |
+| Contributor | Add a surface | New `scene*()` + `SCENES` entry (+ route in `server.py` if needed) — App Template = scene builder |
+| Automator / a11y user | Use without multi-pane chrome | Single-scene / `plain` = today’s SPA behavior |
+| Mobile / narrow viewport | Still reach Console + Settings | Degraded to single scene (current behavior) |
+
+Future **Docs** / **Files** scenes are **Could** only — not MVP apps that displace the seven.
 
 ---
 
@@ -75,32 +79,33 @@ Metrics are **product intent**, not invented analytics sources.
 
 | Metric | Target (directional) | How measured |
 |---|---|---|
-| Time to multi-surface session | &lt; 30s from shell load to Terminal + Agent open | Manual / Phase 0 spike stopwatch; later: local telemetry opt-in |
-| Approval visibility | 100% of irreversible gates appear in Inbox when shell is connected | Integration test against approval bus (**Proposal**) |
-| Intent correctness | `new` always appends; `focus` never duplicates; `replace` only mutates focused | Unit + e2e tests on nav reducer |
-| Keyboard coverage | All Must keymap entries documented and testable | Keymap contract tests |
-| Plain mode | Shell chrome fully unmounted; content still deep-linkable | E2E: `experience=plain` |
-| Perf budget | Drag/resize of 4 windows stays interactive on mid-tier laptop | Frame-time check in Phase 2; `performanceBoost` equivalent |
+| Time to multi-surface session | &lt; 30s from `bashos gui` to Console + Runs (or Health) side-by-side | Manual / Phase 0 spike stopwatch |
+| Guard integrity | All #20 refusals still hold (no `!`, no secrets, CSP, token, bind) | Existing GUI / capture tests + regression checklist |
+| Intent correctness | `new` appends scene instance; `focus` no duplicate; `replace` = current hash nav | Unit + e2e on nav reducer |
+| Keyboard coverage | #20 baseline + OS-shell Must keys documented and non-colliding with composer `/` and ⌘K | Keymap contract tests |
+| No-build constraint | Phases 0–2: still one HTML + CSS + ES module; capture_desktop still works | Spike exit + `tools/capture_desktop.py` |
+| Perf budget | Two-pane layout stays interactive; no npm required | Phase 1 manual; optional later instrumentation |
 
 ---
 
 ## 6. Experience modes
 
-| Mode | Metaphor | Chrome | Default when |
+| Mode | Metaphor | Relation to #20 | Default when |
 |---|---|---|---|
-| `os` | Floating windows over a desktop | Menu/status bar, optional icons, window chrome, z-order | Desktop / wide viewport; preference |
-| `tiling` | IDE / tmux-like splits | Menu/status bar, pane borders, no free drag | Power users; Phase 2 default option |
-| `plain` | Traditional single-pane console | Minimal header; no windows/desktop | Mobile, automation, screenshots, a11y preference |
+| `single` (today) | One scene, sidebar + top bar | **Current** `gui/web` behavior | Default until multi-pane ships; narrow viewports |
+| `tiling` / multi-pane | IDE / tmux-like splits of **scenes** | Scene instances in panes; sidebar may become window list | Power users; Phase 1–2 |
+| `os` (Could / Phase 3) | Floating windows over a desktop | Optional chrome around same scenes | Preference after tiling is solid |
+| `plain` | Minimal chrome | Unmount multi-pane / desktop chrome; one scene content | Automation, screenshots, a11y |
 
-**Lesson from PostHog:** handbook documented `experience: 'posthog' | 'boring'`, but live `SiteSettings` lacked a reader for boring mode (only a Spotlight writer). bashOS **must** gate shell mount on `shellSettings.experience` with an actual consumer.
+**Lesson from PostHog:** docs-only “boring” mode with no consumer. bashOS **must** gate chrome on a real setting.
 
 ```
-if experience == plain:
-  render PlainConsole(route)
+if experience == plain or single:
+  render current #20 scene shell (hash → one scene)
 else if experience == tiling:
-  render TilingLayout(panes)
+  render MultiPane(sceneInstances)
 else:
-  render OsDesktop(windows)
+  render OsDesktop(sceneWindows)  # Phase 3+
 ```
 
 ---
@@ -109,147 +114,123 @@ else:
 
 ### Must
 
-- Multi-window **or** multi-pane with **focus**, z-order (os) / layout tree (tiling), **maximize/restore**, **close**  
-- **Side-by-side panes** + focus switching (close one → single window) — primary multitasking path for MVP  
-- Desktop / pinned entry points: **single-click select**, **double-click open**, Ctrl multi-select (icon drag optional)  
-- **Context menus** on apps/links: Open in new window, Open side-by-side, Open in new browser tab, Copy link  
-- Navigation intents: `replace` | `new` | `focus` | `sideBySide` — all implemented in the nav reducer  
-- Documented, testable keyboard map aligned to **live-proven** shortcuts (search/chat/settings/Esc + toasts); see SPEC  
-- Command / search palette + Esc closes overlays; toast feedback for settings changes  
-- Browser-tab fallback when in-shell multitasking is insufficient  
-- App Template API: chrome slots `title`, `toolbar`, `sidebar`, `main`, `status`  
-- Initial apps: **Terminal**, **Agent**, **Editor**, **Files**, **Logs/trace**, **Settings**, **Inbox/approvals**  
-- Deep-linkable URLs per window/pane content  
-- `plain` mode without window chrome (real unmount consumer — do not ship docs-only “boring”)  
-- Attribution fields on window/session metadata (actor, runId)  
-- Inbox as the human-approval surface for irreversible acts  
+- **Evolve #20 chrome** — sidebar / top bar / palette remain; add window/pane affordances around **existing scenes**  
+- **Keep #20 guards and refusals** normative (see §9 and SPEC security table)  
+- **Side-by-side of existing scenes** (e.g. Console ‖ Runs, Console ‖ Health) + focus switching; close one → single  
+- Navigation intents: `replace` (current hash nav) \| `new` \| `focus` \| `sideBySide` — implemented, not docs-only  
+- Context menus / palette actions: Open side-by-side, Open in new pane, Open in new browser tab, Copy hash/link  
+- Documented keyboard map: **#20 baseline first**; OS-shell additions without colliding with composer `/` or ⌘K  
+- Command palette remains global overlay (extend items; do not make it a managed window)  
+- App/scene template = extend `scene*()` + `SCENES`; initial apps = **the seven scenes**  
+- Deep-linkable hashes per scene / run (`#/runs/<id>`) preserved and extended for multi-pane  
+- Attribution fields on window/scene-instance metadata when a run is bound  
+- **Must not** break no-build constraint without an **explicit later phase** decision  
 
 ### Should
 
-- Shareable workspace layout serialization (`?windows=` or workspace JSON)  
-- Command palette depth over agents, skills, files, slash commands  
-- Per-app min/max size and modal policies (`appSettings[appId]`)  
-- Narrow / mobile fallback (simplify chrome or force `plain`)  
-- Split React (or equivalent) contexts so layout updates do not re-render Terminal/Logs  
-- Status bar: host, agent count, model id, session cost (**Proposal:** fed by kernel)  
+- Window / scene-instance **list** (taskbar analogue) — what’s open, focus, close  
+- Shareable workspace layout serialization (`?windows=` or workspace JSON) of scene ids + resources  
+- Palette depth: scenes, recent runs, commands registry, dry-run toggle  
+- Narrow viewport → force `single`  
+- Status affordances already in #20 project card / top bar — extend carefully from `/api/state`  
 
 ### Could
 
-- Free-floating **drag / resize** polish (PostHog live: unreliable; optional after side-by-side)  
-- Snap-edge keyboard shortcuts (PostHog `Shift+Arrow` had **no effect** live — re-evaluate after motion spike)  
-- Minimize + taskbar / active-windows restore (**only if** restore path is complete end-to-end)  
+- Free-floating **drag / resize** (PostHog live: unreliable; after side-by-side)  
+- Desktop icons = pinned scenes / slash commands  
+- Future scenes: Docs, Files (only if they fit no-build + same API discipline)  
 - Nostalgic theme pack (optional skin; off by default)  
-- In-window back/forward history  
-- Animated open-from-icon origins  
-- Screensaver / fun mode (gated)  
-- Presentation-style run report decks  
-- Media-style run replay player  
+- Minimize + restore **only if** end-to-end restore works  
+- React/Vite migration (**Phase 3+** explicit tradeoff — rewrite capture tooling; not default)  
 
 ### Won’t (near term)
 
-- Fake minimize / taskbar without working restore  
-- Trash-style restore/delete metaphors without real actions  
-- Bookmarks app without a clear operator purpose  
-- Conflicting cheatsheet shortcuts copied from handbook fiction (`.`, `|` vs live `m` / `\`)  
+- Replacing #20 or prescribing Vite/Next as the default stack  
+- Shell passthrough, wider policy, credential echo, on-disk run history, reasoning in `gui/`  
+- Invented MVP app set (Terminal/Agent/Editor/Files…) that **ignores** the seven scenes  
+- Fake minimize / Trash / Bookmarks metaphors  
 - Hedgehog / confetti / custom face cursors as product surface  
-- Merch / marketing Explorer metaphors  
 - Replacing SSH or TUI paths  
 
 ---
 
 ## 8. PostHog → bashOS concept map
 
-| PostHog | bashOS |
+| PostHog | bashOS (on #20) |
 |---|---|
-| `AppWindow` | `ShellWindow` bound to a **pane session** (PTY, agent run, file URI, URL) |
-| `appSettings[route]` | `appSettings[appId]` + resource URI |
-| `siteSettings` | `shellSettings` (theme, keymap, `experience`, density, performanceBoost) |
-| Desktop icons | Pinned agents / skills / workspaces |
-| `?windows=` shareable desktop | Saved workspace layouts |
-| Inbox (Outlook forums) | Notification / human-input / **approvals** queue |
-| Explorer | Workspace FS + artifact browser |
-| MediaPlayer | Run replay / trace viewer (**Could**) |
-| Presentation | Structured run-report decks (**Could**) |
-| Editor | Markdown/spec + agent-editable buffers |
-| Spotlight (Algolia) | Command palette (local index + runtime registry) |
-| Ask Max overlay | Agent app / optional always-on dock |
-| TaskBarMenu | MenuBar + StatusBar (host, agents, model, cost) |
-| Boring mode (docs drift) | `plain` — **must** unmount shell |
-| `newWindow` (docs vs code) | Explicit `NavIntent.new` that **appends** |
-| Framer-heavy chrome | Prefer lighter drag if beside heavy agent UIs; see SPEC stack |
-| Gatsby SSG | Vite or Next operator console; wrap-at-root pattern kept |
+| `AppWindow` | **Scene instance** (window/pane) bound to a scene id + optional resource (`#/runs/<id>`) |
+| App route / content | Existing `scene*()` builders in `gui/web/app.js` |
+| `siteSettings` | Extend #20 prefs / Settings scene (`shellSettings`: experience, theme already exists) |
+| Desktop icons | Pinned scenes / commands (**Could**) |
+| `?windows=` shareable desktop | Saved layout of scene instances |
+| Spotlight | **Existing ⌘K/Ctrl-K palette** — extend |
+| TaskBarMenu | Sidebar scene switcher → **window list** + status (evolve, don’t discard) |
+| Ask Max overlay | Console composer / agent path already in kernel — not a second chat product |
+| Boring mode (docs drift) | `single` / `plain` — **must** match real chrome unmount |
+| `newWindow` (docs vs code) | Explicit `NavIntent.new` that appends a scene instance |
+| Gatsby / React / Framer | **Inspiration only** — #20 stack for Phases 0–2 |
 
-**Transferable bets:** windowed multitasking, dense apps, keyboard-first, explicit intents, shareable layouts, plain fallback.  
-**Optional later:** nostalgia skins.  
-**Skip for MVP:** brand gimmicks that do not serve agent workflows.
+**Transferable bets:** windowed multitasking, dense apps, keyboard-first, explicit intents, shareable layouts, plain/single fallback.  
+**Skip for MVP:** brand gimmicks; greenfield SPA frameworks.
 
 ---
 
 ## 9. Constraints & principles
 
-1. **Intent over folklore** — if a flag is documented, a reducer must honor it.  
-2. **CLI remains canonical** — web shell is additive L6.  
-3. **Proposals labeled** — no invented kernel endpoints.  
-4. **Density over decoration** — apps look like tools (tables, sidebars, transcripts), not heroes.  
-5. **Security posture** — shell never bypasses approval gates; irreversible actions require Inbox confirmation when policy says so.  
-6. **Model-agnostic** — Settings shows model as data from runtime, not hard-coded vendor UI.
+1. **#20 is today’s L6 surface** — OS-shell docs propose evolution; cite “as proposed/landed in PR #20.”  
+2. **Intent over folklore** — documented flag ⇒ reducer consumer.  
+3. **CLI remains canonical** — GUI stays beside the terminal.  
+4. **Proposals labeled** — existing `/api/*` + SSE are real in #20; new endpoints are Proposal.  
+5. **Density over decoration.**  
+6. **Security posture (normative — copy from DESKTOP.md):**  
+   - No shell passthrough (`!` → 403)  
+   - No wider tool policy (Health renders allowlist only)  
+   - No credentials on the wire  
+   - No history file (runs in-memory, cap 200)  
+   - No reasoning loop in `gui/`  
+   - Bind `127.0.0.1`, per-process token, Host/Origin checks, CSP `default-src 'self'`, input caps  
+7. **Model-agnostic** — Settings/model from runtime state, not hard-coded vendor UI.  
+8. **No-build until Phase 3+ explicit tradeoff.**
 
 ---
 
 ## 10. Out-of-scope decisions deferred to SPEC / ROADMAP
 
-- Exact SPA framework (Vite+React vs Next) — SPEC recommends with justification  
-- Floating-first vs tiling-first default — ROADMAP Phase 0/1 prioritize **side-by-side + context menus**; free drag/resize is polish, not MVP  
-- Websocket protocol to LangGraph / OpenCode — **Proposal** surfaces only  
-- Whether TUI and web shell share a pane-session protocol — open question  
+- Floating-first vs tiling-first — ROADMAP: side-by-side first on current scenes  
+- Whether any new `/api/*` is needed for layouts — default: client-only layout state  
+- Framework migration — Phase 3+ only, with capture_desktop rewrite cost  
+- Dependency: **merge PR #20 first** (or rebase this work onto it)
 
 ---
 
-*End of PRD.*
-
----
-
-## 11. Live evidence (PostHog.com browser tour)
+## 11. Live evidence (PostHog.com browser tour) — inspiration only
 
 **Scope:** Public marketing site only (`posthog.com`). Did **not** use `app.posthog.com` or login.  
-**Date:** 2026-09-15 (same research window as brief).
+**Date:** 2026-09-15.  
+**Caveat:** Evidence informs multitasking UX patterns. It does **not** authorize replacing #20’s stack or security model.
 
 ### Confirmed live
 
 | Observation | Implication for bashOS |
 |---|---|
-| Desktop wallpaper + left/right icon catalogs (Home, Self-driving, Context warehouse, Pricing, Docs, Demo; About, Changelog, Handbook, Store, Careers, Trash) | Icon rail as pinned entry points is viable; map to agents/skills/workspaces, not merch |
-| Fixed top taskbar | MenuBar/StatusBar should be persistent chrome in `os` / `tiling` |
-| Routes render inside AppWindow panels: rounded chrome, scrollbars, close + maximize/restore (**maximize verified**; deep pass reconfirmed) | Window chrome + expand/restore are real; include in Must |
-| Standard navigation **replaces** the active window | Matches “replace focused” default; bashOS must still implement explicit `new` / `focus` |
-| Blog / handbook show multi-pane reader (sidebar + article + jump panel) | Reader/dense multi-column template informs Editor/Docs-like apps |
-| `/` opens centered global search; Esc closes | Command palette as global overlay (not a managed window) is proven UX |
-| Display Options: System/Light/Dark, scrollbars, cursors, wallpaper, screensaver preview, transparency, hedgehog | Settings app pattern; hedgehog/cursors → Could / fun pack only |
-| Screensaver preview works; click exits; wallpaper changeable | Personalization via `shellSettings` is fine; keep off critical path |
-| Visible apps: merch/File Explorer, trash, docs hub, blog reader, handbook, changelog spreadsheet/timeline, product carousel, presentation/slides, product detail | App-template diversity works; prefer Terminal/Agent/Files/Logs metaphors for bashOS |
+| Desktop wallpaper + icon catalogs | Optional pinned scenes/commands later; not MVP |
+| Fixed top taskbar | Evolve #20 top bar / sidebar; don’t discard |
+| Routes inside AppWindow panels; maximize/close | Window chrome around **scenes** |
+| Standard navigation **replaces** active window | Matches #20 hash `replace`; still need `new` / `sideBySide` |
+| `/` opens search; Esc closes | #20 already uses ⌘K for palette; composer owns `/` — do not blindly copy PostHog `/` |
+| Display Options / themes | Settings scene + theme toggle already in #20 |
 
 ### Deep interaction pass (2026-09-15) — refined live truth
 
-Hands-on second pass after the first tour. Full detail: research brief §13.
+Full detail: research brief §13.
 
 | Observation | bashOS stance |
 |---|---|
-| Icon select / double-click open / Ctrl multi-select / icon drag | Must: selection + double-click open |
-| Context menu: new window, side-by-side, new browser tab, copy link | Must intents + browser-tab fallback |
-| Maximize / restore / close; side-by-side panes + focus; close → single | Must chrome; **prefer side-by-side over free drag** |
-| `/` search, `?` chat, `,` display options, Esc closes, `m` color+toast, `\` wallpaper+toast | Must overlay + toast patterns; keymap from **live**, not handbook |
-| `Ctrl+K` did **not** open search; `Shift+Arrow` / `Shift+W` / `Shift+X` no effect; `.` / `|` no | Do not copy failing shortcuts; document PostHog drift |
-| Internal window drag/resize unreliable (selects content) | Defer free drag/resize; Phase 0 optional polish |
-| No minimize / taskbar restore found | Won’t fake minimize without restore |
-| “Enter boring mode” in search — no visible change | `plain` needs a real consumer |
-| No Bookmarks app; Trash no real restore/delete; long-press Store just opens | Skip empty metaphors |
-
-### Still open / earlier tour gaps
-
-| Claim (docs / code) | Live status | bashOS stance |
-|---|---|---|
-| `experience: boring` unmounts desktop | Spotlight action present; **no visible unmount** | Implement `plain` with a real unmount gate |
-| Mobile boring auto-switch | Not toured | Narrow → simplify or force `plain` |
+| Context menu: new window, side-by-side, new tab, copy link | Must intents + browser-tab fallback |
+| Maximize / restore / close; side-by-side + focus | Must; **prefer side-by-side over free drag** |
+| Free drag/resize unreliable; minimize not found | Defer |
+| Ctrl+K failed on PostHog; `/` worked | bashOS #20 already uses ⌘K successfully — keep #20 baseline |
+| Boring mode with no visible change | `single`/`plain` need real consumers |
 
 ### URLs toured (evidence set)
 
@@ -257,4 +238,4 @@ Hands-on second pass after the first tour. Full detail: research brief §13.
 
 ---
 
-*End of PRD (incl. live evidence + deep interaction pass).*
+*End of PRD (aligned with PR #20 desktop GUI).*

@@ -1,14 +1,15 @@
-# SPEC: bashOS L6 OS Shell
+# SPEC: bashOS L6 OS Shell (evolution of `gui/web`)
 
-**Status:** Draft for review  
-**Related:** [PRD-os-shell.md](./PRD-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md)  
-**Evidence:** PostHog research brief + live browser tour + **deep interaction pass** (2026-09-15). Proposals labeled **Proposal**.
+**Status:** Draft for review — builds on [PR #20](https://github.com/bamr87/bashos/pull/20)  
+**Related:** [PRD-os-shell.md](./PRD-os-shell.md), [ROADMAP-os-shell.md](./ROADMAP-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
+**Foundation:** [`docs/DESKTOP.md`](../DESKTOP.md) (when #20 merges) — stack, scenes, guards  
+**Evidence:** PostHog research = **inspiration only**. Proposals beyond #20 APIs labeled **Proposal**.
 
 ---
 
 ## 1. Scope
 
-Technical specification for an optional L6 **web OS shell**: multi-window / tiling operator console over bashOS runtime sessions. Does not replace CLI/REPL, SSH, or TUI.
+Technical specification for evolving the **existing** desktop GUI (`src/bashos/gui/`, `gui/web/`) into an optional multi-pane / OS-shell operator console. Does not replace CLI/REPL, SSH, TUI, or PR #20’s single-scene mode.
 
 ---
 
@@ -20,78 +21,86 @@ Technical specification for an optional L6 **web OS shell**: multi-window / tili
 L6 INTERFACE
 ├── bashos CLI / REPL (existing)
 ├── SSH / TUI (existing)
-└── Web OS Shell (this spec)
-      ├── Shell Provider (experience, settings, nav)
-      ├── Layout: OsDesktop | TilingLayout | PlainConsole
-      ├── Apps (Terminal, Agent, Editor, Files, Logs, Settings, Inbox)
-      └── Bridges → runtime  [Proposal]
-            ├── LangGraph kernel (runs, graph state, approvals)
-            └── OpenCode engine (tools, PTY, workspace FS)
+└── bashos gui  [PR #20 — current web/native surface]
+      ├── gui/http.py      asyncio HTTP (~300 LOC)
+      ├── gui/server.py    routes · guards · SSE
+      ├── gui/runs.py      in-memory runs (cap 200)
+      ├── gui/desktop.py   optional pywebview
+      └── gui/web/         index.html + app.css + app.js  (no npm)
+            ├── SCENES + scene*() builders   ← App Template today
+            ├── hash router (#/console, #/runs/<id>)
+            ├── ⌘K palette, sidebar, themes
+            └── Shell Provider (this spec) wraps scene system
+                  ├── single (today) | multi-pane | os (later)
+                  └── scene instances as windows/panes
 ```
 
-### 2.2 Shell component tree (mermaid)
+### 2.2 Incremental path (normative)
+
+1. **Scene-as-window chrome** around current scenes (title, focus, close, maximize) without changing scene builders’ core contracts.  
+2. **Side-by-side two scenes** (two instances visible; hash/layout state tracks both).  
+3. **Optional floating** drag/resize later (Phase 3) — not MVP.
+
+Do **not** introduce a parallel React tree or Vite app in Phases 0–2.
+
+### 2.3 Shell component tree
 
 ```mermaid
 flowchart TB
-  subgraph L6["L6 Web Shell"]
-    SP[ShellProvider]
-    MB[MenuBar / StatusBar]
-    CP[CommandPalette]
-    ND[NotificationDock]
-    SP --> MB
-    SP --> CP
-    SP --> ND
+  subgraph L6["L6 bashos gui — evolve"]
+    HTTP[gui/http.py + server.py]
+    WEB[gui/web app.js]
+    HTTP --> WEB
+    WEB --> SP[ShellProvider / layout state]
+    WEB --> PAL[CommandPalette ⌘K]
+    WEB --> SB[Sidebar / window list]
     SP --> EXP{experience}
-    EXP -->|os| OD[OsDesktop]
-    EXP -->|tiling| TL[TilingLayout]
-    EXP -->|plain| PC[PlainConsole]
-    OD --> WL[WindowList]
-    OD --> DI[PinnedIcons optional]
-    WL --> SW[ShellWindow x N]
-    TL --> PN[Pane nodes]
-    SW --> AT[AppTemplate]
-    PN --> AT
-    AT --> APP[Terminal / Agent / Editor / Files / Logs / Settings / Inbox]
+    EXP -->|single| ONE[Current one-scene mount]
+    EXP -->|tiling| MP[MultiPane two+ scene instances]
+    EXP -->|os later| OD[Floating scene windows]
+    ONE --> SC[scene*() builders]
+    MP --> SC
+    OD --> SC
+    SC --> S7[Overview Console Commands Runs Health Engine Settings]
   end
-  subgraph Runtime["Runtime — Proposal"]
-    KG[LangGraph kernel]
-    OC[OpenCode engine]
+  subgraph Kernel["Same kernel as CLI"]
+    BK[build_kernel]
   end
-  APP -.->|session bind| KG
-  APP -.->|PTY / FS / tools| OC
+  HTTP --> BK
 ```
 
-### 2.3 Text tree (parity with PostHog wrap-at-root)
+### 2.4 Wrap-at-root (conceptual — vanilla JS)
 
 ```
-ShellRoot
-├── ShellProvider          # windows/panes, shellSettings, actions
-├── MenuBar / StatusBar    # host, agent count, model, cost  [Proposal: cost feed]
+ShellRoot (index.html chrome)
+├── Sidebar / WindowList     # evolve scene nav → open instances
+├── TopBar                   # breadcrumb, dry-run, theme (#20)
 ├── LayoutViewport
-│   ├── OsDesktop | TilingLayout | PlainConsole
-│   └── WindowList | PaneTree → ShellWindow → AppTemplate → App
-├── CommandPalette         # Ctrl+K / `/` — global overlay, not a managed window
-└── NotificationDock       # toasts; irreversible prompts may deep-link to Inbox
+│   ├── SingleScene | MultiPane | OsDesktop
+│   └── SceneHost → scene*() / SCENES
+├── CommandPalette           # existing ⌘K — global overlay
+└── Toasts / locked screen   # existing patterns
 ```
 
-**Live PostHog parallel (confirmed):** fixed top taskbar; routes inside rounded AppWindow chrome; `/` → search overlay; `?` chat; `,` display options; Esc closes; maximize/restore/close; **side-by-side panes + focus**; icon context menus (new window / side-by-side / new tab / copy link); toast on color/wallpaper. Deep pass: **free drag/resize unreliable**; minimize not found; several handbook/code shortcuts (`Ctrl+K`, `Shift+Arrow/W/X`, `.`, `|`) failed live — treat free motion as polish risk, side-by-side as Phase 0 goal.
+**Live PostHog parallel (inspiration only):** side-by-side + context menus + maximize/close are high-confidence; free drag/resize and handbook shortcuts are not. Prefer side-by-side on #20 scenes.
 
-### 2.4 Context split (performance)
+### 2.5 State split (performance, no React required)
 
-Mirror PostHog’s split-context pattern so Terminal/Logs do not re-render on every drag frame:
+Keep layout state separate from scene DOM where possible (Console already keeps its own DOM across nav in #20 — preserve that):
 
-| Context | Hook | Contents |
-|---|---|---|
-| Actions | `useShellActions()` | open/close/focus/snap/navigate — stable identity |
-| Settings | `useShellSettings()` | `shellSettings`, `experience`, `isNarrow` |
-| UI flags | `useShellUI()` | palette open, docks, screensaver-equivalent |
-| Windows/panes | `useShellWindows()` / `useShellPanes()` | layout state only |
+| Concern | Owner |
+|---|---|
+| Actions | `navigate(intent)`, `focus`, `close`, `sideBySide` — stable functions |
+| Settings / prefs | existing `store.prefs`, theme, future `experience` |
+| UI flags | palette open, overlays |
+| Windows/panes | list of scene instances (layout only) |
+| Scene data | existing `store` + `/api/*` fetches |
 
 ---
 
 ## 3. Window / pane JSON schema
 
-Serializable for deep-links and workspace files. Geometry as **percent of viewport** when persisted (PostHog `?windows=` pattern). Fields `minimized` / free `position`+`size` remain in the schema for Phase 2+; MVP may persist side-by-side / maximized layouts without relying on free drag.
+Binds to **scene id** + optional resource (e.g. run id). Geometry as percent of viewport when persisted. Compatible with #20 hashes.
 
 ```json
 {
@@ -100,218 +109,200 @@ Serializable for deep-links and workspace files. Geometry as **percent of viewpo
   "windows": [
     {
       "id": "win_01HZX...",
-      "appId": "terminal",
-      "title": "pty:agent-17",
-      "resourceUri": "pty://session/agent-17",
-      "path": "/app/terminal/agent-17",
-      "zIndex": 3,
+      "sceneId": "console",
+      "title": "Console",
+      "resourceId": null,
+      "hash": "#/console",
+      "zIndex": 2,
       "minimized": false,
       "expanded": false,
-      "snapped": false,
-      "position": { "xPct": 5, "yPct": 8 },
-      "size": { "wPct": 45, "hPct": 50 },
-      "sizeConstraints": {
-        "min": { "width": 320, "height": 200 },
-        "max": { "width": null, "height": null }
-      },
-      "fixedSize": false,
+      "snapped": "left",
+      "position": { "xPct": 0, "yPct": 0 },
+      "size": { "wPct": 50, "hPct": 100 },
       "attribution": {
-        "actor": "user:amr",
-        "runId": "run_01HZY...",
-        "sessionId": "sess_01HZY..."
+        "actor": "user:local",
+        "runId": null,
+        "sessionId": null
       },
-      "appSettingsKey": "terminal",
       "createdAt": "2026-09-15T02:00:00Z"
+    },
+    {
+      "id": "win_01HZY...",
+      "sceneId": "runs",
+      "title": "Run detail",
+      "resourceId": "run_01HZY...",
+      "hash": "#/runs/run_01HZY...",
+      "zIndex": 3,
+      "snapped": "right",
+      "position": { "xPct": 50, "yPct": 0 },
+      "size": { "wPct": 50, "hPct": 100 },
+      "attribution": {
+        "actor": "user:local",
+        "runId": "run_01HZY...",
+        "sessionId": null
+      },
+      "createdAt": "2026-09-15T02:01:00Z"
     }
   ]
 }
 ```
 
-### 3.1 TypeScript shape (normative for implementers)
+### 3.1 TypeScript-shaped types (documentation only — implement in JS)
 
 ```ts
-type Experience = 'os' | 'tiling' | 'plain'
+type Experience = 'single' | 'tiling' | 'os' | 'plain'
 type SnapEdge = 'left' | 'right' | false
 type NavIntent = 'replace' | 'new' | 'focus' | 'sideBySide'
 
+type SceneId =
+  | 'overview'
+  | 'console'
+  | 'commands'
+  | 'runs'
+  | 'health'
+  | 'engine'
+  | 'settings'
+  // Could later: 'docs' | 'files'
+
 interface ShellWindow {
   id: string
-  appId: AppId
+  sceneId: SceneId
   title: string
-  resourceUri: string          // pty:// | agent:// | file:// | log:// | inbox:// | settings://
-  path: string                 // deep-link path
+  resourceId?: string | null   // e.g. run id for #/runs/<id>
+  hash: string                 // aligned with #20 routing
   zIndex: number
   minimized: boolean
   expanded: boolean
   snapped: SnapEdge
   position: { xPct: number; yPct: number }
   size: { wPct: number; hPct: number }
-  sizeConstraints: {
-    min: { width: number; height: number }
-    max: { width: number | null; height: number | null }
-  }
-  fixedSize: boolean
   attribution: {
     actor: string
-    runId?: string
-    sessionId?: string
+    runId?: string | null
+    sessionId?: string | null
   }
-  appSettingsKey: string
-  createdAt: string            // ISO-8601
+  createdAt: string
 }
 
 interface ShellSettings {
   experience: Experience
-  colorMode: 'light' | 'dark' | 'system'
-  density: 'comfortable' | 'compact'
-  performanceBoost: boolean    // reduce motion / wallpaper cost
-  reduceTransparency: boolean
-  keymapProfile: 'default' | string
-  wallpaperId?: string         // Could — optional theme pack
-}
-
-interface AppSetting {
-  size?: {
-    min: { width: number; height: number }
-    max?: { width: number; height: number }
-    fixed?: boolean
-  }
-  position?: { center?: boolean }
-  modal?: { type: 'standard' | 'side' | 'floating' }
-  closeOnEscape?: boolean
-  toolbar?: boolean
-  hideTitle?: boolean
+  // theme already in #20 localStorage; dryRun/model in prefs
+  density?: 'comfortable' | 'compact'
+  performanceBoost?: boolean
+  keymapProfile?: 'default' | string
 }
 ```
 
-**Tiling mode** uses a binary tree of panes instead of free `position`/`size`; persistence schema v1 may store `layoutTree` alongside or instead of `windows` (Phase 2).
+MVP may persist only side-by-side / maximized layouts without free `position` drag.
 
 ---
 
 ## 4. Navigation intents
 
-PostHog handbook claimed `newWindow` / focus / replace. Live: **standard nav replaces** the active window; **context menu** “Open in new PostHog window” and “Open in side-by-side view” **work** (deep pass 2026-09-15); code historically lacked an explicit `newWindow` branch in `updatePages` (research brief). bashOS implements intents in the reducer with tests — including `sideBySide` as a **Phase 0/1** consumer, not a docs-only flag.
+Aligned with #20 hash routing. Today’s `navigate(id)` / `location.hash` ≈ **`replace`**.
 
 | Intent | Behavior | Trigger examples |
 |---|---|---|
-| `replace` | Mutate focused window’s `appId` / `resourceUri` / `path`; preserve others | Default in-app link, address bar submit |
-| `new` | **Append** a window/pane; bring to front | Context “Open in new window”, pinned icon open (policy), palette “new …” |
-| `focus` | If same `path` or `(appId, resourceUri)` exists → bringToFront only; no duplicate | Second activation of same agent/resource |
-| `sideBySide` | Split focused + open target opposite (or as second pane); focus switching; close one → single | Context menu “Open side by side” — **Must** (live-proven) |
-| *(browser)* | Open target in a new browser tab (escape hatch) | Context “Open in new browser tab” — Must fallback, not a shell intent enum |
+| `replace` | Mutate focused instance’s `sceneId` / `resourceId` / `hash` (current #20 behavior) | Sidebar click, in-scene link, default nav |
+| `new` | **Append** a scene instance; bring to front | Context “Open in new pane/window”, palette “new …” |
+| `focus` | If same `(sceneId, resourceId)` exists → focus only; no duplicate | Second activation of same run detail |
+| `sideBySide` | Keep focused; open target as opposite pane; focus switch; close → single | Context / palette “Open side by side” |
+| *(browser)* | `window.open` same origin + hash + token rules as #20 | “Open in new browser tab” — Must fallback |
 
-```ts
-function navigate(target: { path: string; appId: AppId; resourceUri: string }, intent: NavIntent) {
-  // Pseudocode — normative behavior
-  const existing = findByPathOrResource(target)
-  if (intent === 'focus' || (intent === 'replace' && existing)) {
-    if (existing) return bringToFront(existing.id)
-  }
+```js
+// Pseudocode — normative behavior; vanilla JS in app.js
+function navigate(target, intent = 'replace') {
+  const existing = findBySceneResource(target)
+  if (intent === 'focus' && existing) return focus(existing.id)
   if (intent === 'new' || intent === 'sideBySide') {
     return appendWindow(target, intent === 'sideBySide' ? { snap: 'opposite' } : {})
   }
-  return replaceFocused(target)  // intent === 'replace'
+  return replaceFocused(target) // also updates location.hash like #20 today
 }
 ```
 
-**Hard rule:** Documented intent ⇒ tested consumer. No docs-only flags.
+**Hard rule:** Documented intent ⇒ tested consumer. Single-scene mode may ignore `new`/`sideBySide` by falling back to `replace` or browser tab until multi-pane ships.
 
 ---
 
-## 5. App Template API
+## 5. App Template API = scene builder pattern
 
-### 5.1 Contract
+### 5.1 Contract (extend, don’t replace)
 
-```ts
-type AppId =
-  | 'terminal'
-  | 'agent'
-  | 'editor'
-  | 'files'
-  | 'logs'
-  | 'settings'
-  | 'inbox'
+#20 already has:
 
-interface AppTemplateSlots {
-  title: ReactNode | string
-  toolbar?: ReactNode
-  sidebar?: ReactNode
-  main: ReactNode
-  status?: ReactNode
-}
+```js
+const SCENES = [
+  { id: 'overview', label: 'Overview', icon: 'i-grid', group: 'Workspace' },
+  { id: 'console', label: 'Console', icon: 'i-terminal', group: 'Workspace' },
+  // ...
+]
 
-interface AppModule {
-  id: AppId
-  displayName: string
-  icon: string
-  defaultSettings: AppSetting
-  canOpen: (resourceUri: string) => boolean
-  render: (props: {
-    windowId: string
-    resourceUri: string
-    attribution: ShellWindow['attribution']
-  }) => AppTemplateSlots
-}
+function sceneOverview() { /* ... */ }
+// sceneCommands, sceneRuns, sceneRunDetail, sceneHealth, sceneEngine, sceneSettings
 ```
 
-Shared chrome (HeaderBar analogue): back (if in-window history), address/resource URI, search affordance, window actions. Live PostHog apps (Explorer, Reader, Presentation, changelog timeline) validate that **one chrome + many content shells** scales; bashOS maps metaphors to operator tools (below).
+OS-shell extends registration optionally:
 
-### 5.2 Initial apps
+```js
+/** @typedef {{ id: string, label: string, icon: string, group: string,
+ *              build: (ctx) => Node, canOpen?: (resourceId) => boolean }} SceneModule */
 
-| AppId | Metaphor | Binds to (resource) | Notes |
+// build(ctx) receives { windowId, resourceId, attribution } in multi-pane mode
+// Console continues to own persistent DOM across instance swaps where #20 does today
+```
+
+Shared chrome: top bar breadcrumb / resource hash, window actions (close, maximize), dry-run switch stays global as in #20.
+
+### 5.2 Initial apps = the seven scenes
+
+| SceneId | Metaphor | Hash / resource | Notes |
 |---|---|---|---|
-| `terminal` | PTY / tmux pane | `pty://session/{id}` | Primary; **Proposal:** OpenCode PTY |
-| `agent` | Transcript + tool calls | `agent://run/{id}` | **Proposal:** LangGraph run stream |
-| `editor` | Buffer / diff / markdown | `file://{workspace-path}` | Specs + agent-editable buffers |
-| `files` | Workspace FS explorer | `files://{root}` | Artifacts + workspace tree |
-| `logs` | Trace / structured log | `log://run/{id}` | Attribution & debug |
-| `settings` | Display / shell / model | `settings://shell` | Includes `experience` toggle |
-| `inbox` | Approvals / human input | `inbox://queue` | Irreversible act gates — **Must** |
+| `overview` | Session home | `#/overview` | Quick-run chips, recent runs |
+| `console` | Terminal-as-GUI | `#/console` | Composer, slash completion, SSE runs |
+| `commands` | Userland registry | `#/commands` | `.claude/commands/*.md` |
+| `runs` | Run list / detail | `#/runs`, `#/runs/<id>` | In-memory only |
+| `health` | Host + allowlist view | `#/health` | **Renders** policy; does not extend it |
+| `engine` | Doctor / engine state | `#/engine` | No secrets on wire |
+| `settings` | Model, dry-run default, theme | `#/settings` | |
 
-Registry: `appSettings: Record<AppId, AppSetting>` keyed by `appId`, not marketing route.
+**Could later:** Docs, Files — only if they fit DESKTOP.md extension rules (JSON from existing state, `el()` not `innerHTML`, no inline styles).
+
+**Won’t as MVP replacements:** Invented Terminal/Agent/Editor/Files/Inbox apps that ignore the seven scenes. Approvals remain engine/policy-gated; do not invent an Inbox that bypasses kernel policy. If an approvals surface appears later, it must call the same resolve path the runtime already uses (**Proposal**).
 
 ---
 
 ## 6. Keyboard map
 
-Ignore when focus is in `INPUT` / `TEXTAREA` / contenteditable / terminal xterm (terminal owns keys when focused).
+### 6.1 PR #20 baseline (normative — do not break)
 
-### 6.1 bashOS core map (normative)
+| Shortcut | Action | Notes |
+|---|---|---|
+| `⌘K` / `Ctrl+K` | Toggle command palette | Works in #20 |
+| Composer `/` at line start | Slash command completion | **Composer-owned** — not global Spotlight |
+| `Esc` | Dismiss palette / slash UI | |
+| `Enter` / `Shift+Enter` | Run / newline in composer | Console |
+| `↑`/`↓` / `Tab` | Slash list navigation | Console |
+| Theme toggle / dry-run | UI controls in chrome | Settings + top bar |
 
-Prefer **live-proven** PostHog behaviors over handbook fiction. bashOS may remap chords for IDE familiarity, but each Must entry needs a tested consumer.
+Ignore OS-shell chords when focus is in composer `textarea` (and future inputs), except chords that intentionally include modifiers (e.g. ⌘K).
+
+### 6.2 OS-shell additions (careful — avoid collisions)
 
 | Shortcut | Action | Mode | Priority |
 |---|---|---|---|
-| `/` | Open Command Palette / search | all | Must |
-| `Esc` | Close palette / modal / overlay | all | Must |
-| `Ctrl/Cmd+,` or `,` | Open Settings / display options | all | Must |
-| `?` | Agent chat dock **or** shortcuts help (pick one; document) | all | Must (single meaning) |
-| Toast on settings change | Non-blocking feedback (theme, wallpaper, etc.) | all | Must |
-| `Ctrl/Cmd+Shift+T` | New Terminal | os, tiling | Must |
-| `Ctrl/Cmd+Shift+A` | New / focus Agent for current run | os, tiling | Must |
-| `Ctrl/Cmd+Shift+I` | Focus Inbox | all | Must |
-| `Ctrl/Cmd+W` | Close focused window/pane | os, tiling | Must |
-| `Ctrl/Cmd+`` ` | Cycle next window/pane | os, tiling | Should |
-| `Ctrl/Cmd+↑` | Maximize / restore | os | Must |
-| `Ctrl/Cmd+K` | Open palette (**optional alias**) | all | Should — **do not assume** browser Ctrl+K works; PostHog live: Ctrl+K failed, `/` worked |
+| `⌘K` / `Ctrl+K` | Palette (baseline) | all | Must |
+| `Esc` | Close palette / overlays | all | Must |
+| `Ctrl/Cmd+W` | Close focused pane/window | tiling, os | Must |
+| `Ctrl/Cmd+\\` or `Ctrl/Cmd+Shift+\\` | Cycle panes | tiling | Should |
+| Context / palette “Side by side” | `sideBySide` intent | tiling | Must (discoverable without new chord if needed) |
+| `Ctrl/Cmd+,` | Focus Settings scene | all | Should — verify no conflict |
 
-### 6.2 PostHog live vs handbook/code drift (do not copy blindly)
+**Do not** steal bare `/` for a global search overlay while Console composer uses `/` for slash completion. PostHog’s live `/` → search is inspiration only.
 
-| Shortcut | Handbook / code claim | Live deep pass (2026-09-15) |
-|---|---|---|
-| `/` | Open Spotlight | **Works** |
-| `Ctrl/Cmd+K` | Open search | **Did not open** search |
-| `?` | Ask Max chat (code) / sometimes “help” in folklore | **Opens chat** |
-| `,` | Display options | **Works** |
-| `m` | Cycle color mode (code); some docs imply cheatsheet | **Color mode + toast** (not cheatsheet) |
-| `\` | Cycle wallpaper (code) | **Works + toast** |
-| `\|` | Wallpaper (handbook) | **No effect** |
-| `.` | Cheatsheet (handbook) | **No effect** |
-| `Shift+←/→` | Snap | **No effect** |
-| `Shift+W` / `Shift+X` | Close focused / close all | **No effect** |
-| Minimize (`Shift+↓` in code) | Minimize focused | **Minimize UI not found** |
+### 6.3 PostHog drift (do not copy blindly)
 
-**Hard rule:** Documented shortcut ⇒ tested consumer. Do not ship a cheatsheet that lists non-working keys.
+PostHog: `/` worked, `Ctrl+K` failed live; snap shortcuts and minimize often folklore. bashOS already chose ⌘K successfully — keep it. Document from **#20 + our tests**, not PostHog handbook fiction.
 
 ---
 
@@ -319,46 +310,37 @@ Prefer **live-proven** PostHog behaviors over handbook fiction. bashOS may remap
 
 | Form | Example | Behavior |
 |---|---|---|
-| Single app | `/app/agent/run_01HZY` | `plain` or single focused window |
-| Layout restore | `/?windows=<url-encoded JSON>` | Hydrate `ShellWindow[]` from schema v1 |
-| Workspace file | `bashos://workspace/{id}` or local `.bashos/workspace.json` | **Proposal:** load layout + resource bindings |
-| Experience override | `?experience=plain` | Force mode for automation / embeds |
+| Single scene (#20) | `#/console`, `#/runs/<id>` | `single` / focused instance |
+| Layout restore | `?windows=<url-encoded JSON>#/...` | Hydrate `ShellWindow[]` — **Proposal** encoding details |
+| Experience override | `?experience=single` | Force mode |
+| Token | `?k=` then sessionStorage (#20) | Unchanged — never put credentials in layouts |
 
-Shareable layouts are for reproducing multi-agent setups (operator demos), not SEO.
+Shareable layouts reproduce operator setups; they are not SEO and must not serialize secrets or full run transcripts to disk by default.
 
 ---
 
-## 8. Runtime integration — **Proposal**
+## 8. Runtime integration
 
-No fake existing APIs. Until kernel/OpenCode expose stable contracts, the shell uses adapters behind interfaces:
+### 8.1 Existing (#20 — real)
 
-```ts
-/** Proposal — not claimed as shipping API */
-interface KernelBridge {
-  listRuns(): Promise<RunSummary[]>
-  subscribeRun(runId: string): AsyncIterable<RunEvent>
-  listApprovals(): Promise<Approval[]>
-  resolveApproval(id: string, decision: 'allow' | 'deny', note?: string): Promise<void>
-}
+| Surface | Role |
+|---|---|
+| `POST /api/runs` + SSE | Console execution; same `build_kernel(...)` as CLI |
+| `GET /api/state` | Overview, Settings, chrome |
+| `GET /api/runs` | Runs scene |
+| `GET /api/policy` | Health allowlist **render** |
+| Doctor / engine routes | Engine scene; credential **source** only, never value |
+| Dry-run switch | Same as CLI `-n` |
 
-/** Proposal */
-interface OpenCodeBridge {
-  openPty(sessionId: string): PtyHandle
-  listWorkspace(path: string): Promise<FsEntry[]>
-  readFile(path: string): Promise<Uint8Array | string>
-  watchLogs(runId: string): AsyncIterable<LogLine>
-}
-```
+### 8.2 New endpoints — **Proposal only**
 
 | Concern | Proposal |
 |---|---|
-| Transport | WebSocket or SSE from local bashOS daemon to web shell |
-| Auth | Same-machine first; token for remote later |
-| Attribution | Every bridge event carries `actor` + `runId` into window metadata |
-| Approvals | Kernel emits approval → Inbox app; UI cannot bypass policy |
-| Model list | Settings reads model catalog from kernel; UI remains vendor-agnostic |
+| Layout persistence | Prefer client-only / URL first; optional `GET/PUT` workspace later |
+| Approvals bus | Only if kernel already emits gates — GUI must not invent a bypass |
+| Extra metrics | Status from `/api/state` extensions — Proposal |
 
-Mark any stub with `// Proposal` and feature-flag off by default until Phase 1 bridge spike lands.
+Mark stubs `// Proposal`. Default: **no new server endpoints** for Phase 0–1 multi-pane.
 
 ---
 
@@ -366,70 +348,85 @@ Mark any stub with `// Proposal` and feature-flag off by default until Phase 1 b
 
 | Concern | Recommendation | Justification |
 |---|---|---|
-| App framework | **Vite + React 18** (or 19) | Operator SPA; no Gatsby SSG need; fast HMR for shell iteration |
-| Optional SSR | Next only if public docs share the shell later | Avoid premature SSG complexity |
-| Styling | Tailwind + `data-experience` / `data-color-mode` | Matches PostHog token approach without CSS-in-JS cost |
-| Primitives | Radix UI (menus, dialogs, focus traps) | A11y baseline for chrome |
-| Window motion | Phase 0: **side-by-side + maximize** first; optional CSS/Framer free drag later | Deep pass: free drag/resize unreliable on PostHog; side-by-side is the proven multitasking path |
-| Terminal | xterm.js | Standard for web PTYs |
-| State | React context split (+ optional Zustand for layout tree) | PostHog split-context lesson |
-| Search/palette | cmdk or custom over local registry | No Algolia dependency for operator console |
-| Test | Playwright (intents, keymap, plain unmount) + Vitest (reducer) | Intent correctness is a Must metric |
+| Phases 0–2 | **Stay on #20 stack** — `gui/http.py`, one HTML/CSS/JS, optional pywebview | Matches product philosophy; `pip install bashos` + `bashos gui` with nothing else |
+| Bundler / npm | **Not required** for MVP | Explicit non-goal |
+| Window motion | Side-by-side + maximize via CSS / DOM | PostHog free-drag unreliable; avoid Framer dependency |
+| Terminal / streams | Existing Console + SSE | Do not add xterm.js unless Console needs it later |
+| Palette | Existing ⌘K implementation | Extend `paletteItems()` |
+| Test / capture | `tools/capture_desktop.py` (+ Playwright deps as today) | Update captures when chrome changes |
+| Phase 3+ framework | React/Vite **only** as explicit tradeoff | Cost: rewrite capture tooling, abandon no-build story — do **not** prescribe as default |
 
-**Rejected for MVP:** Gatsby (marketing SSG), Kea (unless already in monorepo), hedgehog-mode packages.
+**Rejected as default:** Vite+React+Tailwind+Radix MVP, Gatsby, Next SSG, Kea, hedgehog packages.
 
 ---
 
-## 10. Accessibility, mobile, performance
+## 10. Security — PR #20 guards (normative)
 
-### 10.1 A11y
+OS-shell evolution **MUST preserve** these. Copy treated as constraints, not suggestions.
 
-- Focus trap in modals and palette; restore focus on close  
-- Window chrome: `role="dialog"` or document landmark per window; labeled title  
-- `prefers-reduced-motion` ⇒ disable entrance/snap animations; honor `performanceBoost`  
-- `plain` mode must be fully usable with keyboard and screen reader (no drag dependency)  
-- Inbox approvals: explicit Allow/Deny buttons with confirm for destructive tools  
+| Guard | What it stops |
+|---|---|
+| binds `127.0.0.1` | anything off this machine |
+| per-process token on `/api/*` | every other process on the box |
+| `Host` must be our own socket | DNS rebinding |
+| `Origin`, when present, must be our own | drive-by browser pages |
+| `Content-Security-Policy: default-src 'self'` | injected script, remote assets, framing |
+| caps on line, header count, body size | malformed / oversized requests |
+| 8000-character input limit | pathological prompts |
 
-### 10.2 Mobile / narrow
+**Product refusals (also normative):**
 
-- `isNarrow` (e.g. `innerWidth < 768`): collapse MenuBar; prefer single pane or force `experience=plain`  
-- Do not ship unbroken floating multi-window on small screens (PostHog simplifies taskbar; boring consumer was drifted — we do not repeat that)  
+- No shell passthrough (`!` → 403)  
+- No wider tool policy (Health renders allowlist only)  
+- No credentials on the wire  
+- No history file (runs in-memory, cap 200)  
+- No reasoning loop in `gui/`  
 
-### 10.3 Performance
-
-- Split contexts (§2.4)  
-- Virtualize Agent transcripts and Logs  
-- Compositor gate while dragging/resizing (skip wallpaper/expensive panes)  
-- Budget: 4 windows interactive on mid-tier laptop; document if Framer fails spike  
+Multi-pane / window chrome is **not** a reason to relax any row above. New UI must use `el()`, not `innerHTML` (except existing escaped markdown path); no inline `style` (CSP).
 
 ---
 
-## 11. Live UI evidence → spec decisions
+## 11. Accessibility, mobile, performance
+
+### 11.1 A11y
+
+- Focus trap in palette; restore focus on close (#20 baseline)  
+- Pane chrome labeled; keyboard close/cycle  
+- `prefers-reduced-motion` honored when animations appear  
+- `single`/`plain` fully usable without drag  
+
+### 11.2 Mobile / narrow
+
+- Force `single` when narrow — multi-pane optional later  
+- Do not ship unbroken floating multi-window on small screens  
+
+### 11.3 Performance
+
+- Preserve Console DOM across scene switches where #20 already does  
+- Avoid re-fetch storms when splitting panes — share `store`  
+- Budget: two panes interactive; no bundler required  
+
+---
+
+## 12. Live UI evidence → spec decisions (inspiration)
 
 | Live confirmation | Spec decision |
 |---|---|
-| Wallpaper + icon rails + fixed taskbar | Optional icons in `os`; MenuBar always on in `os`/`tiling` |
-| Rounded panels, scrollbars, close, maximize/restore | Must chrome; expand/restore in Phase 1 |
-| Replace-on-standard-nav | Default intent = `replace` |
-| Multi-pane reader (handbook/blog) | App templates may use sidebar + main + aux columns |
-| `/` search + Esc | Palette global overlay |
-| Display Options surface | Settings app owns theme/experience/performance |
-| Explorer / slides / changelog density | Validates dense apps; map to Files / Agent report / Logs |
-| Side-by-side panes + context menus (deep pass) | `sideBySide` + `new` are Must; Phase 0 validates first |
-| Free drag/resize unreliable; snap shortcuts no effect; minimize not found | Defer free drag/resize/snap/minimize; don’t block MVP |
-| Ctrl+K failed; `/` worked; handbook `.`/`|` failed | Keymap from live truth; note PostHog drift in cheatsheet |
-| Boring mode action with no visible change | `plain` requires real unmount consumer |
-| No app.posthog.com | Spec ignores product-app auth; local daemon first |
+| Side-by-side + context menus | Must on **scenes**, Phase 0–1 |
+| Free drag unreliable; minimize missing | Defer to Phase 3 Could |
+| `/` search on PostHog | **Do not** steal composer `/`; keep ⌘K |
+| Boring mode broken | Real `single`/`plain` consumer |
+| Dense apps | Seven scenes already dense — wrap them |
 
 ---
 
-## 12. Open questions (spec-level)
+## 13. Open questions (spec-level)
 
-1. Does OpenCode already expose a web-consumable PTY protocol, or does L6 need a new adapter? **Proposal until answered.**  
-2. Should tiling be the default for terminal users, with `os` as optional skin? (Product: ROADMAP Phase 2.)  
-3. Single shared pane-session protocol between TUI and web shell?  
-4. Workspace file format: extend existing bashOS project config or new `.bashos/workspace.json`?  
-5. Cost/model StatusBar feeds — which kernel metrics are stable?  
+1. Persist multi-pane only in URL, or also `sessionStorage`?  
+2. Should Console be **pinned** left when side-by-side with any System scene?  
+3. Two instances of the same scene (two run details) — allow in Phase 1 or Phase 2?  
+4. Any need for new `/api/*` for layouts, or client-only forever?  
+5. Phase 3 framework trigger: what complexity metric forces the tradeoff?
 
 ---
 

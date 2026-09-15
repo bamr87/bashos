@@ -1,89 +1,93 @@
-# ROADMAP: bashOS L6 OS Shell
+# ROADMAP: bashOS L6 OS Shell (on desktop GUI)
 
 **Status:** Draft for review  
-**Related:** [PRD-os-shell.md](./PRD-os-shell.md), [SPEC-os-shell.md](./SPEC-os-shell.md)  
-**Evidence note:** Live tour + **deep interaction pass** (2026-09-15) confirmed maximize/restore/close, **side-by-side panes**, context menus (new window / side-by-side / new tab / copy link), `/` search, `?` chat, `,` display options, Esc, toasts. Free drag/resize **unreliable**; snap shortcuts & minimize **not working/found**. Phase 0 validates side-by-side + menus first; drag/resize/snap are later risk.
+**Related:** [PRD-os-shell.md](./PRD-os-shell.md), [SPEC-os-shell.md](./SPEC-os-shell.md), [RELATION-TO-DESKTOP.md](./RELATION-TO-DESKTOP.md)  
+**Prerequisite:** Merge [PR #20](https://github.com/bamr87/bashos/pull/20) (`bashos gui`) — or rebase OS-shell implementation onto that branch. Desktop docs: [`DESKTOP.md`](../DESKTOP.md), [`DESKTOP-TOUR.md`](../DESKTOP-TOUR.md) when present.  
+**Evidence note:** PostHog live pass = inspiration for side-by-side / menus; stack and guards come from #20.
 
 ---
 
-## Phase 0 — Spike (1–2 weeks)
-
-**Goal:** Prove stack + **side-by-side multitasking** + intent reducer + one real app bind before free-drag polish.
+## Prerequisite — Merge PR #20
 
 | Deliverable | Done when |
 |---|---|
-| Vite + React + Tailwind scaffold under agreed package path | Dev server boots; `experience` switch mounts/unmounts shell |
-| Nav reducer: `replace` \| `new` \| `focus` \| `sideBySide` | Unit tests green; `new` **appends**; `sideBySide` splits + focus switch; close one → single |
-| Context menus | Open in new window; Open side-by-side; Open in new browser tab; Copy link |
-| Chrome spike | Maximize / restore / close on panes; **no** fake minimize required |
-| Command palette | `/` (and optional Ctrl+K alias) opens palette; Esc closes; toast on a settings toggle |
-| Motion / drag (optional) | Free floating drag/resize/snap is **out of Phase 0 exit criteria** — spike only if time; document as later risk |
-| Terminal app stub | xterm.js renders; fake PTY or local echo |
-| Agent app stub | Static transcript fixture; layout slots OK |
-| Plain mode | `experience=plain` fully removes window/desktop chrome |
-| Bridge sketch | `KernelBridge` / `OpenCodeBridge` interfaces only (**Proposal**); no fake endpoints |
+| `bashos gui` on main (or integration branch) | Seven scenes, palette, guards, capture pipeline available |
+| `docs/DESKTOP.md` + tour + `tools/capture_desktop.py` | Linked from these OS-shell docs without broken paths |
+| No parallel greenfield SPA started | OS-shell work targets `src/bashos/gui/web/` only |
 
-**Exit criteria:** Demo Terminal + Agent **side-by-side** via context menu / intent; maximize/close; palette + Esc; intents tested; plain mode verified. Free drag/resize **not** required to exit.
-
-**Kill / pivot signals:** Side-by-side + xterm unsustainable → simplify to single-pane + browser-tab fallback; do not burn schedule on Framer free-drag.
+**Until merged:** Treat desktop behavior as “as proposed/landed in PR #20.”
 
 ---
 
-## Phase 1 — MVP
+## Phase 0 — Spike on current `gui/web` (1–2 weeks)
 
-**Goal:** Usable operator console for a single-host bashOS session.
+**Goal:** Prove **side-by-side + window chrome** on the existing one HTML/CSS/JS app **without new npm deps**.
+
+| Deliverable | Done when |
+|---|---|
+| Layout state for two scene instances | Can show Console ‖ Runs (or Health) |
+| Nav intents: `replace` \| `new` \| `focus` \| `sideBySide` | Unit tests; `replace` preserves #20 hash behavior |
+| Scene-as-window chrome | Focus, close, maximize/restore on panes — no fake minimize |
+| Context / palette actions | Open side-by-side; open in new browser tab; copy hash |
+| Palette baseline | ⌘K unchanged; items may include “Side by side: …” |
+| No new deps | Still no bundler; edit `app.js` / `app.css` + reload |
+| `tools/capture_desktop.py` | Updated if chrome selectors change; tour still regenerates |
+| Guard regression | `!` still 403; token/CSP/Host/Origin unchanged |
+
+**Exit criteria:** Demo two existing scenes side-by-side from palette or menu; maximize/close; hash deep links still work for focused pane; capture script green enough for docs. Free drag/resize **not** required.
+
+**Kill / pivot signals:** Dual scene mount breaks Console SSE/DOM → keep Console singleton + second pane for non-console scenes only; do not add React to “fix” it in Phase 0.
+
+---
+
+## Phase 1 — MVP multi-pane beside CLI
+
+**Goal:** Usable multi-pane operator console **still one HTML/CSS/JS**, beside CLI.
 
 | Deliverable | Priority |
 |---|---|
-| `os` mode with side-by-side panes: focus, close, maximize/restore | Must |
-| Context menus + browser-tab fallback | Must |
-| Apps: Terminal, Agent, Editor, Files, Logs, Settings, Inbox | Must |
-| Keyboard map (SPEC §6 live-aligned core) | Must |
-| Command Palette (`/` primary; Ctrl+K optional alias) | Must |
-| Deep-links per app path; `?experience=` | Must |
-| Inbox wired to approval bus | Must — **Proposal** adapter |
-| Attribution on window metadata | Must |
-| StatusBar: host, agent count, model id | Should (**Proposal** feeds) |
-| Settings: theme, experience, performanceBoost, reduceTransparency + toasts | Must |
-| Narrow viewport → plain or single-pane | Should |
-| Playwright: intents (incl. sideBySide), keymap, plain unmount, maximize/close | Must |
+| `tiling` / multi-pane usable; default remains `single` | Must |
+| Side-by-side of any two of the seven scenes | Must |
+| Window / open-instance list (Should if not in Phase 0) | Should |
+| Keyboard: #20 baseline + close/cycle without composer collisions | Must |
+| Deep-links: focused hash + optional layout query (**Proposal**) | Must / Should |
+| Settings: `experience` toggle with real consumer | Must |
+| Narrow → force `single` | Should |
+| Capture + manual regression of #20 refusals | Must |
+| **No** Vite/React; **no** shell passthrough; **no** run history file | Must |
 
-**Non-goals in Phase 1:** Free-floating drag/resize polish, snap-edge keyboard shortcuts, fake minimize/taskbar, shareable multi-window URL (Phase 2), nostalgia themes, remote multi-user auth.
+**Non-goals in Phase 1:** Free-floating drag/resize, nostalgia themes, new Docs/Files scenes, new approval bypass UI, npm build.
 
-**Exit criteria:** Operator can approve an irreversible act from Inbox while watching Agent + Terminal; layout survives reload for single focused deep-link.
+**Exit criteria:** Operator runs a line in Console while Run detail or Health is visible beside it; closing the second pane returns to single-scene; guards intact.
 
 ---
 
-## Phase 2 — Tiling, workspaces, palette depth
+## Phase 2 — Workspace layouts, window list, palette depth
 
-**Goal:** tmux/IDE-grade multitasking and reproducible setups.
+**Goal:** Reproducible setups and denser navigation — still on #20 stack.
 
 | Deliverable | Notes |
 |---|---|
-| `tiling` experience with pane tree | Split, join, equalize; keyboard cycle (deepens Phase 0/1 side-by-side) |
-| Free drag / resize / snap-edge polish in `os` | **Later risk** — PostHog live drag unreliable; only after side-by-side is solid |
-| Minimize + taskbar/active-windows list | Only if restore path is complete end-to-end (PostHog: not found live) |
-| Workspace serialize/restore (`?windows=` + `.bashos/workspace.json`) | Percent geometry schema v1 |
-| Palette indexes skills, slash commands, files, runs | Local + runtime registry |
-| Per-app `appSettings` policies | min/max, modal, center |
-| In-window history back/forward | Could → Should if Editor/Files need it |
-| Perf pass | Virtualize logs/transcripts; compositor gate if free-drag added |
+| Workspace serialize/restore (`?windows=` / local JSON) | Scene id + resourceId schema v1 |
+| Window list polish | Focus, close, reorder; taskbar analogue |
+| Palette depth | Scenes, recent runs, commands, dry-run, side-by-side actions |
+| Two instances of same scene (e.g. two run details) | If Phase 0 deferred it |
+| Perf pass | Share `store`; don’t double-SSE Console |
+| Optional tiling tree beyond 2 panes | Split/join if needed |
 
-**Exit criteria:** Share a workspace URL/file that restores ≥3 panes; tiling usable without mouse.
+**Exit criteria:** Share a URL/file that restores ≥2 panes; keyboard cycle works; capture tour documents multi-pane.
 
 ---
 
-## Phase 3 — Polish
+## Phase 3 — Optional nostalgia / drag — or framework tradeoff
 
 | Deliverable | Notes |
 |---|---|
-| Optional nostalgia / theme pack | Off by default; wallpaper skins |
-| Animated open origins, snap indicators | Match PostHog feel only if perf budget holds |
-| Run report “presentation” app | Could |
-| Trace replay viewer | Could — MediaPlayer analogue |
-| Fun mode (screensaver-equivalent) | Gated; never blocks Inbox |
-| Remote daemon auth + multi-user attribution | After local-first is solid |
+| Optional floating drag/resize / desktop icons | Only after side-by-side solid; PostHog risk applies |
+| Nostalgia / theme pack | Off by default |
+| Evaluate React/Vite **only if** complexity forces it | Explicit ADR: cost includes rewriting `capture_desktop` and abandoning no-build MVP story — **not** default |
 | a11y audit | Focus, SR labels, reduced motion |
+| Remote auth | Out of scope until local-first multi-pane is solid; never weaken loopback/token model casually |
 
 ---
 
@@ -91,38 +95,36 @@
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Handbook/code drift copied into bashOS (boring / newWindow) | High if unchecked | Operators distrust shell | Intent tests; real `plain` consumer |
-| Framer + xterm + agent streams jank | Medium | Unusable console | Phase 0 spike; CSS drag fallback; tiling-first pivot |
-| Kernel/OpenCode bridges vapor | Medium | Apps stay mock | Keep Proposal adapters; ship UI against fixtures |
-| Approval bypass via UI | Low–medium | Safety regression | Inbox-only resolve; kernel enforces policy |
-| Scope creep into marketing OS | Medium | Delayed MVP | Non-goals; nostalgia = Phase 3 optional |
-| Mobile floating windows | High pain | Broken UX | Force plain/single-pane when narrow |
-| Drag/snap assumed “done” because PostHog docs say so | High | Bad estimates | Deep pass: free drag unreliable; Shift+snap no effect — **do not** schedule as Phase 0 exit |
-| Handbook keyboard folklore (`.`, `\|`, Ctrl+K, Shift+W/X) | High | Broken cheatsheets | Keymap from live pass; contract tests |
-| Fake minimize / Trash / Bookmarks metaphors | Medium | Hollow UX | Skip until actions are real |
+| Fighting no-build constraint with premature React/Vite | High if unchecked | Diverges from #20; breaks simple install | Phases 0–2 ban new bundler; Phase 3 ADR only |
+| Shortcut collisions with composer `/` and ⌘K | High | Broken Console UX | Never steal bare `/`; test composer focus |
+| pywebview quirks with multi-pane CSS | Medium | Native window layout bugs | Test browser path + pywebview; capture in both when possible |
+| Violating #20 refusals while “just adding chrome” | Medium | Security regression | Guard checklist every phase; no `!`, no secrets, no history file |
+| PostHog folklore (drag, minimize, Ctrl+K) copied blindly | High | Bad estimates / broken cheatsheets | Inspiration only; keymap from #20 + our tests |
+| Console DOM/SSE broken by dual mount | Medium | Unusable MVP | Console singleton pattern; second pane for other scenes |
+| Scope creep into marketing OS / greenfield apps | Medium | Delayed MVP | Non-goals; seven scenes only |
+| Implementing before #20 merges | Medium | Rebase pain / duplicate stack | Prerequisite gate |
 
 ---
 
 ## Open questions
 
-1. **Default experience:** `os` vs `tiling` for terminal-native users? Recommendation: Phase 1 `os` with **side-by-side-first** (matches PostHog-proven multitasking), Phase 2 promote full `tiling` tree as recommended default.  
-2. **PTY protocol:** Does OpenCode expose web-ready PTY today, or new adapter?  
-3. **Shared session protocol** with TUI — one pane model or divergent?  
-4. **Workspace file** location and merge with existing project config.  
-5. **StatusBar metrics** — which cost/model fields are stable from LangGraph kernel?  
-6. **Slash commands** (`.claude/commands/`) — palette parity in Phase 1 or 2?  
-7. **PostHog follow-ups (optional):** Re-check whether drag/resize improved upstream; mobile behavior; boring-mode consumer — does not block bashOS (deep pass already set Phase 0 priorities).  
-8. **Auth boundary:** Local daemon only until when?  
+1. Default experience after Phase 1: stay `single` with opt-in multi-pane, or detect wide viewports?  
+2. Console singleton vs multiple Console instances?  
+3. Layout persistence: URL only vs `sessionStorage` vs file under project?  
+4. When (if ever) is framework complexity justified — LOC? pane count? test pain?  
+5. Should `capture_desktop.py` grow multi-pane scenarios in Phase 0 or Phase 1?  
+6. Approvals UI: stay policy-in-engine only, or future scene that **cannot** widen allowlist?
 
 ---
 
 ## Suggested sequencing (summary)
 
 ```
-Phase 0: scaffold → intents(+sideBySide) → context menus → maximize/close → palette → Terminal+Agent stubs → plain
-Phase 1: full app set → Inbox bridge → live-aligned keymap → deep-links → tests
-Phase 2: tiling depth → optional free drag/snap polish → workspaces → palette depth → perf
-Phase 3: themes → replay/reports → remote auth → a11y audit
+Prerequisite: merge PR #20 (desktop GUI)
+Phase 0: side-by-side + chrome on gui/web (no new deps) → update capture if needed
+Phase 1: MVP multi-pane beside CLI; seven scenes; guards intact; still one HTML/CSS/JS
+Phase 2: workspace layouts, window list, deeper palette
+Phase 3: optional drag/nostalgia OR evaluate framework only with explicit tradeoff
 ```
 
 ---
