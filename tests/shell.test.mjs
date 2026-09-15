@@ -165,3 +165,172 @@ test("an unknown action leaves the state untouched", () => {
   const state = start();
   assert.equal(shell.reduce(state, { type: "nope" }), state);
 });
+
+/* ───────────────────────────────── desktop mode (os) and workspace layouts */
+
+const desktop = () => shell.reduce(start(), { type: "experience", experience: "os" });
+
+test("the desktop holds more than two windows, up to a cap", () => {
+  let state = desktop();
+  for (const scene of ["runs", "health", "engine", "commands", "settings"]) {
+    state = nav(state, scene, "new");
+  }
+  assert.equal(state.windows.length, 6);
+  assert.ok(state.windows.length <= shell.MAX_WINDOWS);
+});
+
+test("a full desktop reuses a window instead of growing forever", () => {
+  let state = desktop();
+  const scenes = ["runs", "health", "engine", "commands", "settings", "console", "overview"];
+  for (let i = 0; i < 12; i++) state = nav(state, scenes[i % scenes.length], "new", `r${i}`);
+  assert.equal(state.windows.length, shell.MAX_WINDOWS);
+});
+
+test("new desktop windows cascade instead of stacking exactly", () => {
+  const state = nav(desktop(), "runs", "new");
+  const [first, second] = state.windows;
+  assert.notDeepEqual(first.position, second.position);
+});
+
+test("focus raises a window above the others", () => {
+  let state = nav(desktop(), "runs", "new");
+  const [first, second] = state.windows;
+  assert.ok(second.zIndex > first.zIndex, "the new window is on top");
+  state = shell.reduce(state, { type: "focus", id: first.id });
+  const raised = state.windows.find((w) => w.id === first.id);
+  assert.ok(raised.zIndex > second.zIndex, "focusing raises");
+});
+
+test("move and resize are clamped to the desktop", () => {
+  let state = desktop();
+  const id = state.focusId;
+  state = shell.reduce(state, { type: "move", id, xPct: 999, yPct: -50 });
+  const moved = shell.focused(state);
+  assert.equal(moved.position.xPct, 98);
+  assert.equal(moved.position.yPct, 0);
+
+  state = shell.reduce(state, { type: "resize", id, wPct: 5, hPct: 400 });
+  const sized = shell.focused(state);
+  assert.equal(sized.size.wPct, 18, "a window never shrinks to nothing");
+  assert.equal(sized.size.hPct, 100);
+});
+
+test("snapping sets an edge, and dragging clears it", () => {
+  let state = desktop();
+  const id = state.focusId;
+  state = shell.reduce(state, { type: "snap", id, edge: "left" });
+  assert.equal(shell.focused(state).snapped, "left");
+  assert.deepEqual(shell.focused(state).size, { wPct: 50, hPct: 100 });
+
+  state = shell.reduce(state, { type: "move", id, xPct: 20, yPct: 20 });
+  assert.equal(shell.focused(state).snapped, null, "moving a snapped window unsnaps it");
+});
+
+test("minimize hides a window but the taskbar still lists it", () => {
+  let state = nav(desktop(), "runs", "new");
+  const runs = shell.focused(state);
+  state = shell.reduce(state, { type: "minimize", id: runs.id });
+  assert.equal(shell.visibleWindows(state).length, 1);
+  assert.equal(shell.taskbarWindows(state).length, 2, "minimized is not closed");
+  assert.notEqual(state.focusId, runs.id, "focus moved off the minimized window");
+
+  state = shell.reduce(state, { type: "restore", id: runs.id });
+  assert.equal(shell.visibleWindows(state).length, 2);
+  assert.equal(state.focusId, runs.id);
+});
+
+test("cycle skips minimized windows", () => {
+  let state = nav(desktop(), "runs", "new");
+  const runs = shell.focused(state);
+  state = shell.reduce(state, { type: "minimize", id: runs.id });
+  const cycled = shell.reduce(state, { type: "cycle" });
+  assert.equal(cycled.focusId, state.focusId, "nothing else to cycle to");
+});
+
+test("arrange tiles every visible window without overlap", () => {
+  let state = desktop();
+  for (const scene of ["runs", "health"]) state = nav(state, scene, "new");
+  const tiled = shell.reduce(state, { type: "arrange", mode: "tile" });
+  const boxes = tiled.windows.map((w) => `${w.position.xPct},${w.position.yPct}`);
+  assert.equal(new Set(boxes).size, boxes.length, "each window got its own cell");
+  assert.ok(tiled.windows.every((w) => w.size.wPct <= 50));
+});
+
+test("arrange cascade puts them back on a diagonal", () => {
+  let state = desktop();
+  state = nav(state, "runs", "new");
+  const tiled = shell.reduce(state, { type: "arrange", mode: "tile" });
+  const cascaded = shell.reduce(tiled, { type: "arrange", mode: "cascade" });
+  const [first, second] = cascaded.windows;
+  assert.ok(second.position.xPct > first.position.xPct);
+  assert.ok(second.position.yPct > first.position.yPct);
+});
+
+test("switching os → tiling keeps two windows, → single keeps one", () => {
+  let state = desktop();
+  for (const scene of ["runs", "health"]) state = nav(state, scene, "new");
+  const tiling = shell.reduce(state, { type: "experience", experience: "tiling" });
+  assert.equal(tiling.windows.length, shell.MAX_PANES);
+  const single = shell.reduce(state, { type: "experience", experience: "single" });
+  assert.equal(single.windows.length, 1);
+});
+
+test("a narrow viewport is single, desktop or not", () => {
+  const state = nav(desktop(), "runs", "new");
+  assert.equal(shell.effectiveExperience(state, 1400), "os");
+  assert.equal(shell.effectiveExperience(state, shell.NARROW_WIDTH - 1), "single");
+  assert.equal(shell.isDesktop(state, shell.NARROW_WIDTH - 1), false);
+});
+
+test("a layout round-trips through encode and decode", () => {
+  let state = desktop();
+  state = nav(state, "runs", "new", "run_abc");
+  state = shell.reduce(state, { type: "snap", id: state.focusId, edge: "right" });
+
+  const restored = shell.decodeLayout(shell.encodeLayout(state));
+  assert.equal(restored.experience, "os");
+  assert.equal(restored.windows.length, state.windows.length);
+  assert.deepEqual(
+    restored.windows.map((w) => [w.sceneId, w.resourceId, w.snapped]),
+    state.windows.map((w) => [w.sceneId, w.resourceId, w.snapped])
+  );
+  assert.equal(shell.focused(restored).sceneId, shell.focused(state).sceneId);
+});
+
+test("an encoded layout carries no credential and no run output", () => {
+  const encoded = JSON.stringify(shell.encodeLayout(nav(desktop(), "runs", "new", "run_abc")));
+  for (const forbidden of ["token", "k=", "secret", "output", "trace"]) {
+    assert.ok(!encoded.includes(forbidden), `layout leaked ${forbidden}`);
+  }
+});
+
+test("a hostile layout cannot invent scenes or fork the console", () => {
+  const hostile = {
+    v: 1,
+    e: "os",
+    f: 0,
+    w: [
+      { s: "console", x: 0, y: 0, cx: 50, cy: 50 },
+      { s: "console", x: 10, y: 10, cx: 50, cy: 50 },
+      { s: "../../etc/passwd", x: 0, y: 0, cx: 50, cy: 50 },
+      { s: "runs", x: 0, y: 0, cx: 50, cy: 50 },
+    ],
+  };
+  const restored = shell.decodeLayout(hostile, ["overview", "console", "runs"]);
+  const scenes = restored.windows.map((w) => w.sceneId);
+  assert.deepEqual(scenes, ["console", "runs"], "unknown scene dropped, console deduped");
+});
+
+test("decodeLayout refuses junk rather than half-restoring it", () => {
+  assert.equal(shell.decodeLayout(null), null);
+  assert.equal(shell.decodeLayout({ v: 99, w: [{ s: "runs" }] }), null);
+  assert.equal(shell.decodeLayout({ v: 1, w: [] }), null);
+  assert.equal(shell.decodeLayout({ v: 1, w: [{ nope: true }] }), null);
+});
+
+test("hydrate replaces the state, but not with nothing", () => {
+  const state = start();
+  const layout = shell.decodeLayout(shell.encodeLayout(desktop()));
+  assert.equal(shell.reduce(state, { type: "hydrate", state: layout }).experience, "os");
+  assert.equal(shell.reduce(state, { type: "hydrate", state: null }), state);
+});

@@ -149,6 +149,72 @@ async def seed_runs(page: Page) -> None:
         await page.wait_for_timeout(1500)
 
 
+async def open_desktop(page) -> None:
+    """Switch the window into desktop mode through the palette."""
+    await page.keyboard.press("Control+k")
+    await page.wait_for_timeout(250)
+    await page.fill('[data-bind="palette-query"]', "Experience: Desktop")
+    await page.wait_for_timeout(250)
+    await page.keyboard.press("Enter")
+    await page.wait_for_timeout(700)
+
+
+async def check_desktop(page) -> list[str]:
+    """Assert the desktop's windows really behave (SPEC §4, ROADMAP phase 3)."""
+    failures: list[str] = []
+
+    def expect(name: str, condition: bool) -> None:
+        if not condition:
+            failures.append(name)
+
+    await open_desktop(page)
+    expect("desktop renders", await page.locator(".desktop-surface").count() == 1)
+    expect("an icon per scene", await page.locator(".icon").count() == 7)
+    expect("taskbar renders", await page.locator(".taskbar").count() == 1)
+
+    await page.dblclick('[data-action="icon"][data-value="health"]')
+    await page.wait_for_timeout(600)
+    expect("an icon opens a window", await page.locator(".window").count() == 2)
+
+    surface = await page.locator(".desktop-surface").bounding_box()
+    head = await page.locator('.window[data-focus="true"] .win-head').bounding_box()
+    await page.mouse.move(head["x"] + 60, head["y"] + 12)
+    await page.mouse.down()
+    await page.mouse.move(head["x"] + 260, head["y"] + 150, steps=10)
+    await page.mouse.up()
+    await page.wait_for_timeout(400)
+    moved = await page.locator('.window[data-focus="true"]').bounding_box()
+    expect("a window drags", moved["x"] > head["x"] + 120)
+
+    head = await page.locator('.window[data-focus="true"] .win-head').bounding_box()
+    await page.mouse.move(head["x"] + 60, head["y"] + 12)
+    await page.mouse.down()
+    await page.mouse.move(surface["x"] + 6, surface["y"] + 140, steps=12)
+    expect("a snap preview appears", await page.locator(".snap-preview").is_visible())
+    await page.mouse.up()
+    await page.wait_for_timeout(400)
+    snapped = await page.locator('.window[data-focus="true"]').bounding_box()
+    expect("snapping halves the desktop", abs(snapped["width"] - surface["width"] / 2) < 14)
+
+    await page.click('.window[data-focus="true"] [data-action="win-min"]')
+    await page.wait_for_timeout(400)
+    expect("minimize hides the window", await page.locator(".window:visible").count() == 1)
+    expect("the taskbar keeps it", await page.locator('.task[data-minimized="true"]').count() == 1)
+    await page.click('.task[data-minimized="true"]')
+    await page.wait_for_timeout(400)
+    expect("the taskbar restores it", await page.locator(".window:visible").count() == 2)
+
+    await page.click('[data-action="arrange"][data-value="tile"]')
+    await page.wait_for_timeout(400)
+    boxes = [await w.bounding_box() for w in await page.locator(".window:visible").all()]
+    expect("tiling gives each window a cell", len({round(b["x"]) for b in boxes}) == len(boxes))
+
+    await page.click('.window[data-focus="true"] [data-action="win-close"]')
+    await page.wait_for_timeout(400)
+    expect("closing removes it", await page.locator(".window").count() == 1)
+    return failures
+
+
 async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
     written: list[Path] = []
     async with async_playwright() as p:
@@ -172,10 +238,17 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         await page.wait_for_timeout(300)
 
         shell_failures = await check_shell(page)
+        shell_failures += await check_desktop(page)
         if shell_failures:
             errors.extend(f"shell check failed: {name}" for name in shell_failures)
         else:
-            print("shell intents verified against the DOM")
+            print("shell intents and desktop windows verified against the DOM")
+        await page.keyboard.press("Control+k")
+        await page.wait_for_timeout(200)
+        await page.fill('[data-bind="palette-query"]', "Experience: Single")
+        await page.wait_for_timeout(200)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(500)
 
         # 1. a line through the kernel, from keystroke to answer
         reel = Reel(page, "console-run", out, tmp)
@@ -266,7 +339,50 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         await reel.snap(12)
         written.append(reel.write(frame_ms=150))
 
-        # 7. a run, from the table to its full trace
+        # 7. the desktop: icons, floating windows, snapping, the taskbar
+        reel = Reel(page, "desktop", out, tmp)
+        await open_desktop(page)
+        await reel.snap(10)
+        await page.dblclick('[data-action="icon"][data-value="health"]')
+        await page.wait_for_timeout(600)
+        await reel.snap(10)
+        surface = await page.locator(".desktop-surface").bounding_box()
+        head = await page.locator('.window[data-focus="true"] .win-head').bounding_box()
+        await page.mouse.move(head["x"] + 60, head["y"] + 12)
+        await page.mouse.down()
+        for step in range(1, 5):
+            await page.mouse.move(head["x"] + 60 + step * 70, head["y"] + 12 + step * 34, steps=4)
+            await reel.snap(2)
+        await page.mouse.up()
+        await reel.snap(8)
+        head = await page.locator('.window[data-focus="true"] .win-head').bounding_box()
+        await page.mouse.move(head["x"] + 60, head["y"] + 12)
+        await page.mouse.down()
+        await page.mouse.move(surface["x"] + 120, surface["y"] + 160, steps=4)
+        await reel.snap(2)
+        await page.mouse.move(surface["x"] + 6, surface["y"] + 150, steps=6)
+        await reel.snap(8)  # the snap preview
+        await page.mouse.up()
+        await reel.snap(10)
+        await page.click('.window[data-focus="true"] [data-action="win-min"]')
+        await page.wait_for_timeout(400)
+        await reel.snap(10)
+        await page.click('.task[data-minimized="true"]')
+        await page.wait_for_timeout(400)
+        await reel.snap(8)
+        await page.click('[data-action="arrange"][data-value="tile"]')
+        await page.wait_for_timeout(450)
+        await reel.snap(14)
+        written.append(reel.write(frame_ms=150))
+
+        await page.keyboard.press("Control+k")
+        await page.wait_for_timeout(200)
+        await page.fill('[data-bind="palette-query"]', "Experience: Single")
+        await page.wait_for_timeout(200)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(500)
+
+        # 8. a run, from the table to its full trace
         reel = Reel(page, "run-detail", out, tmp)
         await goto_scene(page, "runs")
         await reel.snap(10)
@@ -316,6 +432,22 @@ async def capture(url: str, out: Path, tmp: Path) -> list[Path]:
         await page.wait_for_timeout(350)
         written.append(await still(page, out, "palette"))
         await page.keyboard.press("Escape")
+
+        # the desktop: three windows, icons and the taskbar
+        await open_desktop(page)
+        await page.dblclick('[data-action="icon"][data-value="health"]')
+        await page.wait_for_timeout(500)
+        await page.dblclick('[data-action="icon"][data-value="runs"]')
+        await page.wait_for_timeout(500)
+        await page.click('[data-action="arrange"][data-value="cascade"]')
+        await page.wait_for_timeout(600)
+        written.append(await still(page, out, "desktop"))
+        await page.keyboard.press("Control+k")
+        await page.wait_for_timeout(200)
+        await page.fill('[data-bind="palette-query"]', "Experience: Single")
+        await page.wait_for_timeout(200)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(500)
 
         # the shell: Console beside Health, with a run in the left pane
         await goto_scene(page, "console")

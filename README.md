@@ -120,6 +120,7 @@ TUI. Same file, no duplication.
 | **Health** | host facts, the react-loop sweeps, and the probe allowlist a sweep may use |
 | **Engine** | `doctor` checks, live engine state, the tool policy, the generated `opencode.jsonc` |
 | **Side by side** | any two scenes in one window — focus, maximize, close; Console stays a singleton |
+| **Desktop** | scenes as floating windows: icons, drag, resize, edge snapping, minimize, a taskbar, shareable layouts |
 
 It is a *view*, not a second runtime: a console line goes through the same
 `build_kernel(...)` call `bashos run` makes. The socket is loopback-only and
