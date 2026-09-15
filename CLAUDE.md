@@ -4,7 +4,8 @@ Terminal-first AI runtime: Claude slash commands routed through a LangGraph
 kernel onto the OpenCode engine, on Claude Code OAuth. Design doc:
 docs/HARNESS.md. The engine (policy, credential bridge, projection):
 docs/OPENCODE.md. The dev-server monitoring pattern (`bin/os-health`,
-`/health`, `/dash`): docs/FORGE.md.
+`/health`, `/dash`): docs/FORGE.md. The GUI front end (`bashos gui`):
+docs/DESKTOP.md.
 
 **The core rule: bashOS never implements a reasoning loop.** OpenCode owns the
 agent loop, tool broker, sessions, and permission gate; bashOS owns userland,
@@ -35,6 +36,12 @@ belongs in the engine layer or nowhere.
   text, and the interaction mirrors onto the box's tmux console monitor. Never
   give loops ssh/network tools — extend `remote.PROBES` instead.
 - `src/bashos/shell/` — Typer CLI, prompt-toolkit REPL, Rich rendering.
+- `src/bashos/gui/` — the desktop (`bashos gui`, docs/DESKTOP.md). `http.py` is
+  a ~300-line asyncio HTTP/SSE server (no web framework — never add one);
+  `server.py` routes onto the kernel behind a loopback + per-process-token
+  guard; `web/` is the front end, hand-written and unbundled (no npm, no build
+  step). The GUI is a VIEW: it runs kernel lines only — no shell passthrough,
+  no policy of its own, and never a loop.
 - `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
   `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024),
   `bashos` (containerized terminal, profile `cli`). LangChain/LangGraph are
@@ -61,6 +68,7 @@ belongs in the engine layer or nowhere.
 
 ```bash
 .venv/bin/pytest -q                  # offline tests (fake model, no engine)
+.venv/bin/bashos gui --browser       # the desktop, in a browser tab
 .venv/bin/bashos run -n "/sh ..."    # dry-run: no auth needed
 .venv/bin/bashos doctor              # auth/backend diagnosis (offline)
 .venv/bin/bashos opencode sync       # regenerate opencode.jsonc
