@@ -11,6 +11,7 @@
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 The prerequisite and Phase 0 are **done**, in the same PR as the desktop GUI — these docs were merged into that branch rather than waiting on it.
 
 | Phase 0 deliverable | Where |
@@ -47,6 +48,44 @@ Free drag was the PostHog failure mode this roadmap flagged. It works here becau
 **Still not built, deliberately:** the nostalgia theme pack (Phase 3 Could, off by default — no product reason yet), a full a11y audit (Phase 3), and remote auth (out of scope; the loopback + token model stands). The React/Vite tradeoff was never triggered: the whole desktop is still one HTML file, one stylesheet and two ES modules, with no bundler and no npm.
 
 **Open, for whoever picks it up:** should a wide viewport ever default to `tiling` or `os` rather than `single`; desktop icons for slash commands as well as scenes; and whether a tiling *tree* (beyond two panes) earns its complexity now that the desktop exists.
+||||||| Stash base
+======= The prerequisite and Phase 0 are **done**, in the same PR as the desktop GUI — these docs were merged into that branch rather than waiting on it.
+
+| Phase 0 deliverable | Where |
+|---|---|
+| Layout state for two scene instances | `gui/web/shell.js` — pure reducer, no DOM |
+| Intents `replace` \| `new` \| `focus` \| `sideBySide` | same, 19 unit tests in `tests/shell.test.mjs` (run by `pytest -q` through `tests/test_shell.py`) |
+| Scene-as-window chrome: focus, split, maximize/restore, close | `gui/web/app.js` `paneNode()`, `app.css` `.pane*` |
+| Context / palette actions | right-click any scene or run row; palette gained side-by-side, close, cycle, experience |
+| Palette baseline unchanged | ⌘K still opens it; composer `/` untouched |
+| No new deps | still one HTML + one CSS + two ES modules; no bundler |
+| `tools/capture_desktop.py` | new side-by-side still and reel, **plus** `check_shell()` asserting the intents against the DOM |
+| Guard regression | `!` still 403; token/CSP/Host/Origin unchanged; no new endpoints |
+
+Exit criteria met: two scenes open side by side from palette or context menu, maximize/close work, the focused pane's hash still deep-links, and the capture tool regenerates the tour. Free drag/resize deliberately absent.
+
+**Also settled while implementing** (open questions 2, 3 and 5): the Console is a singleton; two run details may share the screen because a resource id distinguishes them; and the capture tool grew multi-pane scenarios now, in Phase 0.
+
+### Phases 1–3 (2026-09-15, same day)
+
+| Deliverable | Phase | Where |
+|---|---|---|
+| Window / open-instance list | 1 (Should) | the taskbar — focus, minimize, restore, per window |
+| `tiling` usable, default still `single` | 1 | unchanged |
+| Workspace serialize / restore (`?windows=`, schema v1) | 2 | `encodeLayout` / `decodeLayout`, plus per-tab `sessionStorage` |
+| Window list polish: focus, close, order | 2 | taskbar, in open order |
+| Palette depth: scenes, runs, commands, dry-run, side-by-side | 2 | recent runs and per-scene window actions added |
+| More than two surfaces | 2 | the desktop holds up to eight; `tiling` stays two by design |
+| Floating drag / resize / desktop icons | 3 (Could) | pointer-driven drag, corner resize, edge snapping, icons |
+| Minimize + restore **only if** restore works end to end | 3 (Could) | it does: the taskbar restores, and a test proves it |
+| `prefers-reduced-motion` | 3 | honoured — the desktop animates nothing |
+
+Free drag was the PostHog failure mode this roadmap flagged. It works here because it is pointer-capture based, writes geometry straight to the node during the gesture, and commits to the reducer once on release — the browser never fights a re-render mid-drag. A Playwright pass drags, snaps, minimizes, restores and tiles on every capture run, so a regression fails the docs build.
+
+**Still not built, deliberately:** the nostalgia theme pack (Phase 3 Could, off by default — no product reason yet), a full a11y audit (Phase 3), and remote auth (out of scope; the loopback + token model stands). The React/Vite tradeoff was never triggered: the whole desktop is still one HTML file, one stylesheet and two ES modules, with no bundler and no npm.
+
+**Open, for whoever picks it up:** should a wide viewport ever default to `tiling` or `os` rather than `single`; desktop icons for slash commands as well as scenes; and whether a tiling *tree* (beyond two panes) earns its complexity now that the desktop exists.
+>>>>>>> Stashed changes
 ||||||| Stash base
 ======= The prerequisite and Phase 0 are **done**, in the same PR as the desktop GUI — these docs were merged into that branch rather than waiting on it.
 
