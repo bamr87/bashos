@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200" role="img" aria-label="Tty, the bashOS prompt">
+  <title>Tty</title>
+  <!-- sticker shadow -->
+  <rect x="18" y="38" width="176" height="128" rx="26" fill="#f54e00"/>
+  <!-- antenna -->
+  <path d="M110 34V16" stroke="#16171b" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="110" cy="12" r="9" fill="#f7a501" stroke="#16171b" stroke-width="5"/>
+  <!-- feet -->
+  <rect x="56" y="158" width="36" height="16" rx="8" fill="#16171b"/>
+  <rect x="128" y="158" width="36" height="16" rx="8" fill="#16171b"/>
+  <!-- screen body -->
+  <rect x="24" y="32" width="176" height="128" rx="26" fill="#1d1f27" stroke="#16171b" stroke-width="5"/>
+  <!-- the prompt: this is a shell with a face -->
+  <path d="M50 72l16 12-16 12" fill="none" stroke="#f54e00" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- eyes -->
+  <ellipse cx="108" cy="80" rx="11" ry="13" fill="#eeefe9"/>
+  <ellipse cx="146" cy="80" rx="11" ry="13" fill="#eeefe9"/>
+  <circle cx="111" cy="83" r="5" fill="#16171b"/>
+  <circle cx="149" cy="83" r="5" fill="#16171b"/>
+  <!-- smile -->
+  <path d="M100 112q27 18 54 0" fill="none" stroke="#eeefe9" stroke-width="7" stroke-linecap="round"/>
+  <!-- cursor -->
+  <rect x="172" y="66" width="11" height="26" rx="3" fill="#f7a501"/>
+</svg>

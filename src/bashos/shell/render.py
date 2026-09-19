@@ -99,5 +99,21 @@ def print_engine_status(rows: list[tuple[str, str]]) -> None:
     console.print(engine_table(rows))
 
 
+def print_gui_banner(entry_url: str, *, native: bool) -> None:
+    """Announce the desktop, and print the URL that carries its token.
+
+    The token is printed for the same reason the engine prints its password:
+    it is the only way to reach this window from another terminal, and it dies
+    with the process.
+    """
+    base = entry_url.split("/?", 1)[0]
+    console.print(BANNER, style="bold cyan", highlight=False)
+    console.print("desktop — a GUI front end on the same kernel\n", style="dim")
+    console.print(f"serving on [bold]{base}[/bold]")
+    console.print(f"opening in {'a native window' if native else 'your browser'}", style="dim")
+    console.print(f"open it yourself: {entry_url}", style="dim", highlight=False)
+    console.print("ctrl-c to stop\n", style="dim")
+
+
 def status(message: str = "thinking"):
     return console.status(f"[dim]{message}[/dim]", spinner="dots")
