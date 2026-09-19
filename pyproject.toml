@@ -44,7 +44,7 @@ dependencies = [
   # fallback model runtime (Claude Code OAuth harness, no tool policy)
   "claude-agent-sdk>=0.2.139",
   # terminal
-  "typer>=0.15",
+  "typer>=0.27.1",
   "rich>=13.9",
   # the desktop: windowed terminal UI (shares rich's renderable protocol)
   "textual>=8.2,<9",
