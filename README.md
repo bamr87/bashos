@@ -19,14 +19,8 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 
 ```bash
 npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
-<<<<<<< HEAD
 ./bin/bashos                 # first run bootstraps .venv, then opens the desktop
-||||||| e147539
-./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
-=======
-./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
-./bin/bashos gui             # …or the desktop window, on the same kernel
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+./bin/bashos gui             # …or the GUI desktop window, on the same kernel
 ```
 
 The desktop ([docs/DESKTOP.md](docs/DESKTOP.md)) is a windowed terminal environment: tiled windows that adapt to your terminal size, a launcher (`F2`) and command palette (`ctrl+p`), and an app suite — AI consoles, a live health monitor, the engine inspector, a kernel trace viewer, and the real OpenCode TUI a keypress away. In an AI Console window:
@@ -54,7 +48,7 @@ bashos run -x /sh list the 5 largest files   # -x confirm-then-run the first bas
 bashos list                                  # command table
 bashos doctor                                # auth + environment checks
 bashos opencode status                       # boot the engine and report what it runs
-bashos gui                                   # the desktop: same kernel, GUI front end
+bashos gui                                   # the GUI desktop: same kernel, browser or native window
 ```
 
 ## Auth — Claude Code OAuth, wired into the engine
@@ -97,7 +91,8 @@ Force one with `BASHOS_BACKEND=opencode|claude-code|api`; pick a model with
 
 Every one of these also works as a plain slash command inside Claude Code when you open this repo, and — after `bashos opencode sync` — inside the OpenCode TUI. Same file, no duplication.
 
-## Desktop
+
+## Desktop (GUI)
 
 `bashos gui` opens a GUI front end on the same kernel — a native window with `pip install "bashos[gui]"`, your browser without it:
 
@@ -122,14 +117,8 @@ It is a *view*, not a second runtime: a console line goes through the same `buil
 ## Architecture
 
 ```
-<<<<<<< HEAD
  terminal (desktop · one-shot CLI — textual + typer + rich)
-||||||| e147539
- terminal (REPL / CLI · typer + rich + prompt-toolkit)
-=======
- terminal (REPL / CLI · typer + rich + prompt-toolkit)
  desktop  (`bashos gui` · loopback HTTP + SSE → one page, no build step)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
     │
     ▼
  kernel — LangGraph state machine
@@ -181,29 +170,8 @@ random per-process password rather than leaving it open to every process on the 
   never merged into your own `opencode` credential store.
 - `/script` output is verified by shellcheck when installed, and labeled
   unverified when not.
-<<<<<<< HEAD
 - Only `!` lines and explicit `--exec` / console `exec` (confirm-then-run,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included.
-||||||| e147539
-- Only `!` lines execute anything by your intent — and that's your own shell.
-=======
-- Only `!` lines execute anything by your intent — and that's your own shell.
-The desktop has no `!` at all: it runs kernel lines, on a loopback socket guarded by a per-process token, and widens no policy.
-||||||| Stash base
-Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included.
-||||||| Stash base
-Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused
-  everywhere, the desktop included.
-======= Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included.
-||||||| e147539
-- Only `!` lines execute anything by your intent — and that's your own shell.
-=======
-- Only `!` lines execute anything by your intent — and that's your own shell.
-The desktop has no `!` at all: it runs kernel lines, on a loopback socket guarded by a per-process token, and widens no policy.
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
+Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included. The GUI desktop has no `!` at all: it runs kernel lines, on a loopback socket guarded by a per-process token, and widens no policy.
 
 ## Services (Docker)
 

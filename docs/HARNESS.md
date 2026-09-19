@@ -5,7 +5,7 @@ This is the design document for the AI harness at the core of bashOS: what the l
 ## Design goals
 
 1. **The terminal is the core access point.** Every capability — commands,
-agent runs, diagnostics, raw shell — is reachable from the terminal. There is no web UI; the terminal desktop ([DESKTOP.md](DESKTOP.md)) and the one-shot CLI are the whole surface.
+agent runs, diagnostics, raw shell — is reachable from the terminal. The Textual desktop ([DESKTOP.md](DESKTOP.md)) and the one-shot CLI are the primary surface; `bashos gui` is a view of the same kernel, not a second runtime.
 2. **Bring an existing agent; never build a reasoning loop.** The reasoning
 engine is [OpenCode](OPENCODE.md) — open source, client/server, provider-agnostic — running as a supervised local server. It owns the agent loop, the tool broker, sessions, and the permission gate. bashOS owns routing, policy, userland, and the terminal. This is the whitepaper's L5 separation, and it is why swapping engines is a module, not a rewrite.
 3. **Libraries everywhere.** Orchestration is LangGraph, the engine is
@@ -21,41 +21,9 @@ through a deterministic verifier (shellcheck), and agentic runs execute under a 
 
 ```
  ┌─────────────────────────────────────────────────────────────┐
-<<<<<<< HEAD
  │ desktop/      terminal desktop: windows · launcher · apps   │  access point
  │ shell/        one-shot CLI · rich rendering                 │
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
  │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
-||||||| Stash base
-=======
-||||||| e147539
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
-=======
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
- │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
-=======
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
- │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
-=======
- │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
- │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
  ├─────────────────────────────────────────────────────────────┤
  │ kernel/       LangGraph state machine: parse → route → loop │  orchestration
  ├─────────────────────────────────────────────────────────────┤
@@ -182,31 +150,9 @@ It is immediately a Claude Code slash command, a bashOS-routable program, and �
 
 **Add a backend** — one branch in `get_chat_model()` returning any `BaseChatModel`. Loops never know which backend they run on.
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-**Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
+**Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/` and `desktop/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
 
 **Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the separation.
-||||||| Stash base
-**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the
-||||||| Stash base
-**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above
-||||||| Stash base
-**Swap the engine** — implement `complete()`/`act()` against another
-client/server agent and point `opencode/engine.py` at it. Nothing above
-======= **Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
-
-**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above
->>>>>>> Stashed changes
-`opencode/` knows which engine is underneath, which is the whole point of the ======= **Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
-
-**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the
->>>>>>> Stashed changes
-separation. ======= **Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
-
-**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the separation.
->>>>>>> Stashed changes
 
 ## Services and observability
 

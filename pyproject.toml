@@ -10,13 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "bamr87", email = "bamr87@users.noreply.github.com" }]
-<<<<<<< HEAD
-keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "desktop", "tui"]
-||||||| e147539
-keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "repl"]
-=======
-keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "repl", "gui", "desktop"]
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+keywords = ["terminal", "ai", "shell", "opencode", "langgraph", "langchain", "claude", "agent", "desktop", "tui", "gui"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -55,52 +49,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-<<<<<<< HEAD
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "pytest-textual-snapshot>=1.1"]
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
 # the desktop window. The GUI itself needs nothing beyond the base install —
 # `bashos gui` serves it and falls back to your browser; this adds the native
 # window (platform webview, no bundled runtime).
 gui = ["pywebview>=5.0"]
-||||||| Stash base
-=======
-||||||| e147539
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-=======
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-# the desktop window. The GUI itself needs nothing beyond the base install —
-# `bashos gui` serves it and falls back to your browser; this adds the native
-# window (platform webview, no bundled runtime).
-gui = ["pywebview>=5.0"]
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-=======
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-# the desktop window. The GUI itself needs nothing beyond the base install —
-# `bashos gui` serves it and falls back to your browser; this adds the native
-# window (platform webview, no bundled runtime).
-gui = ["pywebview>=5.0"]
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-=======
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
-# the desktop window. The GUI itself needs nothing beyond the base install —
-# `bashos gui` serves it and falls back to your browser; this adds the native
-# window (platform webview, no bundled runtime).
-gui = ["pywebview>=5.0"]
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
 # observability: OpenInference spans exported to Arize Phoenix
 trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.29"]
 

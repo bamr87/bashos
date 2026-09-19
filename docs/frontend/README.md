@@ -36,9 +36,6 @@ Research basis: [posthog-os-research.md](./posthog-os-research.md) (PostHog.com 
 
 ## Status
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 **Phase 0 is implemented** in PR #20, which now carries both these docs and the code they describe:
 
 | Capability | State |
@@ -58,68 +55,5 @@ Research basis: [posthog-os-research.md](./posthog-os-research.md) (PostHog.com 
 | React/Vite migration | **Rejected** — never needed; still no npm |
 
 No new server endpoints were needed: layout state is client-only, exactly as §8.2 of the SPEC proposed. Every guard and refusal is unchanged.
-||||||| Stash base
-======= **Phase 0 is implemented** in PR #20, which now carries both these docs and the code they describe:
-
-| Capability | State |
-|---|---|
-| Experiences `single` \| `tiling` \| `os` \| `plain` (each with a real consumer) | **Landed** — Settings → Workspace, or the palette |
-| Nav intents `replace` \| `new` \| `focus` \| `sideBySide` | **Landed** — `gui/web/shell.js`, 36 unit tests |
-| Pane chrome: focus, split, maximize/restore, close | **Landed** |
-| Desktop: floating windows, drag, resize, edge snapping, z-order | **Landed** — phase 3, ahead of schedule |
-| Desktop icons, taskbar/window list, minimize **with** restore | **Landed** |
-| Arrange: tile and cascade | **Landed** |
-| Workspace layouts: `?windows=` share + per-tab restore, schema v1 | **Landed** — client-only, no new endpoint |
-| Context menus: open, side by side, new browser tab, copy link | **Landed** |
-| Palette depth: scenes, commands, recent runs, windows, arrange, experience | **Landed** |
-| Keymap: `⌘K`, `⌘\` cycle, `⌘W` close (native window) | **Landed** |
-| Narrow viewport → single; Console singleton | **Landed** |
-| Nostalgia theme pack; full a11y audit; remote auth | **Not built** — see ROADMAP |
-| React/Vite migration | **Rejected** — never needed; still no npm |
-
-No new server endpoints were needed: layout state is client-only, exactly as §8.2 of the SPEC proposed. Every guard and refusal is unchanged.
->>>>>>> Stashed changes
-||||||| Stash base
-======= **Phase 0 is implemented** in PR #20, which now carries both these docs and the code they describe:
-
-| Capability | State |
-|---|---|
-| Experiences `single` \| `tiling` \| `os` \| `plain` (each with a real consumer) | **Landed** — Settings → Workspace, or the palette |
-| Nav intents `replace` \| `new` \| `focus` \| `sideBySide` | **Landed** — `gui/web/shell.js`, 36 unit tests |
-| Pane chrome: focus, split, maximize/restore, close | **Landed** |
-| Desktop: floating windows, drag, resize, edge snapping, z-order | **Landed** — phase 3, ahead of schedule |
-| Desktop icons, taskbar/window list, minimize **with** restore | **Landed** |
-| Arrange: tile and cascade | **Landed** |
-| Workspace layouts: `?windows=` share + per-tab restore, schema v1 | **Landed** — client-only, no new endpoint |
-| Context menus: open, side by side, new browser tab, copy link | **Landed** |
-| Palette depth: scenes, commands, recent runs, windows, arrange, experience | **Landed** |
-| Keymap: `⌘K`, `⌘\` cycle, `⌘W` close (native window) | **Landed** |
-| Narrow viewport → single; Console singleton | **Landed** |
-| Nostalgia theme pack; full a11y audit; remote auth | **Not built** — see ROADMAP |
-| React/Vite migration | **Rejected** — never needed; still no npm |
-
-No new server endpoints were needed: layout state is client-only, exactly as §8.2 of the SPEC proposed. Every guard and refusal is unchanged.
->>>>>>> Stashed changes
-||||||| Stash base
-======= **Phase 0 is implemented** in PR #20, which now carries both these docs and the code they describe:
-
-| Capability | State |
-|---|---|
-| Experiences `single` \| `tiling` \| `os` \| `plain` (each with a real consumer) | **Landed** — Settings → Workspace, or the palette |
-| Nav intents `replace` \| `new` \| `focus` \| `sideBySide` | **Landed** — `gui/web/shell.js`, 36 unit tests |
-| Pane chrome: focus, split, maximize/restore, close | **Landed** |
-| Desktop: floating windows, drag, resize, edge snapping, z-order | **Landed** — phase 3, ahead of schedule |
-| Desktop icons, taskbar/window list, minimize **with** restore | **Landed** |
-| Arrange: tile and cascade | **Landed** |
-| Workspace layouts: `?windows=` share + per-tab restore, schema v1 | **Landed** — client-only, no new endpoint |
-| Context menus: open, side by side, new browser tab, copy link | **Landed** |
-| Palette depth: scenes, commands, recent runs, windows, arrange, experience | **Landed** |
-| Keymap: `⌘K`, `⌘\` cycle, `⌘W` close (native window) | **Landed** |
-| Narrow viewport → single; Console singleton | **Landed** |
-| Nostalgia theme pack; full a11y audit; remote auth | **Not built** — see ROADMAP |
-| React/Vite migration | **Rejected** — never needed; still no npm |
-
-No new server endpoints were needed: layout state is client-only, exactly as §8.2 of the SPEC proposed. Every guard and refusal is unchanged.
->>>>>>> Stashed changes
 
 **Research refresh (2026-09-15):** PostHog deep interaction pass refined live truth — side-by-side panes, context menus, maximize/close, overlays; free drag/resize unreliable. See [posthog-os-research.md](./posthog-os-research.md) §13. Alignment pass: these docs no longer assume a greenfield L6 stack; they build on #20’s scenes and no-build philosophy.

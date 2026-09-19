@@ -16,19 +16,7 @@
 
 ## Dependency — resolved
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 The dependency was resolved by merging **this** documentation into PR #20, so the docs and the surface they describe review and ship together. Phase 0 of the roadmap is implemented there; desktop paths below are live, not proposed.
-||||||| Stash base
-======= The dependency was resolved by merging **this** documentation into PR #20, so the docs and the surface they describe review and ship together. Phase 0 of the roadmap is implemented there; desktop paths below are live, not proposed.
->>>>>>> Stashed changes
-||||||| Stash base
-======= The dependency was resolved by merging **this** documentation into PR #20, so the docs and the surface they describe review and ship together. Phase 0 of the roadmap is implemented there; desktop paths below are live, not proposed.
->>>>>>> Stashed changes
-||||||| Stash base
-======= The dependency was resolved by merging **this** documentation into PR #20, so the docs and the surface they describe review and ship together. Phase 0 of the roadmap is implemented there; desktop paths below are live, not proposed.
->>>>>>> Stashed changes
 
 ## One-line rule
 

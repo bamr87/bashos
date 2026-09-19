@@ -4,33 +4,8 @@
     bashos desktop             the desktop, explicitly
     bashos run /sh <request>   one-shot command
     bashos run <plain english> routed to the best command by the kernel
-<<<<<<< HEAD
     bashos run -x /sh …        generate, confirm, then run the first bash fence
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     bashos gui                 the desktop window (same kernel, GUI front end)
-||||||| Stash base
-=======
-||||||| e147539
-=======
-    bashos gui                 the desktop window (same kernel, GUI front end)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
-=======
-    bashos gui                 the desktop window (same kernel, GUI front end)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
-||||||| Stash base
-=======
-||||||| e147539
-=======
-    bashos gui                 the desktop window (same kernel, GUI front end)
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
->>>>>>> Stashed changes
     bashos list                command table
     bashos doctor              auth + environment checks
     bashos opencode …          the engine: sync · status · auth · serve
@@ -331,11 +306,6 @@ def remote_ask(
     render.print_output(answer)
 
 
-<<<<<<< HEAD
-@app.command("repl", hidden=True)
-||||||| e147539
-@app.command("repl")
-=======
 @app.command("gui")
 def gui(
     port: int = typer.Option(0, "--port", "-p", help="port to serve on (0 = pick a free one)"),
@@ -359,8 +329,7 @@ def gui(
     launch(server, window=not browser, open_browser=open_page, announce=announce)
 
 
-@app.command("repl")
->>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+@app.command("repl", hidden=True)
 def repl(
     model: str | None = typer.Option(None, "--model", "-m", help="model override"),
 ) -> None:
