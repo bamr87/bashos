@@ -7,7 +7,15 @@
 <<<<<<< HEAD
     bashos run -x /sh …        generate, confirm, then run the first bash fence
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     bashos gui                 the desktop window (same kernel, GUI front end)
+||||||| Stash base
+=======
+||||||| e147539
+=======
+    bashos gui                 the desktop window (same kernel, GUI front end)
+>>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+>>>>>>> Stashed changes
 ||||||| Stash base
 =======
 ||||||| e147539

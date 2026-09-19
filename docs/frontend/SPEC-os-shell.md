@@ -207,6 +207,7 @@ interface ShellSettings {
 ```
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 **As implemented:** every field above is real except `expanded` (tiling's maximize, kept separate from the desktop's `snapped: "max"`). Geometry is percentages, `zIndex` is a monotonic counter bumped on focus, and `snapped`
 takes `left | right | max | null`. The serialized form is shorter than the
 schema above — `{v,e,f,w:[{s,r,x,y,cx,cy,m,k}]}` — because it travels in a URL; `decodeLayout` validates the version, drops scenes this build does not have, dedupes the Console, and clamps every number.
@@ -238,6 +239,39 @@ function navigate(target, intent = 'replace') {
 ```
 
 **Hard rule:** Documented intent ⇒ tested consumer. Every row above has one, in `gui/web/shell.js`, asserted by `tests/shell.test.mjs` (unit) and `tools/capture_desktop.py` (DOM).
+||||||| Stash base
+======= **As implemented:** every field above is real except `expanded` (tiling's maximize, kept separate from the desktop's `snapped: "max"`). Geometry is percentages, `zIndex` is a monotonic counter bumped on focus, and `snapped`
+takes `left | right | max | null`. The serialized form is shorter than the
+schema above — `{v,e,f,w:[{s,r,x,y,cx,cy,m,k}]}` — because it travels in a URL; `decodeLayout` validates the version, drops scenes this build does not have, dedupes the Console, and clamps every number.
+
+---
+
+## 4. Navigation intents
+
+Aligned with #20 hash routing. Today’s `navigate(id)` / `location.hash` ≈ **`replace`**.
+
+| Intent | Behavior | Trigger examples |
+|---|---|---|
+| `replace` | Mutate focused instance’s `sceneId` / `resourceId` / `hash` (current #20 behavior) | Sidebar click, in-scene link, default nav |
+| `new` | **Append** a scene instance; bring to front | Context “Open in new pane/window”, palette “new …” |
+| `focus` | If same `(sceneId, resourceId)` exists → focus only; no duplicate | Second activation of same run detail |
+| `sideBySide` | Keep focused; open target as opposite pane; focus switch; close → single | Context / palette “Open side by side” |
+| *(browser)* | `window.open` same origin + hash + token rules as #20 | “Open in new browser tab” — Must fallback |
+
+```js
+// Pseudocode — normative behavior; vanilla JS in app.js
+function navigate(target, intent = 'replace') {
+  const existing = findBySceneResource(target)
+  if (intent === 'focus' && existing) return focus(existing.id)
+  if (intent === 'new' || intent === 'sideBySide') {
+    return appendWindow(target, intent === 'sideBySide' ? { snap: 'opposite' } : {})
+  }
+  return replaceFocused(target) // also updates location.hash like #20 today
+}
+```
+
+**Hard rule:** Documented intent ⇒ tested consumer. Every row above has one, in `gui/web/shell.js`, asserted by `tests/shell.test.mjs` (unit) and `tools/capture_desktop.py` (DOM).
+>>>>>>> Stashed changes
 ||||||| Stash base
 ======= **As implemented:** every field above is real except `expanded` (tiling's maximize, kept separate from the desktop's `snapped: "max"`). Geometry is percentages, `zIndex` is a monotonic counter bumped on focus, and `snapped`
 takes `left | right | max | null`. The serialized form is shorter than the
