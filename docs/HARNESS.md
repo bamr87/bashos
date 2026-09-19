@@ -21,10 +21,21 @@ through a deterministic verifier (shellcheck), and agentic runs execute under a 
 
 ```
  ┌─────────────────────────────────────────────────────────────┐
+<<<<<<< HEAD
  │ desktop/      terminal desktop: windows · launcher · apps   │  access point
  │ shell/        one-shot CLI · rich rendering                 │
+<<<<<<< Updated upstream
  │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
  │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
+||||||| Stash base
+=======
+||||||| e147539
+ │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
+=======
+ │ shell/        terminal layer: REPL · CLI · rich rendering   │  access point
+ │ gui/          desktop layer: loopback HTTP+SSE · one page   │  (DESKTOP.md)
+>>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+>>>>>>> Stashed changes
  ├─────────────────────────────────────────────────────────────┤
  │ kernel/       LangGraph state machine: parse → route → loop │  orchestration
  ├─────────────────────────────────────────────────────────────┤
@@ -151,9 +162,17 @@ It is immediately a Claude Code slash command, a bashOS-routable program, and �
 
 **Add a backend** — one branch in `get_chat_model()` returning any `BaseChatModel`. Loops never know which backend they run on.
 
+<<<<<<< Updated upstream
 **Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
 
 **Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the separation.
+||||||| Stash base
+**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the
+separation.
+======= **Add a desktop scene** — one route in `gui/server.py` over state that already exists, one builder in `gui/web/app.js`. The GUI is an access layer beside `shell/`, not above the kernel: it calls `build_kernel(...)` exactly as `bashos run` does, and holds no policy, no history file, and no loop of its own. [DESKTOP.md](DESKTOP.md) has the guard model and the scene list.
+
+**Swap the engine** — implement `complete()`/`act()` against another client/server agent and point `opencode/engine.py` at it. Nothing above `opencode/` knows which engine is underneath, which is the whole point of the separation.
+>>>>>>> Stashed changes
 
 ## Services and observability
 

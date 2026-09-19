@@ -19,9 +19,20 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 
 ```bash
 npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
+<<<<<<< HEAD
 ./bin/bashos                 # first run bootstraps .venv, then opens the desktop
+<<<<<<< Updated upstream
 ./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
 ./bin/bashos gui             # …or the desktop window, on the same kernel
+||||||| Stash base
+=======
+||||||| e147539
+./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
+=======
+./bin/bashos                 # first run bootstraps .venv, then drops into the REPL
+./bin/bashos gui             # …or the desktop window, on the same kernel
+>>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+>>>>>>> Stashed changes
 ```
 
 The desktop ([docs/DESKTOP.md](docs/DESKTOP.md)) is a windowed terminal environment: tiled windows that adapt to your terminal size, a launcher (`F2`) and command palette (`ctrl+p`), and an app suite — AI consoles, a live health monitor, the engine inspector, a kernel trace viewer, and the real OpenCode TUI a keypress away. In an AI Console window:
@@ -114,6 +125,28 @@ It is a *view*, not a second runtime: a console line goes through the same `buil
 
 **[Take the tour](docs/DESKTOP-TOUR.md)** — every scene, with screenshots and recordings of the real thing. The architecture and guard model are in [docs/DESKTOP.md](docs/DESKTOP.md); where the window metaphors are going is in [docs/frontend/](docs/frontend/README.md).
 
+## Desktop
+
+`bashos gui` opens a GUI front end on the same kernel — a native window with `pip install "bashos[gui]"`, your browser without it:
+
+[![The bashOS desktop](docs/media/overview.png)](docs/DESKTOP-TOUR.md)
+
+
+| scene | what it is |
+|---|---|
+| **Overview** | session stats, quick-run chips, recent runs, the path a line takes |
+| **Console** | the terminal as a GUI — slash completion, live kernel trace, tool calls as they happen |
+| **Commands** | userland: every `.claude/commands/*.md` with its loop, agent, and prompt spec |
+| **Runs** | every line this window ran, with its trace, its tool calls, and its answer |
+| **Health** | host facts, the react-loop sweeps, and the probe allowlist a sweep may use |
+| **Engine** | `doctor` checks, live engine state, the tool policy, the generated `opencode.jsonc` |
+| **Side by side** | any two scenes in one window — focus, maximize, close; Console stays a singleton |
+| **Desktop** | scenes as floating windows: icons, drag, resize, edge snapping, minimize, a taskbar, shareable layouts |
+
+It is a *view*, not a second runtime: a console line goes through the same `build_kernel(...)` call `bashos run` makes. The socket is loopback-only and token-guarded, `!` shell passthrough is refused (that stays in your terminal, where it is your own shell by your own keystroke), and the tool policy is unchanged — the Health scene renders the allowlist, it does not widen it. No bundler, no npm, no web framework in the dependency tree: one HTML file, one stylesheet, one ES module, served by ~300 lines of asyncio.
+
+**[Take the tour](docs/DESKTOP-TOUR.md)** — every scene, with screenshots and recordings of the real thing. The architecture and guard model are in [docs/DESKTOP.md](docs/DESKTOP.md); where the window metaphors are going is in [docs/frontend/](docs/frontend/README.md).
+
 ## Architecture
 
 ```
@@ -178,12 +211,23 @@ random per-process password rather than leaving it open to every process on the 
   unverified when not.
 <<<<<<< HEAD
 - Only `!` lines and explicit `--exec` / console `exec` (confirm-then-run,
+<<<<<<< Updated upstream
 Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included.
 ||||||| e147539
 - Only `!` lines execute anything by your intent — and that's your own shell.
 =======
 - Only `!` lines execute anything by your intent — and that's your own shell.
 The desktop has no `!` at all: it runs kernel lines, on a loopback socket guarded by a per-process token, and widens no policy.
+||||||| Stash base
+Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused
+  everywhere, the desktop included.
+======= Cancel focused by default) execute anything by your intent — and that's your own shell. Approval requests from engine runs are auto-refused everywhere, the desktop included.
+||||||| e147539
+- Only `!` lines execute anything by your intent — and that's your own shell.
+=======
+- Only `!` lines execute anything by your intent — and that's your own shell.
+The desktop has no `!` at all: it runs kernel lines, on a loopback socket guarded by a per-process token, and widens no policy.
+>>>>>>> Stashed changes
 >>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
 
 ## Services (Docker)

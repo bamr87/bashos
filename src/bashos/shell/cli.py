@@ -4,8 +4,17 @@
     bashos desktop             the desktop, explicitly
     bashos run /sh <request>   one-shot command
     bashos run <plain english> routed to the best command by the kernel
+<<<<<<< HEAD
     bashos run -x /sh …        generate, confirm, then run the first bash fence
+<<<<<<< Updated upstream
     bashos gui                 the desktop window (same kernel, GUI front end)
+||||||| Stash base
+=======
+||||||| e147539
+=======
+    bashos gui                 the desktop window (same kernel, GUI front end)
+>>>>>>> 4e04c89164334d9daf8762caec1f7bed433d776e
+>>>>>>> Stashed changes
     bashos list                command table
     bashos doctor              auth + environment checks
     bashos opencode …          the engine: sync · status · auth · serve
