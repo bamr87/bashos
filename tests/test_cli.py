@@ -1,5 +1,7 @@
 """CLI wiring smoke tests — guard the terminal entry points offline."""
 
+import re
+
 from typer.testing import CliRunner
 
 from bashos.shell.cli import app
@@ -29,7 +31,10 @@ def test_run_dry_run_needs_no_auth():
 def test_run_help_mentions_exec():
     result = runner.invoke(app, ["run", "--help"])
     assert result.exit_code == 0
-    assert "--exec" in result.output
+    # Typer forces rich colour when GITHUB_ACTIONS/FORCE_COLOR is set, and rich
+    # styles the option's dashes separately, so match against plain text.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--exec" in plain
 
 
 def test_exec_disabled_in_dry_run():
