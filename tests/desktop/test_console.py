@@ -186,7 +186,15 @@ async def test_bang_passthrough_streams_into_an_output_window(desktop_app):
         desktop = desktop_app.query_one(Desktop)
         shell_windows = [w for w in desktop.windows if (w.id or "").startswith("win-shell-")]
         assert len(shell_windows) == 1
-        log_lines = [str(line) for line in shell_windows[0].query_one("RichLog").lines]
+        log = shell_windows[0].query_one("RichLog")
+        # RichLog defers writes until the new window has been laid out, so on a
+        # loaded runner the final line can land a few refreshes after the worker
+        # finishes. Poll (bounded) instead of trusting a single pause.
+        for _ in range(50):
+            if any("[exit 0]" in str(line) for line in log.lines):
+                break
+            await pilot.pause(0.05)
+        log_lines = [str(line) for line in log.lines]
         assert any("[exit 0]" in line for line in log_lines)
 
 
