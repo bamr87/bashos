@@ -1,40 +1,82 @@
 #!/usr/bin/env bash
+# chui check — verify the install. Exits 1 on any [!!]; [--] lines are advice only.
 set -u
+
+CHUI_ROOT="${CHUI_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+# shellcheck source=lib.sh
+source "$CHUI_ROOT/lib.sh"
 
 fail=0
 ok() { printf '  [ok] %s\n' "$1"; }
 bad() { printf '  [!!] %s\n' "$1"; fail=1; }
+note() { printf '  [--] %s\n' "$1"; }
 
-CHUI_ROOT="${CHUI_ROOT:-$(cd "$(dirname "$0")" && pwd)}"
+# chk CONDITION... -- OK-TEXT BAD-TEXT
+chk() {
+  local args=()
+  while [[ $1 != -- ]]; do args+=("$1"); shift; done
+  shift
+  if "${args[@]}"; then ok "$1"; else bad "$2"; fi
+}
 
-echo "chui check"
+echo "chui check  ($CHUI_ROOT)"
 
-[[ -L $HOME/.zshrc && $(readlink "$HOME/.zshrc") == *chui/config/zshrc ]] && ok "zshrc symlink" || bad "zshrc not linked to chui"
-[[ -L $HOME/.zshenv && $(readlink "$HOME/.zshenv") == *chui/config/zshenv ]] && ok "zshenv symlink" || bad "zshenv not linked to chui"
-[[ -L $HOME/.p10k.zsh ]] && ok "p10k symlink" || bad "p10k not linked"
-[[ -d $HOME/.oh-my-zsh ]] && ok "oh-my-zsh" || bad "oh-my-zsh missing"
-[[ -d $HOME/.oh-my-zsh/custom/themes/powerlevel10k ]] && ok "powerlevel10k" || bad "powerlevel10k missing"
-[[ -d $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions ]] && ok "autosuggestions" || bad "autosuggestions missing"
-[[ -d $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting ]] && ok "syntax-highlighting" || bad "syntax-highlighting missing"
-[[ -d $HOME/.oh-my-zsh/custom/plugins/fzf-tab ]] && ok "fzf-tab" || bad "fzf-tab missing"
-[[ -e $HOME/.oh-my-zsh/custom/forge.zsh ]] && ok "forge.zsh" || bad "forge.zsh missing"
-[[ -L $HOME/.config/zellij/config.kdl ]] && ok "zellij config" || bad "zellij config not linked"
-[[ -L $HOME/.config/zellij/layouts/home.kdl ]] && ok "zellij home layout" || bad "zellij home layout not linked"
-[[ -L $HOME/.local/bin/chui-home && -x $CHUI_ROOT/config/home.sh ]] && ok "chui-home" || bad "chui-home missing"
+# Every link must point into THIS checkout. One that points into another chui (say the old
+# standalone ~/github/chui clone) still works today, but stops tracking this tree.
+here=$(chui_phys "$CHUI_ROOT/x")
+here=${here%/x}
+while IFS='|' read -r rel dest; do
+  name=${dest/#$HOME/\~}
+  if [[ ! -L $dest ]]; then
+    bad "$name not linked to chui  (run: chui install)"
+    continue
+  fi
+  target=$(readlink "$dest")
+  [[ $target == /* ]] || target="$(dirname "$dest")/$target"
+  target=$(chui_phys "$target")
+  case $rel in
+    config/zellij/config*.kdl) want="$here/config/zellij/" ;;
+    *) want="$here/$rel" ;;
+  esac
+  if [[ $target == "$want"* ]]; then
+    ok "$name"
+  elif [[ $target == */chui/* ]]; then
+    bad "$name links another checkout: $target  (run: chui install)"
+  else
+    bad "$name points at $target, not chui"
+  fi
+done < <(chui_links)
+
+chk test -d "$HOME/.oh-my-zsh" -- "oh-my-zsh" "oh-my-zsh missing"
+while read -r _ dest; do
+  [[ -n $dest ]] || continue
+  chk test -d "$ZSH_CUSTOM/$dest" -- "$(basename "$dest")" "$(basename "$dest") missing"
+done <"$CHUI_ROOT/custom/plugins.txt"
 
 for cmd in zsh brew git eza bat fd fzf zoxide delta btop lazygit fastfetch zellij gum; do
-  command -v "$cmd" >/dev/null && ok "$cmd" || bad "$cmd missing"
+  if command -v "$cmd" >/dev/null; then ok "$cmd"; else bad "$cmd missing  (run: chui install)"; fi
 done
 
 if [[ -L $HOME/.zshrc ]]; then
-  grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' "$HOME/.zshrc" && ok "theme p10k" || bad "theme not p10k"
-  grep -q 'keybindings.zsh' "$HOME/.zshrc" && ok "keybindings sourced" || bad "keybindings not sourced"
-  grep -q 'completions.zsh' "$HOME/.zshrc" && ok "completions sourced" || bad "completions not sourced"
+  chk grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' "$HOME/.zshrc" -- "theme p10k" "theme not p10k"
+  chk grep -q 'keybindings.zsh' "$HOME/.zshrc" -- "keybindings sourced" "keybindings not sourced"
+  chk grep -q 'completions.zsh' "$HOME/.zshrc" -- "completions sourced" "completions not sourced"
 fi
-[[ -f ${CHUI_ROOT:-$HOME/github/chui}/config/keybindings.zsh ]] && ok "keybindings.zsh" || bad "keybindings.zsh missing"
-if command -v osascript >/dev/null; then
+
+if [[ $(uname -s) == Darwin ]] && command -v osascript >/dev/null; then
   font=$(osascript -e 'tell application "Terminal" to get font name of default settings' 2>/dev/null || true)
-  [[ $font == *Meslo* || $font == *Nerd* || $font == *NF* ]] && ok "terminal font $font" || bad "terminal font is ${font:-unknown} (want MesloLGS Nerd Font)"
+  case $font in
+    *Meslo* | *Nerd* | *NF*) ok "terminal font $font" ;;
+    *) bad "terminal font is ${font:-unknown} (want MesloLGS Nerd Font: chui configure → Apply font)" ;;
+  esac
+fi
+
+# Advice: settings that only matter for keys v1 (docs/TERMINAL-FRAMEWORK.md §6.1).
+note "zellij keys: $(chui_zellij_config | sed 's/config.kdl/classic/; s/config.unlock-first.kdl/unlock-first/')  (chui configure → Zellij keys)"
+vscode="$HOME/Library/Application Support/Code/User/settings.json"
+if [[ -f $vscode ]] && ! grep -Eq '"terminal\.integrated\.macOptionIsMeta"[[:space:]]*:[[:space:]]*true' "$vscode"; then
+  note "VS Code: set \"terminal.integrated.macOptionIsMeta\": true for alt+key chords in TUIs"
 fi
 
 echo

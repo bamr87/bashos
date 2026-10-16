@@ -49,12 +49,28 @@ Mac text-editing in the shell. **Restart Terminal.app** after install.
 
 ## Zellij (`zj`)
 
+`chui configure` → Zellij keys picks one of two key sets.
+
+**classic** (the default):
+
 | Key | Action |
 | --- | --- |
 | **⌃ G** | lock / unlock |
 | **⌃ P** | pane mode |
 | **⌃ T** | tab mode |
+| **⌃ N** | resize mode |
+| **⌃ O** | session mode |
 | **⌃ Q** | quit |
+
+**unlock-first** (bashOS keys v1). Zellij starts locked, so every key reaches the app inside it:
+
+| Key | Action |
+| --- | --- |
+| **⌃ G** | unlock (again, or **esc**: lock) |
+| then **p** / **t** / **r** / **o** | pane / tab / resize / session mode |
+| then **q** | quit |
+
+In a mode, `h j k l` move or resize, `n` new, `x` close, `f` fullscreen; every action locks again.
 
 ## Home map (`hm` / `zh`)
 

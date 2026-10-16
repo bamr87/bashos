@@ -1,24 +1,35 @@
 #!/usr/bin/env bash
+# chui installer — idempotent, safe to re-run. `--dry-run` shows the plan and changes nothing.
 set -euo pipefail
 
 CHUI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+# shellcheck source=lib.sh
+source "$CHUI_ROOT/lib.sh"
+
 NO_BACKUP=0
 SKIP_BREW=0
+NO_TERMINAL=0
+DRY_RUN=0
+STAMP="$(date +%Y%m%d-%H%M%S)"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [options]
-  --no-backup   skip config snapshot
-  --skip-brew   skip brew bundle
-  -h, --help    this help
+Usage: chui install [options]      (or: ./install.sh)
+  -n, --dry-run   print what would change; change nothing
+  --no-backup     skip the config snapshot (an existing real file is still moved aside)
+  --skip-brew     skip brew bundle
+  --no-terminal   leave Apple Terminal and VS Code alone (font, key maps)
+  -h, --help      this help
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -n|--dry-run) DRY_RUN=1 ;;
     --no-backup) NO_BACKUP=1 ;;
     --skip-brew) SKIP_BREW=1 ;;
+    --no-terminal) NO_TERMINAL=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
   esac
@@ -26,81 +37,131 @@ while [[ $# -gt 0 ]]; do
 done
 
 log() { printf '==> %s\n' "$*"; }
+plan() { printf 'plan: %s\n' "$*"; }
+
+# run CMD... — run it, or under --dry-run print it.
+run() {
+  if [[ $DRY_RUN -eq 1 ]]; then
+    plan "$*"
+  else
+    "$@"
+  fi
+}
 
 link() {
-  local src=$1 dest=$2
+  local src=$1 dest=$2 was=""
+  if [[ -L $dest ]]; then
+    was=$(readlink "$dest")
+    if [[ $was == "$src" ]]; then
+      log "ok    $dest"
+      return 0
+    fi
+  fi
+  if [[ $DRY_RUN -eq 1 ]]; then
+    if [[ -n $was ]]; then
+      plan "relink $dest -> $src  (was $was)"
+    elif [[ -e $dest ]]; then
+      plan "move $dest -> $dest.chui-$STAMP, then link -> $src"
+    else
+      plan "link $dest -> $src"
+    fi
+    return 0
+  fi
   mkdir -p "$(dirname "$dest")"
   if [[ -e $dest && ! -L $dest ]]; then
-    rm -rf "$dest"
+    # Never delete a real file: a snapshot may not exist (--no-backup, or a path backup.sh
+    # does not cover), so keep the original beside the link.
+    mv "$dest" "$dest.chui-$STAMP"
+    log "moved $dest -> $dest.chui-$STAMP"
   fi
   ln -sfn "$src" "$dest"
-  log "link $dest -> $src"
+  if [[ -n $was ]]; then
+    log "relink $dest -> $src  (was $was)"
+  else
+    log "link  $dest -> $src"
+  fi
 }
 
 clone_if_missing() {
   local url=$1 dest=$2
   if [[ -d $dest/.git ]]; then
-    log "have $(basename "$dest")"
+    log "have  $(basename "$dest")"
     return 0
   fi
   log "clone $url"
-  git clone --depth=1 "$url" "$dest"
+  run git clone --depth=1 "$url" "$dest"
 }
+
+DARWIN=0
+[[ $(uname -s) == Darwin ]] && DARWIN=1
+if [[ $DARWIN -eq 0 ]]; then
+  log "not macOS: shell, prompt and Zellij install; Apple Terminal steps are skipped"
+fi
+[[ $DRY_RUN -eq 1 ]] && log "dry run — nothing will change"
 
 if [[ $NO_BACKUP -eq 0 ]]; then
   log "backup"
-  "$CHUI_ROOT/backup.sh" >/dev/null
+  if [[ $DRY_RUN -eq 1 ]]; then
+    plan "$CHUI_ROOT/backup.sh  → ${CHUI_BACKUP_ROOT:-$HOME/.chui-backups}/$STAMP"
+  else
+    "$CHUI_ROOT/backup.sh" >/dev/null
+  fi
 fi
 
 if [[ $SKIP_BREW -eq 0 ]]; then
   if ! command -v brew >/dev/null; then
-    echo "homebrew required: https://brew.sh" >&2
+    echo "homebrew required: https://brew.sh  (or re-run with --skip-brew)" >&2
     exit 4
   fi
   log "brew bundle"
-  brew bundle install --file="$CHUI_ROOT/Brewfile"
+  run brew bundle install --file="$CHUI_ROOT/Brewfile"
 fi
 
 if [[ ! -d $HOME/.oh-my-zsh ]]; then
   log "install oh-my-zsh"
-  RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  if [[ $DRY_RUN -eq 1 ]]; then
+    plan "oh-my-zsh installer (RUNZSH=no CHSH=no KEEP_ZSHRC=yes)"
+  else
+    RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  fi
 fi
 
-clone_if_missing https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k"
-clone_if_missing https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-clone_if_missing https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-clone_if_missing https://github.com/Aloxaf/fzf-tab "$ZSH_CUSTOM/plugins/fzf-tab"
+# custom/plugins.txt is the list: "<github owner/repo>  <path under $ZSH_CUSTOM>".
+while read -r repo dest; do
+  [[ -n $repo && $repo != \#* ]] || continue
+  clone_if_missing "https://github.com/$repo.git" "$ZSH_CUSTOM/$dest"
+done <"$CHUI_ROOT/custom/plugins.txt"
 
-link "$CHUI_ROOT/config/zshrc" "$HOME/.zshrc"
-link "$CHUI_ROOT/config/zshenv" "$HOME/.zshenv"
-link "$CHUI_ROOT/config/p10k.zsh" "$HOME/.p10k.zsh"
-link "$CHUI_ROOT/custom/forge.zsh" "$ZSH_CUSTOM/forge.zsh"
-link "$CHUI_ROOT/config/zellij/config.kdl" "$HOME/.config/zellij/config.kdl"
-link "$CHUI_ROOT/config/zellij/layouts/home.kdl" "$HOME/.config/zellij/layouts/home.kdl"
-mkdir -p "$HOME/.local/bin"
-link "$CHUI_ROOT/tui.sh" "$HOME/.local/bin/chui"
-link "$CHUI_ROOT/config/home.sh" "$HOME/.local/bin/chui-home"
+while IFS='|' read -r rel dest; do
+  link "$CHUI_ROOT/$rel" "$dest"
+done < <(chui_links)
 
 if command -v git >/dev/null; then
-  git config --global core.pager delta
-  git config --global interactive.diffFilter "delta --color-only"
-  git config --global delta.navigate true
-  git config --global delta.side-by-side true
-  git config --global merge.conflictstyle zdiff3
+  run git config --global core.pager delta
+  run git config --global interactive.diffFilter "delta --color-only"
+  run git config --global delta.navigate true
+  run git config --global delta.side-by-side true
+  run git config --global merge.conflictstyle zdiff3
   log "git delta configured"
 fi
 
-if command -v osascript >/dev/null; then
+if [[ $DARWIN -eq 1 && $NO_TERMINAL -eq 0 ]]; then
+  font=$(chui_local_get CHUI_FONT_NAME)
   log "terminal font"
-  bash "$CHUI_ROOT/config/terminal/macos-font.sh" || true
+  CHUI_FONT_NAME="${font:-MesloLGS Nerd Font}" run bash "$CHUI_ROOT/config/terminal/macos-font.sh" || true
+  if command -v python3 >/dev/null; then
+    log "macos terminal keys"
+    run python3 "$CHUI_ROOT/config/terminal/macos-keys.py"
+    log "vscode terminal keys"
+    run python3 "$CHUI_ROOT/config/terminal/vscode-keys.py"
+  fi
+elif [[ $NO_TERMINAL -eq 1 ]]; then
+  log "terminal + vscode settings left alone (--no-terminal)"
 fi
 
-if command -v python3 >/dev/null; then
-  log "macos terminal keys"
-  python3 "$CHUI_ROOT/config/terminal/macos-keys.py"
-  log "vscode terminal keys"
-  python3 "$CHUI_ROOT/config/terminal/vscode-keys.py"
+if [[ $DRY_RUN -eq 1 ]]; then
+  log "dry run done. install for real: chui install"
+else
+  log "done. open a new terminal or: exec zsh"
+  log "verify: chui check"
 fi
-
-log "done. open a new terminal or: exec zsh"
-log "verify: $CHUI_ROOT/check.sh"

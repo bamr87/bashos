@@ -1,0 +1,81 @@
+// chui — Zellij with unlock-first keys (keys v1, bamr87 docs/TERMINAL-FRAMEWORK.md §6.1).
+// Zellij starts LOCKED, so every ctrl key reaches the app (the bashOS desktop, lazygit, vim).
+// ctrl+g unlocks; then one plain letter picks a mode, and each action locks again.
+// Opt in with `chui configure` → Zellij keys (CHUI_ZELLIJ_KEYS=unlock-first).
+// Everything after the keybinds block must stay identical to config.kdl (tests/test_chui.py).
+default_mode "locked"
+
+keybinds clear-defaults=true {
+    locked {
+        bind "Ctrl g" { SwitchToMode "normal"; }
+    }
+    normal {
+        bind "Ctrl g" "Esc" { SwitchToMode "locked"; }
+        bind "p" { SwitchToMode "pane"; }
+        bind "t" { SwitchToMode "tab"; }
+        bind "r" { SwitchToMode "resize"; }
+        bind "o" { SwitchToMode "session"; }
+        bind "q" { Quit; }
+    }
+    pane {
+        bind "h" "Left" { MoveFocus "left"; }
+        bind "j" "Down" { MoveFocus "down"; }
+        bind "k" "Up" { MoveFocus "up"; }
+        bind "l" "Right" { MoveFocus "right"; }
+        bind "n" { NewPane; SwitchToMode "locked"; }
+        bind "x" { CloseFocus; SwitchToMode "locked"; }
+        bind "f" { ToggleFocusFullscreen; SwitchToMode "locked"; }
+        bind "z" { TogglePaneFrames; SwitchToMode "locked"; }
+        bind "Esc" "Ctrl g" { SwitchToMode "locked"; }
+    }
+    tab {
+        bind "n" { NewTab; SwitchToMode "locked"; }
+        bind "x" { CloseTab; SwitchToMode "locked"; }
+        bind "h" "Left" { GoToPreviousTab; }
+        bind "l" "Right" { GoToNextTab; }
+        bind "Esc" "Ctrl g" { SwitchToMode "locked"; }
+    }
+    resize {
+        bind "h" "Left" { Resize "Increase Left"; }
+        bind "j" "Down" { Resize "Increase Down"; }
+        bind "k" "Up" { Resize "Increase Up"; }
+        bind "l" "Right" { Resize "Increase Right"; }
+        bind "Esc" "Ctrl g" { SwitchToMode "locked"; }
+    }
+    session {
+        bind "d" { Detach; }
+        bind "Esc" "Ctrl g" { SwitchToMode "locked"; }
+    }
+}
+
+themes {
+    chui {
+        fg "#e4e4e4"
+        bg "#1c1c1c"
+        black "#1c1c1c"
+        red "#ff5f87"
+        green "#5fd75f"
+        yellow "#ffd75f"
+        blue "#5f87ff"
+        magenta "#af87ff"
+        cyan "#5fd7d7"
+        white "#e4e4e4"
+        orange "#ffaf5f"
+    }
+}
+
+theme "chui"
+default_shell "zsh"
+pane_frames false
+session_serialization false
+simplified_ui true
+copy_on_select true
+show_startup_tips false
+show_release_notes false
+
+ui {
+    pane_frames {
+        rounded_corners true
+        hide_session_name false
+    }
+}

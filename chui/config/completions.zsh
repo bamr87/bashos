@@ -29,12 +29,13 @@ _chui() {
   local -a cmds
   cmds=(
     'menu:interactive TUI'
+    'install:install / re-link (--dry-run to preview)'
     'update:git pull + reinstall'
-    'configure:icons, splash, font, theme'
+    'configure:icons, splash, font, theme, zellij keys'
     'dash:status box'
     'home:map $HOME + next level'
     'keys:keyboard shortcuts'
-    'doctor:font / icons / tools'
+    'doctor:same as check'
     'check:verify install'
     'backup:snapshot configs'
     'restore:roll back last snapshot'

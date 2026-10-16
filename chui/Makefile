@@ -1,10 +1,13 @@
-.PHONY: backup install uninstall check brew update tui
+.PHONY: backup install dry-run uninstall check brew update tui
 
 backup:
 	./backup.sh
 
 install:
 	./install.sh
+
+dry-run:
+	./install.sh --dry-run
 
 uninstall:
 	./uninstall.sh

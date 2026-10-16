@@ -1,4 +1,4 @@
-.PHONY: install test lint repl gui run doctor up down clean
+.PHONY: install test lint repl gui run doctor up down clean chui-install chui-dry-run chui-check
 
 VENV := .venv
 
@@ -13,6 +13,7 @@ test:
 lint:
 	$(VENV)/bin/ruff check .
 	shellcheck bin/bashos
+	shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
 
 repl:
 	$(VENV)/bin/bashos
@@ -28,6 +29,15 @@ up:       ## phoenix + langgraph-dev services
 
 down:
 	docker compose down
+
+chui-install:  ## macOS terminal environment (chui/README.md); no venv needed
+	./chui/install.sh
+
+chui-dry-run:
+	./chui/install.sh --dry-run
+
+chui-check:
+	./chui/check.sh
 
 clean:
 	rm -rf $(VENV) dist build .pytest_cache .ruff_cache

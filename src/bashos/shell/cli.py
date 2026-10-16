@@ -9,11 +9,13 @@
     bashos list                command table
     bashos doctor              auth + environment checks
     bashos opencode …          the engine: sync · status · auth · serve
+    bashos chui …              the macOS terminal environment: install · configure · check
 """
 
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
@@ -343,6 +345,37 @@ def repl(
     from ..desktop import run_desktop
 
     run_desktop(model=model)
+
+
+def chui_root() -> Path | None:
+    """The chui/ tree: $BASHOS_CHUI_ROOT, else the source checkout this package runs from."""
+    import os
+
+    env = os.environ.get("BASHOS_CHUI_ROOT")
+    root = Path(env) if env else Path(__file__).resolve().parents[3] / "chui"
+    return root if (root / "tui.sh").is_file() else None
+
+
+@app.command(
+    "chui",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def chui(ctx: typer.Context) -> None:
+    """The macOS terminal environment: install · update · configure · check · home · restore."""
+    import subprocess
+
+    root = chui_root()
+    if root is None:
+        typer.echo(
+            "bashos: chui ships in the bashOS source tree, not the wheel.\n"
+            "  gh repo clone bamr87/bashos ~/github/bashos\n"
+            "  ~/github/bashos/bin/bashos chui install",
+            err=True,
+        )
+        raise typer.Exit(1)
+    # Plain shell, interactive menus included: hand it the terminal and pass its exit code on.
+    raise typer.Exit(subprocess.call([str(root / "tui.sh"), *ctx.args]))
 
 
 @app.command("desktop")

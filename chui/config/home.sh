@@ -25,7 +25,6 @@ RED=$'\033[31m'
 GREEN=$'\033[32m'
 YELLOW=$'\033[33m'
 CYAN=$'\033[36m'
-MAGENTA=$'\033[35m'
 DIM=$'\033[2m'
 BOLD=$'\033[1m'
 RST=$'\033[0m'
@@ -336,7 +335,7 @@ do_open() {
     map_full
     return 0
   fi
-  cd "$HOME_DIR"
+  cd "$HOME_DIR" || return 1
   exec zellij --layout "$layout"
 }
 

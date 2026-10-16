@@ -1,8 +1,8 @@
 alias c="code ."
 alias vsc="code --new-window"
-alias zshconfig="code ${CHUI_ROOT:-$HOME/github/chui}/config/zshrc"
+alias zshconfig="code ${CHUI_ROOT:-$HOME/github/bashos/chui}/config/zshrc"
 alias ohmyzsh="code ~/.oh-my-zsh"
-alias chuicfg="code ${CHUI_ROOT:-$HOME/github/chui}"
+alias chuicfg="code ${CHUI_ROOT:-$HOME/github/bashos/chui}"
 
 alias gs="git status"
 alias glog="git log --oneline --graph --decorate -10"

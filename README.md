@@ -21,6 +21,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
 ./bin/bashos                 # first run bootstraps .venv, then opens the desktop
 ./bin/bashos gui             # …or the GUI desktop window, on the same kernel
+./bin/bashos chui install    # macOS: the terminal environment it is built to run in (optional)
 ```
 
 The desktop ([docs/DESKTOP.md](docs/DESKTOP.md)) is a windowed terminal environment: tiled windows that adapt to your terminal size, a launcher (`F2`) and command palette (`ctrl+p`), and an app suite — AI consoles, a live health monitor, the engine inspector, a kernel trace viewer, and the real OpenCode TUI a keypress away. In an AI Console window:
@@ -50,6 +51,20 @@ bashos doctor                                # auth + environment checks
 bashos opencode status                       # boot the engine and report what it runs
 bashos gui                                   # the GUI desktop: same kernel, browser or native window
 ```
+
+## Terminal environment (macOS) — chui
+
+bashOS ships the terminal it is built to run in, as an option: **[chui](chui/README.md)**. It sets up Oh My Zsh + Powerlevel10k, Zellij, the modern CLI (eza, bat, fd, fzf, zoxide, delta, lazygit, btop), MesloLGS Nerd Font, Mac-style editing keys in Apple Terminal and VS Code, a `chui` menu, a `$HOME` mapper, and backup/restore. Nothing in bashOS requires it.
+
+```bash
+./bin/bashos chui install --dry-run   # every change it would make, nothing changed
+./bin/bashos chui install             # snapshot your dotfiles, then install + link
+chui check                            # verify (from any shell, once installed)
+chui configure                        # icons · splash · font · bat theme · Zellij keys
+chui restore                          # roll back to the snapshot
+```
+
+`bashos chui …` is plain shell and runs before the Python virtualenv exists, so it works on a fresh Mac. Each subcommand is also reachable as `chui …` once installed. Install is idempotent and never deletes a file: a real dotfile where a link goes is moved aside. `chui configure` → Zellij keys can switch Zellij to *unlock-first*, so the desktop's keys reach it unclaimed. Coming from the standalone `bamr87/chui` clone? See [chui/README.md](chui/README.md#moving-from-the-standalone-bamr87chui-clone).
 
 ## Auth — Claude Code OAuth, wired into the engine
 
