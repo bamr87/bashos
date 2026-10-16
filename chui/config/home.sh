@@ -71,7 +71,8 @@ is_cache() {
 file_size() {
   local p=$1
   if [[ -f $p && ! -d $p ]]; then
-    stat -f %z "$p" 2>/dev/null || stat -c %s "$p" 2>/dev/null || echo 0
+    # GNU first: GNU `stat -f` is filesystem status, so it "succeeds" with the wrong output.
+    stat -c %s "$p" 2>/dev/null || stat -f %z "$p" 2>/dev/null || echo 0
   else
     echo 0
   fi

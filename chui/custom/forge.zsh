@@ -141,7 +141,7 @@ _forge() {
         sh|logs|restart)
           local cache="${XDG_CACHE_HOME:-$HOME/.cache}/chui/forge-ps"
           mkdir -p "${cache:h}"
-          if [[ ! -s $cache ]] || (( $(date +%s) - $(stat -f %m "$cache" 2>/dev/null || echo 0) > 60 )); then
+          if [[ ! -s $cache ]] || (( $(date +%s) - $(stat -c %Y "$cache" 2>/dev/null || stat -f %m "$cache" 2>/dev/null || echo 0) > 60 )); then
             command ssh -o ConnectTimeout=1 -o BatchMode=yes forge "docker ps --format '{{.Names}}' #nomirror" >|"$cache" 2>/dev/null || true
           fi
           [[ -s $cache ]] && compadd -X 'container' -- ${(f)"$(<$cache)"}
