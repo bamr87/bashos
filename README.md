@@ -221,7 +221,7 @@ Contributions are welcome via pull request. Use [Conventional Commits](https://w
 
 ## Changelog
 
-There is no CHANGELOG.md yet; changes are tracked in the [commit history](https://github.com/bamr87/bashos/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/bashos/releases).
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md); the full record is in the [commit history](https://github.com/bamr87/bashos/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/bashos/releases).
 
 ## License
 
