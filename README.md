@@ -1,6 +1,10 @@
 # bashOS
 
+> Terminal-first AI runtime that routes Claude slash commands through a LangGraph kernel onto the OpenCode engine.
+
 [![CI](https://github.com/bamr87/bashos/actions/workflows/ci.yml/badge.svg)](https://github.com/bamr87/bashos/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+## Overview
 
 **A terminal-first AI runtime.** Claude slash commands routed through a LangGraph kernel onto the **OpenCode engine**, running on your Claude Code OAuth — for all things software development and information systems.
 
@@ -91,13 +95,11 @@ Force one with `BASHOS_BACKEND=opencode|claude-code|api`; pick a model with
 
 Every one of these also works as a plain slash command inside Claude Code when you open this repo, and — after `bashos opencode sync` — inside the OpenCode TUI. Same file, no duplication.
 
-
 ## Desktop (GUI)
 
 `bashos gui` opens a GUI front end on the same kernel — a native window with `pip install "bashos[gui]"`, your browser without it:
 
 [![The bashOS desktop](docs/media/overview.png)](docs/DESKTOP-TOUR.md)
-
 
 | scene | what it is |
 |---|---|
@@ -212,3 +214,20 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 - More loops: plan-execute, multi-draft panel w/ judge
 - More userland: `/git`, `/docker`, `/net`, `/db`
 - Desktop: token streaming into the console, packaged app bundles
+
+## Contributing
+
+Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep the CI checks green. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow. AI agents should start with [CLAUDE.md](CLAUDE.md).
+
+## Changelog
+
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md); the full record is in the [commit history](https://github.com/bamr87/bashos/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/bashos/releases).
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+---
+
+<!-- bamr87-portfolio-footer -->
+Part of the [bamr87 portfolio](https://github.com/bamr87) — browse every project on [Amr's GitHub profile](https://github.com/bamr87).
