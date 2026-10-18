@@ -6,10 +6,10 @@ from .conftest import FakeChat
 
 def test_config_reads_refine_and_classify_env(monkeypatch):
     monkeypatch.setenv("BASHOS_REFINE_MAX_ITERS", "4")
-    monkeypatch.setenv("BASHOS_CLASSIFY_MODEL", "claude-haiku-4")
+    monkeypatch.setenv("BASHOS_CLASSIFY_MODEL", "claude-haiku-5-5")
     config = KernelConfig.from_env()
     assert config.refine_max_iters == 4
-    assert config.classify_model == "claude-haiku-4"
+    assert config.classify_model == "claude-haiku-5-5"
 
 
 def test_parse_line():

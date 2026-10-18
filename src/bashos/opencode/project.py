@@ -64,7 +64,7 @@ You have no tools in this context — answer directly in a single message."""
 
 
 def qualify_model(model: str, provider: str = DEFAULT_PROVIDER) -> str:
-    """`claude-opus-5` → `anthropic/claude-opus-5`; qualified ids pass through."""
+    """`claude-opus-5-5` → `anthropic/claude-opus-5-5`; qualified ids pass through."""
     return model if "/" in model else f"{provider}/{model}"
 
 

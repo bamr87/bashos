@@ -17,7 +17,7 @@ Terminal-first AI runtime: Claude slash commands routed through a LangGraph kern
 - `src/bashos/opencode/` — the core. `policy.py` is the ONLY place that widens
 bashOS's blast radius; `project.py` compiles the registry + policy into the generated, committed `opencode.jsonc`; `auth.py` bridges Claude Code OAuth into the engine process's environment (never to disk); `server.py`/`engine.py` supervise it and expose two verbs, `complete()` and `act()`.
 - `src/bashos/runtime/` — backend resolution. Default is `opencode`; the Claude
-Agent SDK adapter and the direct API are completion-only fallbacks that cannot run the react loop. Default model: claude-opus-5.
+Agent SDK adapter and the direct API are completion-only fallbacks that cannot run the react loop. Default model: claude-opus-5-5.
 - `src/bashos/remote.py` — dev-box integration (`bashos remote …`): CODE runs
 fixed read-only probes over ssh, the model reasons locally over the gathered text, and the interaction mirrors onto the box's tmux console monitor. Never give loops ssh/network tools — extend `remote.PROBES` instead.
 - `src/bashos/shell/` — Typer CLI (one-shot `bashos run` and friends) + Rich
