@@ -1,0 +1,58 @@
+# bamr87/chui — ~/.zshrc (symlinked from this repo)
+# Instant prompt must stay at the top.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=244'
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
+plugins=(
+  git
+  docker
+  vscode
+  web-search
+  colored-man-pages
+  jsontools
+  copypath
+  brew
+  macos
+  fzf-tab
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+)
+
+source "$ZSH/oh-my-zsh.sh"
+
+CHUI_ZSHRC="${${(%):-%x}:A}"
+export CHUI_ROOT="${CHUI_ROOT:-${CHUI_ZSHRC:h:h}}"
+[[ -f "$HOME/.config/chui/local.zsh" ]] && source "$HOME/.config/chui/local.zsh"
+
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.opencode/bin:$PATH"
+export EDITOR="${EDITOR:-code --wait}"
+export BAT_THEME="${BAT_THEME:-Catppuccin Mocha}"
+export EZA_ICON_SPACING=2
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --cycle --info=inline"
+export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=plain --line-range=:80 {} 2>/dev/null || eza -la --color=always {}'"
+
+[[ -f "$CHUI_ROOT/config/aliases.zsh" ]] && source "$CHUI_ROOT/config/aliases.zsh"
+[[ -f "$CHUI_ROOT/config/functions.zsh" ]] && source "$CHUI_ROOT/config/functions.zsh"
+[[ -o zle && -f "$CHUI_ROOT/config/keybindings.zsh" ]] && source "$CHUI_ROOT/config/keybindings.zsh"
+[[ -o zle && -f "$CHUI_ROOT/config/completions.zsh" ]] && source "$CHUI_ROOT/config/completions.zsh"
+
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+if command -v fzf >/dev/null && [[ -o zle ]]; then
+  source <(fzf --zsh)
+fi
+
+[[ -f "${ZDOTDIR:-$HOME}/.p10k.zsh" ]] && source "${ZDOTDIR:-$HOME}/.p10k.zsh"
+
+if [[ -o interactive && -z "${CHUI_NO_FETCH:-}" && -z "${ZELLIJ:-}" ]] && command -v fastfetch >/dev/null; then
+  fastfetch --logo-type small --structure title:os:host:kernel:uptime:memory:shell
+fi
+if [[ -o interactive && -n ${CHUI_HOME_MAP:-} && -z ${ZELLIJ:-} && $PWD == $HOME ]]; then
+  "$CHUI_ROOT/config/home.sh" map
+fi

@@ -1,0 +1,74 @@
+keybinds clear-defaults=true {
+    locked {
+        bind "Ctrl g" { SwitchToMode "normal"; }
+    }
+    pane {
+        bind "h" "Left" { MoveFocus "left"; }
+        bind "j" "Down" { MoveFocus "down"; }
+        bind "k" "Up" { MoveFocus "up"; }
+        bind "l" "Right" { MoveFocus "right"; }
+        bind "n" { NewPane; SwitchToMode "normal"; }
+        bind "x" { CloseFocus; SwitchToMode "normal"; }
+        bind "f" { ToggleFocusFullscreen; SwitchToMode "normal"; }
+        bind "z" { TogglePaneFrames; SwitchToMode "normal"; }
+        bind "Esc" { SwitchToMode "normal"; }
+    }
+    tab {
+        bind "n" { NewTab; SwitchToMode "normal"; }
+        bind "x" { CloseTab; SwitchToMode "normal"; }
+        bind "h" "Left" { GoToPreviousTab; }
+        bind "l" "Right" { GoToNextTab; }
+        bind "Esc" { SwitchToMode "normal"; }
+    }
+    resize {
+        bind "h" "Left" { Resize "Increase Left"; }
+        bind "j" "Down" { Resize "Increase Down"; }
+        bind "k" "Up" { Resize "Increase Up"; }
+        bind "l" "Right" { Resize "Increase Right"; }
+        bind "Esc" { SwitchToMode "normal"; }
+    }
+    session {
+        bind "d" { Detach; }
+        bind "Esc" { SwitchToMode "normal"; }
+    }
+    normal {
+        bind "Ctrl g" { SwitchToMode "locked"; }
+        bind "Ctrl p" { SwitchToMode "pane"; }
+        bind "Ctrl t" { SwitchToMode "tab"; }
+        bind "Ctrl n" { SwitchToMode "resize"; }
+        bind "Ctrl o" { SwitchToMode "session"; }
+        bind "Ctrl q" { Quit; }
+    }
+}
+
+themes {
+    chui {
+        fg "#e4e4e4"
+        bg "#1c1c1c"
+        black "#1c1c1c"
+        red "#ff5f87"
+        green "#5fd75f"
+        yellow "#ffd75f"
+        blue "#5f87ff"
+        magenta "#af87ff"
+        cyan "#5fd7d7"
+        white "#e4e4e4"
+        orange "#ffaf5f"
+    }
+}
+
+theme "chui"
+default_shell "zsh"
+pane_frames false
+session_serialization false
+simplified_ui true
+copy_on_select true
+show_startup_tips false
+show_release_notes false
+
+ui {
+    pane_frames {
+        rounded_corners true
+        hide_session_name false
+    }
+}

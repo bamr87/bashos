@@ -1,0 +1,36 @@
+name: chui (macOS)
+
+# chui is the macOS terminal environment, so it is tested where it runs: stock bash 3.2 and
+# BSD userland. CI's ubuntu job runs the same suite on every PR; this one only when chui moves.
+on:
+  push:
+    branches: [main]
+    paths: ["chui/**", "bin/bashos", ".github/workflows/chui.yml"]
+  pull_request:
+    paths: ["chui/**", "bin/bashos", ".github/workflows/chui.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: chui tests (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: install pytest
+        run: pip install pytest
+      - name: test (throwaway HOME; defaults/osascript shimmed)
+        run: python -m pytest chui/tests -q -p no:cacheprovider
+      - name: Brewfile parses
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: brew bundle list --file=chui/Brewfile --all

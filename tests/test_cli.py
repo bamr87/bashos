@@ -71,3 +71,22 @@ def test_bashos_desktop_env_zero_disables_autolaunch(monkeypatch):
     monkeypatch.setenv("BASHOS_DESKTOP", "0")
     result = runner.invoke(app, [])
     assert result.exit_code == 2
+
+
+def test_chui_is_found_in_the_source_tree():
+    from bashos.shell.cli import chui_root
+
+    root = chui_root()
+    assert root is not None and (root / "install.sh").is_file()
+
+
+def test_chui_passes_args_and_exit_code_through():
+    result = runner.invoke(app, ["chui", "nope"])
+    assert result.exit_code == 2  # tui.sh: unknown command
+
+
+def test_chui_outside_a_source_tree_says_how_to_get_it(monkeypatch, tmp_path):
+    monkeypatch.setenv("BASHOS_CHUI_ROOT", str(tmp_path))
+    result = runner.invoke(app, ["chui", "install"])
+    assert result.exit_code == 1
+    assert "gh repo clone bamr87/bashos" in result.output

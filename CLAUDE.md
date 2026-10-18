@@ -28,6 +28,8 @@ window manager, taskbar, launcher, app suite (AI console, health, doctor, engine
 `http.py` is a ~300-line asyncio HTTP/SSE server (no web framework — never add one); `server.py` routes onto the kernel behind a loopback + per-process-token guard; `web/` is the front end, hand-written and unbundled (no npm, no build step) — `app.js` draws, `shell.js` is a pure layout reducer (experience modes, nav intents) tested by `tests/shell.test.mjs`. The GUI is a VIEW: it runs kernel lines only — no shell passthrough, no policy of its own, and never a loop. Window/OS-shell direction: docs/frontend/.
 - `tools/capture_desktop.py` — drives the GUI with a real browser and writes
 the stills/GIFs in `docs/DESKTOP-TOUR.md`. Not packaged, not in CI; re-run it when the front end changes (`pip install playwright pillow`).
+- `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI;
+formerly bamr87/chui, merged with history). Plain bash + zsh, no Python dependency: `bin/bashos chui …` dispatches to `chui/tui.sh` BEFORE the venv bootstrap, and the Typer `bashos chui` command forwards to the same script. `tui.sh` is the one dispatch table (the zsh `chui` function only re-sources prefs); `lib.sh` holds the link table, the `local.zsh` managed block (never rewrite the rest of that file), and the Zellij key mode. Install never deletes a real file. Tests: `chui/tests/` (stdlib + pytest, a throwaway `$HOME`, `defaults`/`osascript` shimmed); they run under macOS's stock bash 3.2 too, so keep the scripts 3.2-compatible. Docs: chui/README.md.
 - `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
 `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise — no daemon required.
 
@@ -58,4 +60,5 @@ auto-refused, and a dead event stream releases the prompt. The desktop's interac
 .venv/bin/bashos doctor              # auth/backend diagnosis (offline)
 .venv/bin/bashos opencode sync       # regenerate opencode.jsonc
 .venv/bin/bashos opencode status     # boot the engine, report live state
+bin/bashos chui install --dry-run    # macOS terminal environment: the plan, nothing changed
 ```

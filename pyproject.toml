@@ -71,7 +71,7 @@ bashos = "bashos.shell.cli:main"
 packages = ["src/bashos"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "chui/tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]

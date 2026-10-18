@@ -1,0 +1,19 @@
+layout {
+    cwd "~"
+    pane split_direction="vertical" {
+        pane size="70%" split_direction="horizontal" {
+            pane name="visible" {
+                command "zsh"
+                args "-c" "export PATH=\"$HOME/.local/bin:$PATH\"; chui-home map visible; exec zsh"
+            }
+            pane name="hidden" {
+                command "zsh"
+                args "-c" "export PATH=\"$HOME/.local/bin:$PATH\"; chui-home map hidden; exec zsh"
+            }
+        }
+        pane size="30%" name="stray" {
+            command "zsh"
+            args "-c" "export PATH=\"$HOME/.local/bin:$PATH\"; chui-home map stray; exec zsh"
+        }
+    }
+}
