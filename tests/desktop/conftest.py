@@ -29,6 +29,16 @@ from bashos.desktop.services import DesktopServices
 from ..conftest import FakeChat
 
 
+@pytest.fixture(autouse=True)
+def _colour_terminal(monkeypatch):
+    """Render in colour whatever the caller's shell says.
+
+    Textual honours NO_COLOR, which strips colour from the screenshots and
+    breaks the SVG baselines; the snapshots must not depend on the caller's env.
+    """
+    monkeypatch.delenv("NO_COLOR", raising=False)
+
+
 @pytest.fixture
 def dry_services(registry, tmp_path) -> DesktopServices:
     return DesktopServices(
