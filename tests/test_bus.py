@@ -270,7 +270,7 @@ def test_models_for_attaches_sink_to_main_llm_only():
     def sink(event):  # pragma: no cover - never called here
         pass
 
-    config = KernelConfig(backend="opencode", classify_model="claude-haiku-4-5")
+    config = KernelConfig(backend="opencode", classify_model="claude-haiku-5-5")
     llm, classifier = models_for(config, event_sink=sink)
     assert llm.event_sink is sink
     assert classifier is not None

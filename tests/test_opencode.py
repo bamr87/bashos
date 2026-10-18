@@ -226,8 +226,8 @@ def config_body(registry):
 
 
 def test_model_ids_get_qualified_with_a_provider():
-    assert project.qualify_model("claude-opus-5") == "anthropic/claude-opus-5"
-    assert project.qualify_model("anthropic/claude-opus-5") == "anthropic/claude-opus-5"
+    assert project.qualify_model("claude-opus-5-5") == "anthropic/claude-opus-5-5"
+    assert project.qualify_model("anthropic/claude-opus-5-5") == "anthropic/claude-opus-5-5"
     assert project.qualify_model("openai/gpt-5") == "openai/gpt-5"
 
 
@@ -282,8 +282,8 @@ def _stub_client(handler, **kwargs) -> OpencodeClient:
 
 
 def test_model_ids_split_into_provider_and_name():
-    assert split_model("anthropic/claude-opus-5") == ("anthropic", "claude-opus-5")
-    assert split_model("claude-opus-5") is None
+    assert split_model("anthropic/claude-opus-5-5") == ("anthropic", "claude-opus-5-5")
+    assert split_model("claude-opus-5-5") is None
 
 
 async def test_prompt_sends_agent_system_and_qualified_model():
@@ -295,14 +295,14 @@ async def test_prompt_sends_agent_system_and_qualified_model():
         return httpx.Response(
             200,
             json={
-                "info": {"modelID": "claude-opus-5"},
+                "info": {"modelID": "claude-opus-5-5"},
                 "parts": [{"type": "text", "text": "the answer"}],
             },
         )
 
     client = _stub_client(handler, directory="/work")
     result = await client.prompt(
-        "ses_1", "do it", agent="bashos", system="house rules", model="anthropic/claude-opus-5"
+        "ses_1", "do it", agent="bashos", system="house rules", model="anthropic/claude-opus-5-5"
     )
     await client.aclose()
 
@@ -311,7 +311,7 @@ async def test_prompt_sends_agent_system_and_qualified_model():
     assert seen["body"]["parts"] == [{"type": "text", "text": "do it"}]
     assert seen["body"]["agent"] == "bashos"
     assert seen["body"]["system"] == "house rules"
-    assert seen["body"]["model"] == {"providerID": "anthropic", "modelID": "claude-opus-5"}
+    assert seen["body"]["model"] == {"providerID": "anthropic", "modelID": "claude-opus-5-5"}
     # the engine serves many projects — every call names ours
     assert "directory=%2Fwork" in seen["url"] or "directory=/work" in seen["url"]
 

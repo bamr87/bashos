@@ -6,7 +6,7 @@ import os
 
 from pydantic import BaseModel
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-opus-5-5"
 
 BACKEND_OPENCODE = "opencode"
 BACKEND_CLAUDE_CODE = "claude-code"

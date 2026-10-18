@@ -128,7 +128,7 @@ def main_callback(ctx: typer.Context) -> None:
 def run(
     words: list[str] = typer.Argument(..., help="input line, e.g. '/sh find files over 100MB'"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="show routing and rendered prompt; no model call"),
-    model: str | None = typer.Option(None, "--model", "-m", help="model override (default: claude-opus-5)"),
+    model: str | None = typer.Option(None, "--model", "-m", help="model override (default: claude-opus-5-5)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="print the kernel trace"),
     do_exec: bool = typer.Option(False, "--exec", "-x", help="confirm-then-run the first bash fence"),
     yes: bool = typer.Option(False, "--yes", "-y", help="do not prompt when used with --exec"),

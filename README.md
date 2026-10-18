@@ -74,7 +74,7 @@ Backends, in preference order:
 | `api` *(fallback)* | direct Anthropic API billing | `ANTHROPIC_API_KEY=...` — completions only |
 
 Force one with `BASHOS_BACKEND=opencode|claude-code|api`; pick a model with
-`BASHOS_MODEL` or `-m` (default `claude-opus-5`). `bashos doctor` shows what was detected, `bashos opencode auth` shows which credential wins and from where. Copy `.env.example` to `.env` for persistent settings. Details, and why the token rides as a bearer header, are in [docs/OPENCODE.md](docs/OPENCODE.md).
+`BASHOS_MODEL` or `-m` (default `claude-opus-5-5`). `bashos doctor` shows what was detected, `bashos opencode auth` shows which credential wins and from where. Copy `.env.example` to `.env` for persistent settings. Details, and why the token rides as a bearer header, are in [docs/OPENCODE.md](docs/OPENCODE.md).
 
 ## Commands
 

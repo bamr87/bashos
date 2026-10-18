@@ -124,7 +124,7 @@ Preference: the engine wins when installed or pinned; `BASHOS_BACKEND` overrides
 
 Auth is the headline: the user's Claude Code credential is discovered (env token → `~/.claude/.credentials.json` → macOS Keychain) and injected into the engine process's environment, so no API key is required and no secret is written to disk. The mechanism — and why it is an `Authorization: Bearer` header rather than a stored OAuth credential — is documented in [OPENCODE.md](OPENCODE.md#auth-claude-code-oauth-by-default).
 
-Default model: `claude-opus-5` (`BASHOS_MODEL` / `-m` to override), qualified to `anthropic/claude-opus-5` for the engine.
+Default model: `claude-opus-5-5` (`BASHOS_MODEL` / `-m` to override), qualified to `anthropic/claude-opus-5-5` for the engine.
 
 ## Extending
 

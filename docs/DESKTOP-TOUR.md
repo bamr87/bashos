@@ -13,7 +13,7 @@ bashos gui                 # native window if bashos[gui] is installed, else you
 bashos gui --browser       # skip the window, use the default browser
 bashos gui --no-open       # just serve; print the URL
 bashos gui --port 7800     # pin the port (default: a free one)
-bashos gui -m claude-opus-5   # model override for this window
+bashos gui -m claude-opus-5-5   # model override for this window
 ```
 
 The window opens on a loopback URL carrying a one-time token:
