@@ -15,7 +15,12 @@ Standard pattern:
 
 from __future__ import annotations
 
+import re
+from collections.abc import Awaitable, Callable, Iterable
+
 import pytest
+from syrupy.assertion import SnapshotAssertion
+from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 
 from bashos.config import KernelConfig
 from bashos.desktop.app import BashOSApp
@@ -52,3 +57,50 @@ def fake_services(registry, tmp_path):
 @pytest.fixture
 def desktop_app(dry_services) -> BashOSApp:
     return BashOSApp(services=dry_services)
+
+
+# --- SVG snapshots ----------------------------------------------------------
+#
+# A local stand-in for pytest-textual-snapshot's `snap_compare`. That plugin
+# (1.1.0, the latest release) hard-pins syrupy==4.8.0, and syrupy 4.x caps
+# pytest below 9, so it cannot be installed beside pytest>=9.1.1. Upstream's
+# fix (Textualize/pytest-textual-snapshot#24) is unreleased. This keeps the
+# same baselines, file layout and `--snapshot-update` flow on syrupy>=5; the
+# only thing dropped is the plugin's HTML diff report.
+
+
+def _normalize_svg(svg: str) -> str:
+    """Strip the per-export unique id rich.Console.export_svg() injects."""
+    return re.sub(r"\bterminal-\d+-([\w-]+)", r"terminal-\1", svg)
+
+
+class SVGImageExtension(SingleFileSnapshotExtension):
+    file_extension = "svg"
+    _write_mode = WriteMode.TEXT
+
+    def read_snapshot_data_from_location(self, *args, **kwargs):
+        data = super().read_snapshot_data_from_location(*args, **kwargs)
+        return _normalize_svg(data) if data is not None else None
+
+    def serialize(self, *args, **kwargs):
+        return _normalize_svg(super().serialize(*args, **kwargs))
+
+
+@pytest.fixture
+def snap_compare(snapshot: SnapshotAssertion) -> Callable[..., bool]:
+    snapshot = snapshot.use_extension(SVGImageExtension)
+
+    def compare(
+        app,
+        press: Iterable[str] = (),
+        terminal_size: tuple[int, int] = (80, 24),
+        run_before: Callable[..., Awaitable[None] | None] | None = None,
+    ) -> bool:
+        from textual._doc import take_svg_screenshot
+
+        actual = take_svg_screenshot(
+            app=app, press=press, terminal_size=terminal_size, run_before=run_before
+        )
+        return snapshot == actual
+
+    return compare
