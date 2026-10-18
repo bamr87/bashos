@@ -5,6 +5,13 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${ROOT}/.venv"
 
+# The macOS terminal environment (chui/) is plain shell: it runs before any Python exists,
+# so a fresh Mac can `bin/bashos chui install` without a virtualenv.
+if [[ "${1:-}" == chui ]]; then
+  shift
+  exec "${ROOT}/chui/tui.sh" "$@"
+fi
+
 if [[ ! -x "${VENV}/bin/bashos" ]]; then
   echo "bashos: first run — creating ${VENV}" >&2
   python3 -m venv "${VENV}"

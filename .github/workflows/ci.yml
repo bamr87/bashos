@@ -26,7 +26,9 @@ jobs:
           pip install ruff
           ruff check .
       - name: shellcheck
-        run: shellcheck bin/bashos
+        run: |
+          shellcheck bin/bashos
+          shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
       - name: compose config
         run: docker compose config --quiet
 
