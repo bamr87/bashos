@@ -160,7 +160,7 @@ The harness needs no daemons — LangChain/LangGraph run in-process. An optional
 
 ## Relation to the appliance reference architecture
 
-[bashOS-architecture.md](../bashOS-architecture.md) is the long-range vision: an image-based Linux appliance where the agent kernel is a first-class OS service (`bashosd`), with microVM sandboxes and a SPIFFE/OPA policy plane. This repository is the Phase-1-spirit incarnation of that architecture as a portable Python runtime — same layer boundaries, lighter enforcement:
+[ARCHITECTURE.md](ARCHITECTURE.md) is the long-range vision: an image-based Linux appliance where the agent kernel is a first-class OS service (`bashosd`), with microVM sandboxes and a SPIFFE/OPA policy plane. This repository is the Phase-1-spirit incarnation of that architecture as a portable Python runtime — same layer boundaries, lighter enforcement:
 
 | appliance layer (whitepaper) | shipped today (this repo) |
 |---|---|

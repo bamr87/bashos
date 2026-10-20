@@ -1,6 +1,6 @@
 # The engine: OpenCode at the core of bashOS
 
-bashOS's [reference architecture](../bashOS-architecture.md) is explicit that
+bashOS's [reference architecture](ARCHITECTURE.md) is explicit that
 the agent kernel must not contain a reasoning loop:
 
 > Note what `bashosd` does *not* contain: a specific model, a specific agent's

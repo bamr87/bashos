@@ -17,7 +17,7 @@
 
 The terminal is the core access point: a windowed **terminal desktop** (and a one-shot CLI) reaches every capability. Commands are markdown specs in `.claude/commands/` — the exact files Claude Code loads as project slash commands — and the bashOS kernel routes those same files through AI orchestration loops. One spec, three runtimes: Claude Code, the bashOS kernel, and the OpenCode TUI.
 
-bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://opencode.ai) — open source, client/server, provider-agnostic — supplies the agent loop, the tool broker, sessions, and the permission gate. bashOS supplies the userland, the routing kernel, the policy, and the terminal. That is the whole bet of the [reference architecture](bashOS-architecture.md): reasoning engines churn, the resource-management layer shouldn't.
+bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://opencode.ai) — open source, client/server, provider-agnostic — supplies the agent loop, the tool broker, sessions, and the permission gate. bashOS supplies the userland, the routing kernel, the policy, and the terminal. That is the whole bet of the [reference architecture](docs/ARCHITECTURE.md): reasoning engines churn, the resource-management layer shouldn't.
 
 ## Quickstart
 
@@ -155,7 +155,7 @@ It is a *view*, not a second runtime: a console line goes through the same `buil
  userland — .claude/commands/*.md  →  compiled to opencode.jsonc
 ```
 
-The engine — why it is a separate process, how the credential reaches it, and what the policy actually enforces — is in [docs/OPENCODE.md](docs/OPENCODE.md). The full harness design (layer contracts, loop semantics, extension guide) is in [docs/HARNESS.md](docs/HARNESS.md). The long-range vision (an image-based Linux appliance with the agent kernel as a first-class OS service) is the [bashOS reference architecture](bashOS-architecture.md); HARNESS.md maps this runtime onto its layers.
+The engine — why it is a separate process, how the credential reaches it, and what the policy actually enforces — is in [docs/OPENCODE.md](docs/OPENCODE.md). The full harness design (layer contracts, loop semantics, extension guide) is in [docs/HARNESS.md](docs/HARNESS.md). The long-range vision (an image-based Linux appliance with the agent kernel as a first-class OS service) is the [bashOS reference architecture](docs/ARCHITECTURE.md); HARNESS.md maps this runtime onto its layers.
 
 ## Extending
 
