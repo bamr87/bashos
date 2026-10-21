@@ -14,3 +14,6 @@ build/
 
 # engine runtime state (supervised opencode server logs)
 .bashos/
+
+# OS noise
+.DS_Store

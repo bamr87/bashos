@@ -72,7 +72,7 @@ Inherited-stdio subprocesses are incompatible with a full-screen app, so:
 - "run attached" (offered in the exec dialog) suspends the whole desktop,
 gives the command the real terminal, and restores — for interactive commands (editors, `top`, ssh).
 
-The safety contract is unchanged: only `!` lines and an explicitly confirmed `exec` run anything, and the confirm dialog defaults to Cancel. Approval requests from engine runs are still auto-refused everywhere — an interactive approval queue remains a future, opt-in, separately-named policy profile (see bashOS-architecture.md L6).
+The safety contract is unchanged: only `!` lines and an explicitly confirmed `exec` run anything, and the confirm dialog defaults to Cancel. Approval requests from engine runs are still auto-refused everywhere — an interactive approval queue remains a future, opt-in, separately-named policy profile (see ARCHITECTURE.md L6).
 
 ## Engine lifecycle
 
