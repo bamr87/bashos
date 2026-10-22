@@ -15,12 +15,8 @@
 | [`AGENTS.md`](../AGENTS.md) | How to work in bashOS: the exact commands, the layout, the hard rules and the generated files, canonical for every coding agent and contributor. |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | How to set up, the architecture rules a pull request must keep, and how releases are cut; the full command list and hard rules are in [AGENTS.md](../AGENTS.md). |
 | [`CHANGELOG.md`](../CHANGELOG.md) | Release history, written by release-please from the merged pull request titles. |
-
-### `chui/`
-
-| Document | What it covers |
-| --- | --- |
-| [`chui/README.md`](../chui/README.md) | The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back. |
+| [`chui/`](../chui/README.md) | The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back. |
+| [`tools/`](../tools/README.md) | Repository scripts for bashOS — the desktop capture and the documentation generators; nothing here ships to users. |
 
 ### `docs/`
 
@@ -35,18 +31,5 @@
 | [`docs/SERVICES.md`](SERVICES.md) | Deploying and observing the optional container stack: Phoenix tracing, the kernel over HTTP through LangGraph, auth inside containers, and the image layout. |
 | [`docs/adr/`](adr/README.md) | Decisions for bashos that are hard to reverse — the stack, data model, security model, public interfaces, and any relaxation of a gate — one file each. |
 | [`docs/frontend/`](frontend/README.md) | The proposals for evolving `bashos gui` into an OS shell — multi-window, side-by-side and desktop metaphors — with the PRD, spec, roadmap and PostHog research behind them. |
-
-### `tools/`
-
-| Document | What it covers |
-| --- | --- |
-| [`tools/README.md`](../tools/README.md) | Repository scripts for bashOS — the desktop capture and the documentation generators; nothing here ships to users. |
-
-### `chui/docs/`
-
-| Document | What it covers |
-| --- | --- |
-| [`chui/docs/KEYS.md`](../chui/docs/KEYS.md) | Every key chui sets up: Mac-style cursor, delete and edit keys in the shell, the Zellij bindings, and the home map. |
-| [`chui/docs/REBUILD.md`](../chui/docs/REBUILD.md) | Back up, package, deploy and restore a chui install, plus the checklist for setting up a new machine. |
 
 <!-- AUTO:docs-index:end -->
