@@ -1,54 +1,254 @@
 # =============================================================================
-# features/features.yml — THE FEATURE INDEX for bashos
+# features/features.yml — THE FEATURE INDEX for bamr87/bashos
 # =============================================================================
-# kit: verify v0.1.0 (seeded from bamr87/bamr87 templates/verify/)
+# kit: verify v0.1.0 · governance v0.1.0 (bamr87/bamr87 templates/verify/, templates/governance/)
 #
-# One entry per user-facing capability. This file is what an AI agent reads to
-# know what the product DOES, where it lives, how it is documented, which tests
-# and user scenarios prove it, and what evidence exists that it works. The hub
-# aggregates every repo's copy into its fleet features index
-# (bamr87/bamr87 _data/features_index.yml → /features/) and grades coverage:
-#
-#   covered    ≥1 of `tests` / `scenarios` exists on disk
-#   evidenced  ≥1 `evidence` bundle exists (README + screenshots + report)
-#   verified   `verified.date` is set (by an agent, a human, or CI)
-#
-# Schema: features/v1 — a strict SUPERSET of the shape zer0-mistakes,
-# it-journey, and barodybroject already use, so legacy files validate as-is.
-# Validate: python3 <hub>/tools/features_index.py check .
-#
-# Per feature:
-#   id            required  STABLE id, `^[A-Z0-9]+-[0-9]+$` (prefix per repo, e.g. ZER0-001)
-#   title         required  short name
-#   description   required  one or two sentences — what the user can do
-#   implemented   required  true|false (planned features are welcome — they show as gaps)
-#   surface       optional  ui | api | cli | docs | content | infra (default: ui when `link`
-#                           is a route starting with `/`, else infra)
-#   link          optional  the route (`/settings/`) or file that IS the feature
-#   docs          optional  where it is explained (path or URL)
-#   tags          optional  list
-#   date          optional  YYYY-MM-DD introduced
-#   provenance    optional  { introduced_in, pr, commit, issue }
-#   tests         optional  automated test files that pin it (paths)
-#   scenarios     optional  declarative user scenarios (verify/scenarios/*.yml)
-#   evidence      optional  evidence bundle dirs (test/evidence/<slug>/)
-#   screenshots   optional  direct image paths, when a bundle is overkill
-#   verified      optional  { date, by: agent|human|ci, run: <url> } — last verification
-#   deviations    optional  free text: why a MUST row is waived for this feature
+# One entry per user-facing capability, grounded in this repo's PRD, README and
+# code: what it does, where it lives (`link`), where it is explained (`docs`),
+# its `status` (shipped | partial | planned | deprecated | tbd) and the PRD
+# requirements it serves (`prd:`; TBD = not yet traced). Ids are STABLE: never
+# renumber or reuse one. The PRD's "Feature catalog" block is generated from
+# this file — edit here, then run:
+#   python3 <bamr87/bamr87>/tools/governance_lint.py prd-sync . --write
+# Validate: python3 <hub>/tools/governance_lint.py check .  ·  <hub>/tools/features_index.py check .
+# Schema: features/v1 (field reference: bamr87/bamr87 templates/verify/features.template.yml)
 # =============================================================================
 schema: features/v1
 repo: bamr87/bashos
+prd: docs/frontend/PRD-os-shell.md
 
 features:
-  - id: TODO-001
-    title: "TODO: the first thing a user does here"
-    description: "TODO: replace with the primary user-facing capability of bashos."
+  - id: BASHOS-001
+    title: "/sh command"
+    description: "Slash command (prompt loop): natural language → a safe, correct shell command. Same markdown spec runs in Claude Code and the OpenCode TUI."
     implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/sh.md"
+    docs: "README.md"
+  - id: BASHOS-002
+    title: "/explain command"
+    description: "Slash command (prompt loop): explain any command, pipeline, error, or config like a man page. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/explain.md"
+    docs: "README.md"
+  - id: BASHOS-003
+    title: "/script command"
+    description: "Slash command (refine loop): production-grade bash script, drafted, shellcheck-verified, auto-repaired. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/script.md"
+    docs: "README.md"
+  - id: BASHOS-004
+    title: "/debug command"
+    description: "Slash command (react loop): diagnose a failure by inspecting this machine (read-only). Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/debug.md"
+    docs: "README.md"
+  - id: BASHOS-005
+    title: "/sys command"
+    description: "Slash command (react loop): answer a system question from live read-only probes. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/sys.md"
+    docs: "README.md"
+  - id: BASHOS-006
+    title: "/health command"
+    description: "Slash command (react loop): verdict-style health check (bin/os-health floor + causes). Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/health.md"
+    docs: "README.md"
+  - id: BASHOS-007
+    title: "/dash command"
+    description: "Slash command (refine loop): generate a labeled, self-healing tmux monitoring dashboard. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/dash.md"
+    docs: "README.md"
+  - id: BASHOS-008
+    title: "/pipe command"
+    description: "Slash command (prompt loop): design text/data pipelines (grep, sed, awk, sort, jq). Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/pipe.md"
+    docs: "README.md"
+  - id: BASHOS-009
+    title: "/regex command"
+    description: "Slash command (prompt loop): craft, explain and test regular expressions. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/regex.md"
+    docs: "README.md"
+  - id: BASHOS-010
+    title: "/cron command"
+    description: "Slash command (prompt loop): build or explain cron expressions and schedules. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/cron.md"
+    docs: "README.md"
+  - id: BASHOS-011
+    title: "/port command"
+    description: "Slash command (prompt loop): translate between bash, POSIX sh, zsh, PowerShell and Python. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/port.md"
+    docs: "README.md"
+  - id: BASHOS-012
+    title: "/audit command"
+    description: "Slash command (prompt loop): security-review a shell script, findings ranked by severity. Same markdown spec runs in Claude Code and the OpenCode TUI."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: ".claude/commands/audit.md"
+    docs: "README.md"
+  - id: BASHOS-013
+    title: "Desktop scene: Overview"
+    description: "session stats, quick-run chips, recent runs (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
     surface: ui
-    link: /
-    docs: README.md
-    tags: [todo]
-    tests: []
-    scenarios:
-      - verify/scenarios/smoke-home.yml
-    evidence: []
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-014
+    title: "Desktop scene: Console"
+    description: "the terminal as a GUI: slash completion, live kernel trace, tool calls (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-015
+    title: "Desktop scene: Commands"
+    description: "every .claude/commands/*.md with its loop, agent and prompt spec (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-016
+    title: "Desktop scene: Runs"
+    description: "every line the window ran, with trace, tool calls and answer (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-017
+    title: "Desktop scene: Health"
+    description: "host facts, react-loop sweeps and the probe allowlist (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-018
+    title: "Desktop scene: Engine"
+    description: "doctor checks, live engine state, tool policy, generated opencode.jsonc (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-019
+    title: "Desktop scene: Side by side"
+    description: "any two scenes in one window: focus, maximize, close (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6", "§7"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-020
+    title: "Desktop scene: Desktop"
+    description: "scenes as floating windows: icons, drag, resize, snapping, minimize, taskbar, shareable layouts (bashos gui)."
+    implemented: true
+    status: shipped
+    prd: ["§6", "§7"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/DESKTOP.md"
+  - id: BASHOS-021
+    title: "One-shot CLI and terminal desktop"
+    description: "bashos run / the windowed terminal desktop reach every capability through the LangGraph kernel on the OpenCode engine."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "src/bashos"
+    docs: "README.md"
+  - id: BASHOS-022
+    title: "Claude Code OAuth wiring"
+    description: "The engine runs on the user's Claude Code OAuth; credentials stay in the engine process environment, never on disk."
+    implemented: true
+    status: shipped
+    prd: ["§9"]
+    surface: infra
+    link: "src/bashos"
+    docs: "README.md"
+  - id: BASHOS-023
+    title: "Safety model"
+    description: "Commands are generated, not executed; react loops run deny-by-default with refused (not awaited) approvals; loopback token-guarded socket."
+    implemented: true
+    status: shipped
+    prd: ["§9"]
+    surface: infra
+    link: "src/bashos"
+    docs: "README.md"
+  - id: BASHOS-024
+    title: "Optional Docker services"
+    description: "phoenix tracing and langgraph-dev API server around the terminal; containerized bashos (profiles: cli)."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: infra
+    link: "docker-compose.yml"
+    docs: "README.md"
+  - id: BASHOS-025
+    title: "chui terminal environment (macOS)"
+    description: "Terminal environment bundle documented in the README chui section."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "chui"
+    docs: "README.md"
+  - id: BASHOS-026
+    title: "Window list and layout serialization"
+    description: "Taskbar-style list and shareable layouts (PRD Should); README reports a taskbar and shareable layouts on the Desktop scene, PRD status not reconciled."
+    implemented: true
+    status: partial
+    prd: ["§7"]
+    surface: ui
+    link: "src/bashos/gui"
+    docs: "docs/frontend/PRD-os-shell.md"
