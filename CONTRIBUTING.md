@@ -1,5 +1,7 @@
 # Contributing to bashOS
 
+> How to set up, the architecture rules a pull request must keep, and how releases are cut; the full command list and hard rules are in [AGENTS.md](AGENTS.md).
+
 ## Setup
 
 ```bash
@@ -10,20 +12,16 @@ make lint         # ruff + shellcheck
 
 Or without make: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`.
 
-Auth is only needed to run commands against a real model (`claude` login,
-`claude setup-token`, or `ANTHROPIC_API_KEY`); tests and dry-runs never call
-one. `bashos doctor` diagnoses your environment.
+Auth is only needed to run commands against a real model (`claude` login, `claude setup-token`, or `ANTHROPIC_API_KEY`); tests and dry-runs never call one. `bashos doctor` diagnoses your environment.
 
 ## Architecture
 
 Read [docs/HARNESS.md](docs/HARNESS.md) first. The short version:
 
 - **Commands** are markdown files in `.claude/commands/` — one file is both a
-  Claude Code slash command and a bashOS-routable program. Adding one requires
-  no code.
+Claude Code slash command and a bashOS-routable program. Adding one requires no code.
 - **Loops** live in `src/bashos/loops/`; a loop is a node factory
-  `(registry, llm, config) -> async node`, registered in
-  `kernel/graph.py:_LOOP_NODES`.
+`(registry, llm, config) -> async node`, registered in `kernel/graph.py:_LOOP_NODES`.
 - Everything is async — use `await llm.ainvoke(...)`, never sync `invoke`,
   inside the kernel.
 - Loops must short-circuit on missing args (usage) and `config.dry_run`; tests
@@ -35,11 +33,9 @@ Read [docs/HARNESS.md](docs/HARNESS.md) first. The short version:
   prompts' style expectations) is `set -Eeuo pipefail`, quoted, shellcheck-clean.
 - The react loop's tool policy is deny-by-default read-only — PRs must not add
   write or network tools to it.
-- New commands/loops ship with docs: a row in the README table and, for loops,
-  a section in docs/HARNESS.md.
+- New commands/loops ship with docs: regenerate the README commands table
+(`python3 tools/gen_commands_table.py --write`) and, for loops, add a section to docs/HARNESS.md. `opencode.jsonc` and the docs index are generated too: `bashos opencode sync`, `python3 tools/docs_index.py --write`.
 
 ## Releasing
 
-Tag `vX.Y.Z` and push the tag — CI builds sdist/wheel, cuts a GitHub release,
-publishes to PyPI (once a trusted publisher is configured), and pushes the
-image to GHCR.
+Tag `vX.Y.Z` and push the tag — CI builds sdist/wheel, cuts a GitHub release, publishes to PyPI (once a trusted publisher is configured), and pushes the image to GHCR.
