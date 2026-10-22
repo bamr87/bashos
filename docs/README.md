@@ -14,7 +14,7 @@
 | --- | --- |
 | [`AGENTS.md`](../AGENTS.md) | How to work in bashOS: the exact commands, the layout, the hard rules and the generated files, canonical for every coding agent and contributor. |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | How to set up, the architecture rules a pull request must keep, and how releases are cut; the full command list and hard rules are in [AGENTS.md](../AGENTS.md). |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Release history, written by release-please from the merged pull request titles. |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Release history: the notable changes in each version, newest first. |
 | [`chui/`](../chui/README.md) | The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back. |
 | [`tools/`](../tools/README.md) | Repository scripts for bashOS — the desktop capture and the documentation generators; nothing here ships to users. |
 
