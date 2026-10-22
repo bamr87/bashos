@@ -1,5 +1,7 @@
 # The bashOS Desktop
 
+> The two interactive surfaces on the kernel — the Textual desktop and the `bashos gui` front end: launching, keys, the window model, the apps, the guard model, and how to add a scene.
+
 The desktop is bashOS's interactive surface: a windowed terminal environment built on [Textual](https://textual.textualize.io), replacing the line REPL. It is the L6 interface layer from the reference architecture — the promised "TUI dashboard" matured into the primary surface. It is a *client* of the kernel and the engine: it builds payloads, renders results and typed engine events, and never reasons or executes anything itself.
 
 ```

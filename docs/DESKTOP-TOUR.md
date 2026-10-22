@@ -1,6 +1,8 @@
 # The bashOS Desktop — a tour
 
-Everything `bashos gui` does, scene by scene, with the real thing on screen. For the architecture, the guard model and how to extend it, read [DESKTOP.md](DESKTOP.md); for where the window metaphors are going, read [frontend/](frontend/README.md). This page is the feature reference.
+> Everything `bashos gui` does, scene by scene, with real captures of the running app: the console, side by side, the desktop, commands, runs, health, the engine, settings and keys.
+
+For the architecture, the guard model and how to extend it, read [DESKTOP.md](DESKTOP.md); for where the window metaphors are going, read [frontend/](frontend/README.md). This page is the feature reference.
 
 ![Every scene in the bashOS desktop](media/scene-tour.gif)
 

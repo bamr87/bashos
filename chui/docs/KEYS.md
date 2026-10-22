@@ -1,5 +1,7 @@
 # Keyboard
 
+> Every key chui sets up: Mac-style cursor, delete and edit keys in the shell, the Zellij bindings, and the home map.
+
 Mac text-editing in the shell. **Restart Terminal.app** after install.
 
 ## Cursor

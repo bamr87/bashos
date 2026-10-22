@@ -1,5 +1,7 @@
 # bashOS L6 OS Shell — Frontend Docs
 
+> The proposals for evolving `bashos gui` into an OS shell — multi-window, side-by-side and desktop metaphors — with the PRD, spec, roadmap and PostHog research behind them.
+
 Documentation for an **OS-shell evolution** of the bashOS L6 web/native surface: multi-window / side-by-side / desktop metaphors on top of the existing desktop GUI — preferring IDE / tmux density over marketing nostalgia.
 
 **Repo:** [bamr87/bashos](https://github.com/bamr87/bashos)  
