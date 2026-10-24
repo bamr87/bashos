@@ -1,6 +1,6 @@
 # The bashOS Orchestration Harness
 
-This is the design document for the AI harness at the core of bashOS: what the layers are, what a loop is, and how to extend each one.
+> The design of the AI harness at the core of bashOS: its layers, the kernel, the loop contract, the engine and model runtime, failure semantics, and how to extend each one.
 
 ## Design goals
 

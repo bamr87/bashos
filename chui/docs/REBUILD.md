@@ -1,5 +1,7 @@
 # Rebuild / deploy
 
+> Back up, package, deploy and restore a chui install, plus the checklist for setting up a new machine.
+
 ## Backup
 
 `chui backup` (`./backup.sh`) writes `~/.chui-backups/YYYYMMDD-HHMMSS/`:

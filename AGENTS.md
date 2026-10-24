@@ -1,10 +1,14 @@
-# AGENTS.md — bashOS
+<!-- kit: sdlc v0.1.0 · AGENTS.md is the CANONICAL agent instructions file (decision D4, UPS-AGENT-07/08). -->
 
-Canonical contract for any coding agent (Claude Code, Copilot, Cursor, Codex, OpenCode) working in this repository. Details live in [CLAUDE.md](CLAUDE.md), [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/HARNESS.md](docs/HARNESS.md); if this file and those disagree, fix the drift rather than picking one.
+# bashos
+
+> How to work in bashOS: the exact commands, the layout, the hard rules and the generated files, canonical for every coding agent and contributor.
 
 ## What this repo is
 
-Terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are routed by a LangGraph kernel (`src/bashos/kernel/`) through a loop (`src/bashos/loops/`) onto the OpenCode engine (`src/bashos/opencode/`), authenticated with the user's Claude Code OAuth. Surfaces: the Typer CLI (`shell/`), the Textual desktop (`desktop/`) and the loopback GUI (`gui/`). `chui/` is the optional macOS terminal environment (plain bash/zsh, kept bash 3.2-compatible).
+bashOS is a terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are routed by a LangGraph kernel (`src/bashos/kernel/`) through a loop (`src/bashos/loops/`) onto the OpenCode engine (`src/bashos/opencode/`), authenticated with the user's Claude Code OAuth. It serves people who want an AI-assisted terminal for software development and systems work, through three surfaces on one kernel: the Typer CLI (`shell/`), the Textual desktop (`desktop/`) and the loopback GUI (`gui/`). `chui/` is the optional macOS terminal environment. A change is done when `make test`, `make lint`, `node --test tests/shell.test.mjs` and `.venv/bin/bashos opencode sync` (leaving no diff) are all clean, the generated docs are current, and the docs a change affects are updated in the same PR.
+
+Design docs: [docs/HARNESS.md](docs/HARNESS.md) (layers, loops, extension guide), [docs/OPENCODE.md](docs/OPENCODE.md) (policy, credential bridge, projection), [docs/DESKTOP.md](docs/DESKTOP.md) (the Textual desktop and the GUI), [docs/FORGE.md](docs/FORGE.md) (the dev-box monitoring pattern behind `bin/os-health`, `/health`, `/dash`). Every document is indexed in [docs/README.md](docs/README.md).
 
 ## Hard rules
 
@@ -12,101 +16,90 @@ Terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are
 2. **Loops never get network or write tools.** Tool policy is deny-by-default and lives only in `src/bashos/opencode/policy.py` — widening that file is the only way to widen what bashOS can touch. Never add a tool that writes, reaches the network, or spawns an agent not bound by the policy. Bash probes on the allowlist must be strictly read-only and must not be able to execute other commands. Remote work goes through fixed, code-owned probes (`remote.PROBES`); never give a loop ssh or network tools.
 3. **`opencode.jsonc` is generated, committed, and credential-free.** Never hand-edit it. Change `.claude/commands/*.md` or `policy.py`, then run `.venv/bin/bashos opencode sync`; a test fails on drift. It must never contain a credential — secrets go in the engine's environment only (`opencode/auth.py`), never on disk.
 4. **Anthropic model IDs are limited to** `claude-opus-5-5` (the default), `claude-sonnet-5-5` and `claude-haiku-5-5`, optionally `anthropic/`-qualified. Use no other Claude model strings.
-5. **Nothing blocks on a human.** Approval requests are auto-refused and a dead event stream releases the prompt. An approval queue would be a new, explicitly named policy profile, off by default.
+5. **Nothing blocks on a human.** Approval requests are auto-refused and a dead event stream releases the prompt. The desktop's interactive affordances (exec confirm, Stop) never loosen this; an approval queue would be a new, explicitly named policy profile, off by default.
+
+## Stack & commands
+
+Python 3.11+ (LangGraph, langchain-core, httpx to the engine, Typer + Rich, Textual, PyYAML); the engine is the `opencode` binary, installed outside pip; Node runs only the GUI reducer tests; shellcheck lints the shell code.
+
+```bash
+npm i -g opencode-ai         # the engine (or: curl -fsSL https://opencode.ai/install | bash)
+make install                 # .venv + editable install with the dev extras
+./bin/bashos                 # the desktop (bootstraps .venv itself if make install was skipped)
+./bin/bashos gui             # …or the GUI desktop, on the same kernel
+make test                    # the offline suite: fake model, no auth, no engine
+make lint                    # ruff check . + shellcheck
+```
+
+```bash
+node --test tests/shell.test.mjs                 # GUI layout reducer tests
+.venv/bin/bashos opencode sync                   # regenerate opencode.jsonc after command/policy edits
+python3 tools/gen_commands_table.py --write      # regenerate the README commands table
+python3 tools/docs_index.py --write              # regenerate the docs/README.md index
+.venv/bin/bashos run -n "/sh ..."                # dry-run: routing + rendered prompt, no auth needed
+.venv/bin/bashos doctor                          # auth/backend diagnosis (offline)
+.venv/bin/bashos opencode status                 # boot the engine, report live state
+.venv/bin/bashos gui --browser                   # the GUI desktop, in a browser tab
+bin/bashos chui install --dry-run                # macOS terminal environment: the plan, nothing changed
+```
+
+Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.mjs` pass, and `.venv/bin/bashos opencode sync` leaves no diff.
+
+## Layout
+
+- `.claude/commands/*.md` — userland, the single source of truth. Each file is a Claude Code slash command, a bashOS command and (compiled) an OpenCode command; `bashos:` frontmatter declares its loop (`prompt` | `refine` | `react`) and optionally its engine `agent`.
+- `src/bashos/kernel/` — the LangGraph state machine (parse → classify/dispatch → loop → respond). State lives in `kernel/state.py`; `trace` is append-only.
+- `src/bashos/loops/` — the orchestration loops, registered in `kernel/graph.py:_LOOP_NODES`.
+- `src/bashos/opencode/` — the core. `policy.py` is the ONLY place that widens bashOS's blast radius; `project.py` compiles the registry + policy into `opencode.jsonc`; `auth.py` bridges Claude Code OAuth into the engine process's environment (never to disk); `server.py`/`engine.py` supervise the engine and expose two verbs, `complete()` and `act()`.
+- `src/bashos/runtime/` — backend resolution. Default `opencode`; the Claude Agent SDK adapter and the direct API are completion-only fallbacks that cannot run the react loop.
+- `src/bashos/remote.py` — dev-box integration (`bashos remote …`): code runs fixed read-only probes over ssh, the model reasons locally over the gathered text, and the interaction mirrors onto the box's tmux console monitor. Extend `remote.PROBES`; never give loops ssh or network tools.
+- `src/bashos/shell/` — the Typer CLI (`bashos run` and friends) and its Rich rendering.
+- `src/bashos/desktop/` — the Textual desktop: tiling window manager, taskbar, launcher, app suite (AI console, health, doctor, engine, commands, trace, OpenCode TUI). It renders typed events (`src/bashos/events.py`) and never reasons.
+- `src/bashos/gui/` — the GUI desktop (`bashos gui`). `http.py` is a ~300-line asyncio HTTP/SSE server (never add a web framework); `server.py` routes onto the kernel behind a loopback + per-process-token guard; `web/` is hand-written and unbundled — `app.js` draws, `shell.js` is a pure layout reducer tested by `tests/shell.test.mjs`. It runs kernel lines only: no shell passthrough, no policy of its own, never a loop. Window/OS-shell direction: [docs/frontend/](docs/frontend/README.md).
+- `bin/` — `bashos` (the launcher: bootstraps `.venv`, dispatches `chui` before it) and `os-health` (the verdict floor `/health` and the desktop's Health app run).
+- `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI; formerly bamr87/chui, merged with history). See **chui** below.
+- `tools/` — repository scripts that do not ship: `capture_desktop.py` (the stills/GIFs in `docs/DESKTOP-TOUR.md`; not in CI, re-run when the front end changes, needs `pip install playwright pillow`), `gen_commands_table.py` and the vendored `docs_index.py`.
+- `docker-compose.yml`, `docker/` — optional services: `phoenix` (:6006), `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (the containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise.
+- `tests/` — the offline pytest suite (`tests/desktop/` has SVG snapshots) and `shell.test.mjs`; `features/`, `verify/` — the fleet feature index and user scenarios.
 
 ## Conventions
 
-- Everything is async; never call sync `invoke` inside the kernel — use `await llm.ainvoke(...)`. The CLI wraps one `asyncio.run`; the Textual desktop is the documented exception.
-- Kernel and engine code never print — emit typed events (`src/bashos/events.py`) and let the surface render them.
-- A loop is a node factory `(registry, llm, config) -> async node`, registered in `kernel/graph.py:_LOOP_NODES`. Loops short-circuit on missing args (usage) and on `config.dry_run`; tests rely on the dry-run path.
-- The GUI uses no web framework, no npm and no build step (`gui/http.py`, hand-written `gui/web/`).
+- **Backlog of record:** GitHub Issues with the fleet labels (`.github/sdlc.yml`, issues mode). Pick up issues labelled `agent:ready`; never touch `agent:hold` or `human-review`.
+- **Definition of Done:** the fleet default pull request checklist (this repo has no `.github/pull_request_template.md`), plus the gates under **Stack & commands**.
+- **Decisions:** ADRs in `docs/adr/NNNN-slug.md`, indexed in `docs/adr/README.md`. Add one for anything hard to reverse.
+- **Commits:** Conventional Commits (`feat fix docs style refactor test chore perf ci build`). The PR title is the squash subject.
+- **Branches:** `feature/`, `fix/`, `docs/`, `refactor/`, `test/` or `chore/` off `main`.
+- **Changelog:** `CHANGELOG.md` (Keep a Changelog) records notable changes.
+- **Generated files — never hand-edit:** `opencode.jsonc` (`bashos opencode sync`), the `AUTO:commands` span in `README.md` (`tools/gen_commands_table.py`), the `AUTO:docs-index` span in `docs/README.md` (`tools/docs_index.py`, vendored from the hub — change it there). `tests/test_opencode.py` and `tests/test_docs.py` fail when any of them is stale.
+- **New commands and loops ship with docs:** run `python3 tools/gen_commands_table.py --write` for the README commands table and, for a loop, add a section to `docs/HARNESS.md`.
+- **Markdown:** one paragraph per line (no hard-wrapped prose); every document opens with one H1 and a one-sentence `>` summary.
+- **Never:** push to `main` directly, commit lockfiles or secrets, suppress type errors, leave empty exception handlers, or edit generated files by hand.
+
+## Code rules
+
+- Everything is async; never call sync `invoke` inside the kernel — use `await llm.ainvoke(...)`. The CLI wraps one `asyncio.run`; the Textual desktop is the documented exception (Textual owns its loop).
+- The desktop owns the alternate screen: kernel and engine code never print — emit typed events (`src/bashos/events.py`) and let the surface render them.
+- A loop is a node factory `(registry, llm, config) -> async node`. Loops short-circuit on missing args (usage) and on `config.dry_run` (rendered prompt, no model call); tests rely on the dry-run path.
+- The GUI uses no web framework, no npm and no build step.
 - Shell code (`bin/`, `chui/`, generated prompts): `set -Eeuo pipefail`, quoted expansions, shellcheck-clean.
-- New commands and loops ship with docs: a row in the README table and, for loops, a section in docs/HARNESS.md.
 
-## Commands
+## chui
 
-```bash
-make install                         # venv + editable install with dev extras
-make test                            # .venv/bin/pytest -q — offline: fake model, no auth, no engine
-make lint                            # ruff check . + shellcheck
-node --test tests/shell.test.mjs     # GUI layout reducer tests
-.venv/bin/bashos opencode sync       # regenerate opencode.jsonc after command/policy edits
-.venv/bin/bashos run -n "/sh ..."    # dry-run: no auth needed
-```
-
-Before opening a PR, `pytest -q`, `ruff check .`, shellcheck and `bashos opencode sync` (leaving no diff) must all be clean.
+- Plain bash + zsh, no Python dependency: `bin/bashos chui …` dispatches to `chui/tui.sh` BEFORE the venv bootstrap, and the Typer `bashos chui` command forwards to the same script.
+- `tui.sh` is the one dispatch table (the zsh `chui` function only re-sources prefs); `lib.sh` holds the link table, the `local.zsh` managed block (never rewrite the rest of that file) and the Zellij key mode. Install never deletes a real file.
+- Tests: `chui/tests/` (stdlib + pytest, a throwaway `$HOME`, `defaults`/`osascript` shimmed). They run under macOS's stock bash 3.2 too, so keep the scripts 3.2-compatible. Docs: [chui/README.md](chui/README.md).
 
 ## Releasing
 
 Tag `vX.Y.Z` and push the tag; CI builds the sdist/wheel, cuts a GitHub release, publishes to PyPI and pushes the GHCR image. Agents do not tag or release unless explicitly asked.
 
-## Claude Code notes
+## Fleet context
 
-Moved verbatim from the former `CLAUDE.md` on 2026-10-20 (decision D4: one canonical agent file). Fold these into the sections above when you next touch them.
+Member of the bamr87 fleet, vendored in the hub as the `projects/bashos` submodule: commit and push here first; the hub bumps its pointer afterwards. The standards live in the hub: <https://github.com/bamr87/bamr87/tree/main/specs> (the Universal Project Standard); this repo's SDLC declaration is `.github/sdlc.yml`. Loops that act on this repo: `claude.yml` (the `@claude` mention handler), `conformance.yml` (the hub's fleet conformance check), `verify.yml` (the fleet verify gate over `features/` and `verify/`), and from the hub the daily fleet-pulse doctor (draft fix PRs for failing workflows) and the issue pipeline (`agent:ready` issues to draft PRs). None of them merges.
 
+## Standard deviations
 
-Terminal-first AI runtime: Claude slash commands routed through a LangGraph kernel onto the OpenCode engine, on Claude Code OAuth. Design doc: docs/HARNESS.md. The engine (policy, credential bridge, projection): docs/OPENCODE.md. The desktop (windowed Textual surface): docs/DESKTOP.md. The GUI front end (`bashos gui`): docs/DESKTOP.md. The dev-server monitoring pattern (`bin/os-health`, `/health`, `/dash`): docs/FORGE.md.
-
-**The core rule: bashOS never implements a reasoning loop.** OpenCode owns the agent loop, tool broker, sessions, and permission gate; bashOS owns userland, routing, policy, and the terminal. Work that would add a tool loop to bashOS belongs in the engine layer or nowhere.
-
-## Layout
-
-- `.claude/commands/*.md` — userland. Each file is a Claude Code slash command,
-  a bashOS command, AND (compiled) an OpenCode command; `bashos:` frontmatter
-  declares its loop (`prompt` | `refine` | `react`) and optionally its engine
-  `agent`. They are the single source of truth.
-- `src/bashos/kernel/` — LangGraph state machine (parse → classify/dispatch →
-  loop → respond). State lives in `kernel/state.py`; `trace` is append-only.
-- `src/bashos/loops/` — orchestration loops. A loop is a node factory
-`(registry, llm, config) -> async node`. Register new ones in `kernel/graph.py:_LOOP_NODES`. Loops call the engine, never a model directly.
-- `src/bashos/opencode/` — the core. `policy.py` is the ONLY place that widens
-bashOS's blast radius; `project.py` compiles the registry + policy into the generated, committed `opencode.jsonc`; `auth.py` bridges Claude Code OAuth into the engine process's environment (never to disk); `server.py`/`engine.py` supervise it and expose two verbs, `complete()` and `act()`.
-- `src/bashos/runtime/` — backend resolution. Default is `opencode`; the Claude
-Agent SDK adapter and the direct API are completion-only fallbacks that cannot run the react loop. Default model: claude-opus-5-5.
-- `src/bashos/remote.py` — dev-box integration (`bashos remote …`): CODE runs
-fixed read-only probes over ssh, the model reasons locally over the gathered text, and the interaction mirrors onto the box's tmux console monitor. Never give loops ssh/network tools — extend `remote.PROBES` instead.
-- `src/bashos/shell/` — Typer CLI (one-shot `bashos run` and friends) + Rich
-  rendering for it.
-- `src/bashos/desktop/` — the Textual desktop, the interactive surface: tiling
-window manager, taskbar, launcher, app suite (AI console, health, doctor, engine, commands, trace, OpenCode TUI). A client of the kernel/engine — it renders typed events (`src/bashos/events.py`), it never reasons. Docs: docs/DESKTOP.md.
-- `src/bashos/gui/` — the GUI desktop (`bashos gui`, docs/DESKTOP.md).
-`http.py` is a ~300-line asyncio HTTP/SSE server (no web framework — never add one); `server.py` routes onto the kernel behind a loopback + per-process-token guard; `web/` is the front end, hand-written and unbundled (no npm, no build step) — `app.js` draws, `shell.js` is a pure layout reducer (experience modes, nav intents) tested by `tests/shell.test.mjs`. The GUI is a VIEW: it runs kernel lines only — no shell passthrough, no policy of its own, and never a loop. Window/OS-shell direction: docs/frontend/.
-- `tools/capture_desktop.py` — drives the GUI with a real browser and writes
-the stills/GIFs in `docs/DESKTOP-TOUR.md`. Not packaged, not in CI; re-run it when the front end changes (`pip install playwright pillow`).
-- `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI;
-formerly bamr87/chui, merged with history). Plain bash + zsh, no Python dependency: `bin/bashos chui …` dispatches to `chui/tui.sh` BEFORE the venv bootstrap, and the Typer `bashos chui` command forwards to the same script. `tui.sh` is the one dispatch table (the zsh `chui` function only re-sources prefs); `lib.sh` holds the link table, the `local.zsh` managed block (never rewrite the rest of that file), and the Zellij key mode. Install never deletes a real file. Tests: `chui/tests/` (stdlib + pytest, a throwaway `$HOME`, `defaults`/`osascript` shimmed); they run under macOS's stock bash 3.2 too, so keep the scripts 3.2-compatible. Docs: chui/README.md.
-- `docker-compose.yml` — optional services: `phoenix` (observability, :6006),
-`langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise — no daemon required.
-
-## Conventions
-
-- Everything async; the CLI wraps one `asyncio.run` (the Textual desktop is the
-documented exception — Textual owns its loop). Never call sync `invoke` inside the kernel — use `await llm.ainvoke`.
-- The desktop owns the alternate screen: kernel/engine code must never print —
-  emit typed events (`events.py`) and let the surface render them.
-- Loops must short-circuit on missing args (usage) and `config.dry_run`
-  (rendered prompt, no model call) — tests rely on the dry-run path.
-- Tool policy is deny-by-default and lives in `opencode/policy.py`. Widening it
-is the only way to widen what bashOS can touch: never add a tool that writes, reaches the network, or spawns an unbound agent.
-- `opencode.jsonc` is GENERATED and committed. Edit `.claude/commands/*.md` or
-`policy.py`, then `bashos opencode sync`; a test fails on drift. It must never contain a credential — secrets go in the engine's environment only.
-- Anything that could block on a human must not: approval requests are
-auto-refused, and a dead event stream releases the prompt. The desktop's interactive affordances (exec confirm, Stop) never loosen this — an approval queue would be a new, explicitly named policy profile, off by default.
-- Shell code style everywhere (bin/, generated prompts): `set -Eeuo pipefail`,
-  quoted expansions, shellcheck-clean.
-
-## Commands
-
-```bash
-.venv/bin/pytest -q                  # offline tests (fake model, no engine)
-.venv/bin/bashos desktop             # the Textual desktop (bare `bashos` on a TTY too)
-.venv/bin/bashos gui --browser       # the GUI desktop, in a browser tab
-.venv/bin/bashos run -n "/sh ..."    # dry-run: no auth needed
-.venv/bin/bashos doctor              # auth/backend diagnosis (offline)
-.venv/bin/bashos opencode sync       # regenerate opencode.jsonc
-.venv/bin/bashos opencode status     # boot the engine, report live state
-bin/bashos chui install --dry-run    # macOS terminal environment: the plan, nothing changed
-```
+none
 
 ## Governance
 

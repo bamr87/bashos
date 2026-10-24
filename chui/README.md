@@ -1,5 +1,7 @@
 # chui
 
+> The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back.
+
 The macOS terminal environment of bashOS: Oh My Zsh + Powerlevel10k + modern CLI + Zellij, rebuildable from this directory. It is the environment layer (L0) the bashOS desktop and every fleet TUI run in. Formerly the standalone `bamr87/chui` repo, merged here with its history.
 
 ## From scratch
