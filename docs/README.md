@@ -23,6 +23,7 @@
 | Document | What it covers |
 | --- | --- |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | A buildable software stack for bashOS — an image-based Linux appliance where the agent kernel is a first-class OS service, from microVMs to policy plane |
+| [`docs/constitution.md`](constitution.md) | The rules every change to this repo must satisfy, whoever makes it — a human or an AI agent. Agents read this before [AGENTS.md](../AGENTS.md) conventions, the [PRD](../PRD.md), or the [feature catalog](../features/features.yml). Ratified… |
 | [`docs/DESKTOP-TOUR.md`](DESKTOP-TOUR.md) | Everything `bashos gui` does, scene by scene, with real captures of the running app: the console, side by side, the desktop, commands, runs, health, the engine, settings and keys. |
 | [`docs/DESKTOP.md`](DESKTOP.md) | The two interactive surfaces on the kernel — the Textual desktop and the `bashos gui` front end: launching, keys, the window model, the apps, the guard model, and how to add a scene. |
 | [`docs/FORGE.md`](FORGE.md) | How a physical dev box is provisioned and watched, the hard-won rules behind it, and how that process became bashOS userland: `bin/os-health`, `/health`, `/dash` and `bashos remote`. |
@@ -30,6 +31,7 @@
 | [`docs/OPENCODE.md`](OPENCODE.md) | Why OpenCode is bashOS's engine and runs as a separate process, how the Claude Code credential reaches it, what the deny-by-default policy enforces, and how the command registry is compiled into its config. |
 | [`docs/SERVICES.md`](SERVICES.md) | Deploying and observing the optional container stack: Phoenix tracing, the kernel over HTTP through LangGraph, auth inside containers, and the image layout. |
 | [`docs/adr/`](adr/README.md) | Decisions for bashos that are hard to reverse — the stack, data model, security model, public interfaces, and any relaxation of a gate — one file each. |
+| [`docs/amendments/`](amendments/README.md) | The append-only log of changes to [the constitution](constitution.md). |
 | [`docs/frontend/`](frontend/README.md) | The proposals for evolving `bashos gui` into an OS shell — multi-window, side-by-side and desktop metaphors — with the PRD, spec, roadmap and PostHog research behind them. |
 
 <!-- AUTO:docs-index:end -->
