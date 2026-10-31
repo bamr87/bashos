@@ -33,6 +33,7 @@ Claude Code slash command and a bashOS-routable program. Adding one requires no 
   prompts' style expectations) is `set -Eeuo pipefail`, quoted, shellcheck-clean.
 - The react loop's tool policy is deny-by-default read-only — PRs must not add
   write or network tools to it.
+- Found a vulnerability? Report it privately as described in [SECURITY.md](SECURITY.md), never in a public issue or PR.
 - New commands/loops ship with docs: regenerate the README commands table
 (`python3 tools/gen_commands_table.py --write`) and, for loops, add a section to docs/HARNESS.md. `opencode.jsonc` and the docs index are generated too: `bashos opencode sync`, `python3 tools/docs_index.py --write`.
 
