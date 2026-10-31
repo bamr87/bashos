@@ -1,0 +1,3 @@
+# The container plane, for the harness's compose mode and the hub's stacks. Skipped when a
+# docker CLI already exists, so an in-place install never swaps docker-ce for Debian's build.
+docker.io docker-compose cmd:docker

@@ -265,7 +265,17 @@ class OpencodeEngine:
         await self.stop()
 
     def _log_path(self) -> Path:
+        """`<root>/.bashos/opencode.log`, or the user's state dir when the root is read-only
+        (the OS layer installs bashOS root-owned at /opt/bashos)."""
         state = self.root / STATE_DIR
+        try:
+            state.mkdir(parents=True, exist_ok=True)
+            if os.access(state, os.W_OK):
+                return state / ENGINE_LOG
+        except OSError:
+            pass
+        xdg = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+        state = Path(xdg) / "bashos"
         state.mkdir(parents=True, exist_ok=True)
         return state / ENGINE_LOG
 

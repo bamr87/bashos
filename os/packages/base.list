@@ -1,0 +1,21 @@
+# The bashOS layer on Debian 13 — what every bashOS machine has. One group per line:
+# Debian package names, then an optional `cmd:NAME` guard (skip the line when NAME is
+# already on PATH, whoever installed it). `bashos os install` adds only what is missing;
+# an image build installs every line.
+
+# runtime: the kernel's Python, the refine loop's shellcheck, the engine's Node
+python3 python3-venv
+shellcheck
+nodejs npm
+git ca-certificates curl rsync
+
+# the console: one shared tmux session on the monitor and every ssh login
+tmux zsh sudo less
+
+# what the probes and the verdict floor read
+procps iproute2 lm-sensors smartmontools
+jq ripgrep fd-find bat btop
+
+# reaching the box: ssh, mDNS (HOST.local), a firewall
+openssh-server avahi-daemon libnss-mdns ufw
+unattended-upgrades locales

@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# bashos-console — the physical monitor's shell: one shared tmux session (the console mirror),
+# whose `bashos` window runs the bashOS desktop. Every view of it is the same session.
+#
+#   bashos-console           tty1's login: the kiosk (cage + foot) when wanted and possible,
+#                            else the plain Linux console; either way, attached to the session
+#   bashos-console --attach  ensure the session and attach this terminal (ssh logins, the kiosk)
+#   bashos-console --heal    add a missing `bashos` window to a running session; never starts a
+#                            server, never attaches, never prints, never changes focus
+#                            (bashos-heal.timer runs this every 10 minutes)
+set -Eeuo pipefail
+
+_src="${BASH_SOURCE[0]}"
+while [[ -L $_src ]]; do
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  [[ $_src == /* ]] || _src="$_dir/$_src"
+done
+OS_SRC="$(cd "$(dirname "$_src")/../.." && pwd)"
+unset _src _dir
+# shellcheck source=../lib.sh
+source "$OS_SRC/os/lib.sh"
+os_conf_load
+
+SESSION=${BASHOS_CONSOLE_SESSION:-console}
+STATE="$HOME/.local/state/bashos"
+# Absolute paths: a tmux pane starts with a bare PATH (forge rule: `watch forge-health` died
+# with "not found" while every interactive shell found it).
+BASHOS_BIN=/usr/local/bin/bashos
+[[ -x $BASHOS_BIN ]] || BASHOS_BIN="$OS_SRC/bin/bashos"
+# The desktop; quitting it leaves a login shell in the window rather than closing it.
+DESKTOP="$BASHOS_BIN; exec ${SHELL:-/bin/bash} -l"
+
+ensure_window() {
+  tmux list-windows -t "=$SESSION" -F '#{window_name}' 2>/dev/null | grep -qx bashos && return 0
+  # -d: created in the background, so whatever the monitor shows stays shown.
+  tmux new-window -d -t "=$SESSION:" -n bashos "$DESKTOP"
+}
+
+ensure_session() {
+  if tmux has-session -t "=$SESSION" 2>/dev/null; then
+    ensure_window
+  else
+    tmux new-session -d -s "$SESSION" -n bashos "$DESKTOP"
+  fi
+}
+
+attach() {
+  ensure_session
+  exec tmux attach-session -t "=$SESSION"
+}
+
+heal() {
+  tmux has-session -t "=$SESSION" 2>/dev/null || exit 0
+  ensure_window >/dev/null 2>&1 || true
+  exit 0
+}
+
+# The kiosk: a Wayland compositor (cage) whose one window is a terminal (foot) attached to the
+# session. Truecolor and real fonts where the Linux console has 16 colours and a 512-glyph font.
+want_kiosk() {
+  case ${BASHOS_CONSOLE:-auto} in auto | kiosk) ;; *) return 1 ;; esac
+  os_has cage && os_has foot || return 1
+  compgen -G '/dev/dri/card*' >/dev/null || return 1
+  # A kiosk that died within the last minute does not get another try this boot.
+  [[ ! -f $STATE/kiosk-failed ]] || (($(date +%s) - $(stat -c %Y "$STATE/kiosk-failed") > 60))
+}
+
+console() {
+  if want_kiosk; then
+    local rc=0
+    cage -s -- foot --font="${BASHOS_CONSOLE_FONT:-monospace:size=11}" /usr/local/bin/bashos-console --attach || rc=$?
+    ((rc == 0)) && exit 0
+    mkdir -p "$STATE"
+    printf '%s kiosk exited %s — falling back to the Linux console\n' "$(date -Is)" "$rc" >>"$STATE/console.log"
+    : >"$STATE/kiosk-failed"
+  fi
+  attach
+}
+
+case ${1:-} in
+  "") console ;;
+  --attach) attach ;;
+  --heal) heal ;;
+  -h | --help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) os_die "usage: bashos-console [--attach|--heal]" ;;
+esac

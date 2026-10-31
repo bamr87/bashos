@@ -35,6 +35,7 @@ drive a server, run bashOS *on* the server: `ssh forge 'NOTMUX=1 bashos run "/he
 | `/dash` | `.claude/commands/dash.md` | refine loop: generate the dashboard script for a machine |
 | react probe allowlist | `src/bashos/loops/react.py` | `bin/os-health` + narrow read-only tmux verbs added; still no write/network tools |
 | forge box scripts | `~/setup/` on the box | idempotent 01-system … 04-dashboard; `~/DEVBOX.md` is its runbook |
+| the OS layer | `os/` in this repo | `bashos os install` generalises `~/setup/` (console mirror, never-sleep, the harness as a service) and builds the bootable image — [OS.md](OS.md) |
 
 ## The remote layer (`bashos remote`)
 
@@ -76,6 +77,10 @@ Validated live against forge 2026-08-14: doctor all-OK (monitor attached, focuse
 ### Hand-rolled vs packaged
 
 The box keeps its richer, box-specific floor (`forge-health`: cpu-temp, SMART, ufw, per-mount disks) and its own dashboard builder (`forge-dash`, now 5 labeled panes: system / health / stack / journal / **ai**, plus a full-screen `ai` window). bashOS ships the portable floor and the transport; where a box-specific floor exists it stays authoritative on the box, and the bashOS floor travels over stdin so remote verdicts never depend on what is installed.
+
+## From pattern to operating system
+
+[OS.md](OS.md) takes the next step: instead of a box that runs bashOS, a box that *is* bashOS. `os/` is an Omarchy-style layer on Debian 13 that packages this whole pattern — tty1 autologin into the shared `console` session (with the bashOS desktop as its `bashos` window and a cage + foot kiosk when the GPU allows), `window-size latest`, never-sleep, absolute paths on `/usr/local/bin`, a 10-minute heal timer that never steals focus — and adds the bamr87 hub's Harness Console as a supervised service. It installs in place (`bashos os install`, which adopts forge's existing console-mirror hooks and getty drop-in instead of duplicating them) or ships as a bootable mkosi disk image that provisions itself from a `BASHOS-SEED` drive. The order forge moves onto it, each step approved before it runs, is in [OS.md § forge, step by step](OS.md#forge-step-by-step).
 
 ## Non-goals
 

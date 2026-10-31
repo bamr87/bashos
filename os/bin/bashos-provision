@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# bashos-provision — the first boot of a bashOS image: create the machine's user, name the
+# machine, install its ssh keys, then run the user phases of `bashos os install` as that user.
+#
+# Unattended when a seed is present (Omarchy's `cidata` drive, for bashOS): a FAT or ISO volume
+# labelled BASHOS-SEED, or /etc/bashos/seed baked into a custom image, holding
+#   seed.env          KEY=value lines (os/image/seed.example/seed.env lists every key)
+#   authorized_keys   the user's ~/.ssh/authorized_keys
+#   harness.env       the user's ~/.config/bashos/harness.env (DASH_CONSOLE_TOKEN, …)
+# Without one it asks on tty1 — an installer may wait for its person; no AI loop is involved.
+#
+# bashos-provision.service runs it once: it ends by writing /var/lib/bashos/provisioned.
+set -Eeuo pipefail
+
+_src="${BASH_SOURCE[0]}"
+while [[ -L $_src ]]; do
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  [[ $_src == /* ]] || _src="$_dir/$_src"
+done
+OS_SRC="$(cd "$(dirname "$_src")/../.." && pwd)"
+unset _src _dir
+# shellcheck source=../lib.sh
+source "$OS_SRC/os/lib.sh"
+
+DONE=/var/lib/bashos/provisioned
+SEED_LABEL=BASHOS-SEED
+SEED_MNT=/run/bashos-seed
+SEED_KEYS="BASHOS_USER BASHOS_HOSTNAME BASHOS_TIMEZONE BASHOS_LOCALE BASHOS_SHELL BASHOS_PASSWORD_HASH
+BASHOS_SUDO_NOPASSWD BASHOS_CONSOLE BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT BASHOS_LAN_CIDR
+BASHOS_HUB_REPO BASHOS_CHANNEL"
+# What the seed sets in /etc/bashos/os.conf (the rest is first-boot only).
+SEED_CONF="BASHOS_CONSOLE BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT BASHOS_LAN_CIDR BASHOS_HUB_REPO BASHOS_CHANNEL"
+
+os_is_root || os_die "bashos-provision runs as root (bashos-provision.service)"
+[[ -e $DONE && ${1:-} != --force ]] && { echo "bashos-provision: already provisioned ($DONE)"; exit 0; }
+mkdir -p /var/lib/bashos
+exec > >(tee -a /var/log/bashos-provision.log) 2>&1
+
+find_seed() {
+  local dev=""
+  [[ -d /etc/bashos/seed ]] && { printf '%s' /etc/bashos/seed; return 0; }
+  # Removable media can trail the boot by a few seconds.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    dev=$(blkid -L "$SEED_LABEL" 2>/dev/null || true)
+    [[ -n $dev ]] && break
+    udevadm settle --timeout=1 2>/dev/null || sleep 1
+  done
+  [[ -n $dev ]] || return 1
+  mkdir -p "$SEED_MNT"
+  mountpoint -q "$SEED_MNT" || mount -o ro "$dev" "$SEED_MNT" || return 1
+  printf '%s' "$SEED_MNT"
+}
+
+# The seed is data, never code: only known KEY=value lines are read, and nothing is sourced.
+read_seed() {
+  local file=$1/seed.env line key val
+  [[ -r $file ]] || return 0
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%$'\r'}
+    [[ $line =~ ^[[:space:]]*([A-Z_]+)=(.*)$ ]] || continue
+    key=${BASH_REMATCH[1]} val=${BASH_REMATCH[2]}
+    [[ " ${SEED_KEYS//$'\n'/ } " == *" $key "* ]] || { os_warn "seed: unknown key $key ignored"; continue; }
+    val=${val#\"} val=${val%\"} val=${val#\'} val=${val%\'}
+    printf -v "$key" '%s' "$val"
+  done <"$file"
+}
+
+ask() { # ask VAR "prompt" [secret]
+  local reply
+  if [[ ${3:-} == secret ]]; then read -rsp "$2: " reply; echo; else read -rp "$2: " reply; fi
+  printf -v "$1" '%s' "$reply"
+}
+
+interactive() {
+  [[ -t 0 ]] || os_die "no $SEED_LABEL seed and no terminal to ask on"
+  printf '\n  bashOS first boot — no %s seed found, so a few questions.\n\n' "$SEED_LABEL"
+  local pw1 pw2
+  while [[ ! ${BASHOS_USER:-} =~ ^[a-z_][a-z0-9_-]*$ ]]; do ask BASHOS_USER "user name"; done
+  ask BASHOS_HOSTNAME "hostname [bashos]"
+  while :; do
+    ask pw1 "password for $BASHOS_USER" secret
+    ask pw2 "again" secret
+    [[ -n $pw1 && $pw1 == "$pw2" ]] && break
+    echo "  passwords differ or are empty — again"
+  done
+  PLAIN_PASSWORD=$pw1
+}
+
+create_user() {
+  local user=$1 shell=/bin/bash g groups=()
+  if [[ -n ${BASHOS_SHELL:-} ]]; then
+    shell=$(command -v "$BASHOS_SHELL" || printf '%s' /bin/bash)
+  fi
+  if id -u "$user" >/dev/null 2>&1; then
+    os_ok "user $user exists"
+  else
+    useradd --create-home --shell "$shell" --comment "$user" "$user"
+    os_ok "user $user ($shell)"
+  fi
+  for g in sudo adm systemd-journal docker video render; do
+    getent group "$g" >/dev/null && groups+=("$g")
+  done
+  ((${#groups[@]})) && usermod -aG "$(IFS=,; printf '%s' "${groups[*]}")" "$user"
+  if [[ -n ${PLAIN_PASSWORD:-} ]]; then
+    printf '%s:%s\n' "$user" "$PLAIN_PASSWORD" | chpasswd
+  elif [[ -n ${BASHOS_PASSWORD_HASH:-} ]]; then
+    usermod -p "$BASHOS_PASSWORD_HASH" "$user"
+  else
+    passwd -l "$user" >/dev/null
+    os_warn "no password for $user: console autologin and ssh keys only"
+  fi
+  if [[ ${BASHOS_SUDO_NOPASSWD:-no} == yes ]]; then
+    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$user" >"/etc/sudoers.d/bashos-$user"
+    chmod 0440 "/etc/sudoers.d/bashos-$user"
+    visudo -cqf "/etc/sudoers.d/bashos-$user" || { rm -f "/etc/sudoers.d/bashos-$user"; os_die "sudoers check failed"; }
+  fi
+}
+
+name_machine() {
+  local host=${BASHOS_HOSTNAME:-bashos}
+  hostnamectl set-hostname "$host" 2>/dev/null || printf '%s\n' "$host" >/etc/hostname
+  if grep -q '^127\.0\.1\.1' /etc/hosts; then
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$host/" /etc/hosts
+  else
+    printf '127.0.1.1\t%s\n' "$host" >>/etc/hosts
+  fi
+  os_ok "hostname $host"
+  if [[ -n ${BASHOS_TIMEZONE:-} ]]; then
+    timedatectl set-timezone "$BASHOS_TIMEZONE" 2>/dev/null ||
+      ln -sf "/usr/share/zoneinfo/$BASHOS_TIMEZONE" /etc/localtime
+    os_ok "timezone $BASHOS_TIMEZONE"
+  fi
+  if [[ -n ${BASHOS_LOCALE:-} && $BASHOS_LOCALE != C.UTF-8 ]]; then
+    sed -i "s/^# *\($BASHOS_LOCALE .*\)/\1/" /etc/locale.gen
+    locale-gen >/dev/null && update-locale "LANG=$BASHOS_LOCALE"
+    os_ok "locale $BASHOS_LOCALE"
+  fi
+}
+
+user_files() {
+  local user=$1 seed=${2:-} home
+  home=$(os_user_home "$user")
+  if [[ -n $seed && -s $seed/authorized_keys ]]; then
+    install -d -m 0700 -o "$user" -g "$user" "$home/.ssh"
+    install -m 0600 -o "$user" -g "$user" "$seed/authorized_keys" "$home/.ssh/authorized_keys"
+    os_ok "ssh keys for $user ($(grep -c . "$seed/authorized_keys") line(s))"
+  fi
+  if [[ -n $seed && -s $seed/harness.env ]]; then
+    install -d -m 0700 -o "$user" -g "$user" "$home/.config" "$home/.config/bashos"
+    install -m 0600 -o "$user" -g "$user" "$seed/harness.env" "$home/.config/bashos/harness.env"
+    os_ok "harness.env for $user"
+  fi
+}
+
+seed_conf() {
+  local key lines=""
+  for key in $SEED_CONF; do
+    [[ -n ${!key:-} ]] && lines+="$key=${!key@Q}"$'\n'
+  done
+  [[ -n $lines ]] || return 0
+  printf '\n# Set by bashos-provision from the first-boot seed (%s).\n%s' "$(date -I)" "$lines" >>/etc/bashos/os.conf
+  os_ok "seed settings -> /etc/bashos/os.conf"
+}
+
+main() {
+  local seed="" user uid
+  printf '%sbashOS%s first boot\n' "$_os_b" "$_os_0"
+  if seed=$(find_seed); then
+    os_ok "seed: $seed"
+    read_seed "$seed"
+  fi
+  [[ -n ${BASHOS_USER:-} ]] || interactive
+  user=$BASHOS_USER
+  create_user "$user"
+  name_machine
+  user_files "$user" "$seed"
+  seed_conf
+  os_conf_load
+
+  # The system pieces that need the user: tty1 autologin and linger.
+  OS_USER=$user OS_HOME=$(os_user_home "$user")
+  export OS_USER OS_HOME
+  # shellcheck source=../install/system.sh
+  source "$OS_DIR/install/system.sh"
+  os_console_login "$user"
+  os_linger "$user"
+  systemctl daemon-reload
+
+  # The user phases, as the user, against their own manager (linger has started it).
+  uid=$(id -u "$user")
+  runuser -u "$user" -- env -i HOME="$OS_HOME" USER="$user" LOGNAME="$user" \
+    PATH=/usr/local/bin:/usr/bin:/bin XDG_RUNTIME_DIR="/run/user/$uid" \
+    BASHOS_USER="$user" NO_COLOR=1 "$OS_DIR/install.sh" --user-only ||
+    os_warn "the user phases failed — rerun as $user: bashos os install --user-only"
+
+  date -Is >"$DONE"
+  [[ $seed == "$SEED_MNT" ]] && umount "$SEED_MNT" 2>/dev/null || true
+  # On the console (a VM's serial port, the monitor otherwise): the boot test waits for this.
+  printf 'bashos-provision: ready user=%s host=%s\n' "$user" "$(hostname)" | tee /dev/console
+}
+
+main "$@"

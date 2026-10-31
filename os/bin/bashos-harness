@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# bashos-harness — serve the bamr87 hub's Harness Console on this machine. bashos-harness.service
+# (a user unit) runs it; settings come from /etc/bashos/os.conf, secrets from
+# ~/.config/bashos/harness.env (mode 0600).
+#
+#   bashos-harness          exec the console in the configured mode (BASHOS_HARNESS)
+#   bashos-harness --print  print the command it would exec, and exit
+#
+#   native   the hub's tools/console/run.sh (uvicorn), as this user
+#   compose  the hub's `console` compose service, foreground, so systemd supervises it
+#   off      exit 0 — nothing to serve
+set -Eeuo pipefail
+
+_src="${BASH_SOURCE[0]}"
+while [[ -L $_src ]]; do
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  [[ $_src == /* ]] || _src="$_dir/$_src"
+done
+OS_SRC="$(cd "$(dirname "$_src")/../.." && pwd)"
+unset _src _dir
+# shellcheck source=../lib.sh
+source "$OS_SRC/os/lib.sh"
+os_conf_load
+
+ENV_FILE="$HOME/.config/bashos/harness.env"
+if [[ -r $ENV_FILE ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+fi
+
+mode=${BASHOS_HARNESS:-native}
+hub=${BASHOS_HUB_DIR:-$HOME/dev/bamr87}
+hub=${hub/#\~/$HOME}
+host=${BASHOS_HARNESS_HOST:-127.0.0.1}
+port=${BASHOS_HARNESS_PORT:-4001}
+
+[[ $mode == off ]] && { echo "bashos-harness: BASHOS_HARNESS=off — nothing to serve"; exit 0; }
+[[ $mode == native || $mode == compose ]] || os_die "BASHOS_HARNESS=$mode (native | compose | off)"
+[[ -d $hub/tools/console ]] || os_die "no hub checkout at $hub — run: bashos os install --only harness (or set BASHOS_HUB_DIR)"
+
+# A LAN listener without a token would hand the console's operations to the network.
+if ! os_loopback "$host"; then
+  [[ -n ${DASH_CONSOLE_TOKEN:-} ]] ||
+    os_die "refusing to bind $host without DASH_CONSOLE_TOKEN (set it in ~/.config/bashos/harness.env)"
+  short=$(hostname -s 2>/dev/null || hostname)
+  export DASH_CONSOLE_ALLOWED_HOSTS="${DASH_CONSOLE_ALLOWED_HOSTS:-$short,$short.local,localhost,127.0.0.1}"
+fi
+
+# systemd hands a unit a bare PATH: find the user's Node (fnm's default alias) and ~/.local/bin.
+for d in "$HOME/.local/share/fnm/aliases/default/bin" "$HOME/.local/bin" /usr/local/bin; do
+  [[ -d $d && :$PATH: != *:$d:* ]] && PATH="$d:$PATH"
+done
+export PATH
+
+if [[ $mode == native ]]; then
+  export CONSOLE_HOST="$host" CONSOLE_PORT="$port"
+  cmd=("$hub/tools/console/run.sh")
+else
+  os_has docker || os_die "BASHOS_HARNESS=compose needs docker"
+  files=(-f "$hub/docker-compose.yml")
+  # The hub's forge overlay publishes on every interface; only a LAN bind wants it.
+  if ! os_loopback "$host" && [[ -f $hub/compose/forge.yml ]]; then
+    files+=(-f "$hub/compose/forge.yml")
+  fi
+  export CONSOLE_PORT="$port"
+  cmd=(docker compose --project-directory "$hub" "${files[@]}" up --no-log-prefix console)
+fi
+
+if [[ ${1:-} == --print ]]; then
+  printf '%s\n' "${cmd[*]}"
+  exit 0
+fi
+echo "bashos-harness: $mode on $host:$port from $hub"
+exec "${cmd[@]}"

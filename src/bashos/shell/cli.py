@@ -378,6 +378,36 @@ def chui(ctx: typer.Context) -> None:
     raise typer.Exit(subprocess.call([str(root / "tui.sh"), *ctx.args]))
 
 
+def os_layer_root() -> Path | None:
+    """The os/ tree: $BASHOS_OS_LAYER_ROOT, else the source checkout this package runs from."""
+    import os
+
+    env = os.environ.get("BASHOS_OS_LAYER_ROOT")
+    root = Path(env) if env else Path(__file__).resolve().parents[3] / "os"
+    return root if (root / "os.sh").is_file() else None
+
+
+@app.command(
+    "os",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def os_layer(ctx: typer.Context) -> None:
+    """The Linux OS layer: install · update · status · harness · image (docs/OS.md)."""
+    import subprocess
+
+    root = os_layer_root()
+    if root is None:
+        typer.echo(
+            "bashos: the OS layer ships in the bashOS source tree, not the wheel.\n"
+            "  curl -fsSL https://raw.githubusercontent.com/bamr87/bashos/main/os/boot.sh | bash",
+            err=True,
+        )
+        raise typer.Exit(1)
+    # Plain shell that may ask for sudo: hand it the terminal and pass its exit code on.
+    raise typer.Exit(subprocess.call([str(root / "os.sh"), *ctx.args]))
+
+
 @app.command("desktop")
 def desktop(
     model: str | None = typer.Option(None, "--model", "-m", help="model override"),
