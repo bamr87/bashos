@@ -148,7 +148,8 @@ check system 'systemctl is-system-running --wait >/dev/null; systemctl --failed 
 check grown 'df -BG --output=size / | tail -1 | tr -dc 0-9 | { read -r g; echo "root ${g}G"; [ "$g" -ge 8 ]; }'
 check layer 'bashos-os version && test -x /opt/bashos/.venv/bin/bashos && command -v opencode claude'
 check route 'cd /tmp && bashos run -n "/sh list the five largest files here"'
-check console 'tmux has-session -t =console && tmux list-windows -t =console -F "#{window_name}" | grep -qx bashos'
+# Quoted targets: checks run in the user's login shell, and zsh expands a bare =word.
+check console 'tmux has-session -t "=console" && tmux list-windows -t "=console" -F "#{window_name}" | grep -qx bashos'
 ((fail)) && diagnose
 if ((harness)); then
   # A first start installs the console's requirements and builds its page: slow under TCG.
