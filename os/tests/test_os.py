@@ -97,8 +97,9 @@ def test_dry_run_changes_nothing(env, root, home):
 @needs_bash
 def test_install_lays_down_the_machine(env, root, home):
     p = install(env)
-    # The layer, root-owned on a real machine, with the commands on /usr/local/bin.
+    # The layer, root-owned on a real machine, readable by everyone, commands on /usr/local/bin.
     assert (root / "opt/bashos/os/os.sh").is_file()
+    assert stat.S_IMODE((root / "opt/bashos").stat().st_mode) == 0o755
     assert not (root / "opt/bashos/.venv").exists()  # pip is skipped in a fake root
     links = {
         "usr/local/bin/bashos": "/opt/bashos/bin/bashos",

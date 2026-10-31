@@ -24,8 +24,10 @@ os_deploy_layer() {
   # Only what git would ship: tracked files plus untracked ones not ignored (.venv, .env, engine
   # state never travel). Without git (a tarball), rsync honours the same .gitignore files.
   # Staged first, so a file the new tree dropped is deleted from the layer too.
-  local stage
+  local stage changes
   stage=$(mktemp -d)
+  # mktemp makes it 0700, and rsync -a gives the destination the source directory's mode.
+  chmod 0755 "$stage"
   if git -C "$OS_SRC" rev-parse --git-dir >/dev/null 2>&1; then
     git -C "$OS_SRC" ls-files -z -co --exclude-standard | tar -C "$OS_SRC" --null -T - -cf - | tar -C "$stage" -xf -
   else
@@ -34,9 +36,14 @@ os_deploy_layer() {
   local own=()
   os_fake_root || own=(--chown=0:0)
   os_root mkdir -p "$dst"
-  os_root rsync -a --delete "${own[@]}" --exclude=/.venv "$stage/" "$dst/"
+  # --omit-dir-times: staged directories are new each run; only file changes count.
+  changes=$(os_root rsync -ai --omit-dir-times --delete "${own[@]}" --exclude=/.venv "$stage/" "$dst/")
   rm -rf "$stage"
-  os_ok "deployed $OS_SRC -> $BASHOS_OS_PATH"
+  if [[ -z $changes ]]; then
+    os_log "${_os_d}unchanged${_os_0} $BASHOS_OS_PATH"
+  else
+    os_ok "deployed $OS_SRC -> $BASHOS_OS_PATH ($(wc -l <<<"$changes" | tr -d ' ') changes)"
+  fi
 }
 
 os_build_info() {
