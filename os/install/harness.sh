@@ -44,6 +44,8 @@ ENV
     os_ok "created ${env_file/#$OS_HOME/\~} (0600)"
   fi
 
+  # A start before the hub existed left the unit failed (exit 78): clear it, then (re)start.
+  os_user_systemctl "$OS_USER" reset-failed bashos-harness.service 2>/dev/null || true
   os_user_systemctl "$OS_USER" enable --now bashos-harness.service bashos-heal.timer
   os_log "harness: $mode on ${BASHOS_HARNESS_HOST:-127.0.0.1}:${BASHOS_HARNESS_PORT:-4001} — bashos os harness status"
 }

@@ -11,6 +11,8 @@ Type=exec
 ExecStart=/usr/local/bin/bashos-harness
 Restart=on-failure
 RestartSec=10s
+# 78: misconfigured (no hub checkout yet, a LAN bind without a token) — waiting cannot fix it.
+RestartPreventExitStatus=78
 Environment=PYTHONUNBUFFERED=1
 
 [Install]

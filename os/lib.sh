@@ -90,8 +90,8 @@ os_systemctl() {
 }
 
 # os_user_systemctl USER ARGS… — that user's manager. With a live session bus it is called
-# directly; offline, `enable` becomes `systemctl --global enable` (every user's default, which
-# is what an image wants); otherwise the step is reported and skipped.
+# directly; in an image build, `enable`/`disable` become `systemctl --global …` (every user's
+# default, which is what an image wants); otherwise the step is reported and skipped.
 os_user_systemctl() {
   local user=$1 args=() a
   shift
@@ -101,7 +101,10 @@ os_user_systemctl() {
   if os_fake_root; then
     os_log "${_os_d}skip (fake root):${_os_0} systemctl --user $*"
   elif os_image; then
-    [[ ${args[0]} == enable ]] && os_run systemctl --global "${args[@]}"
+    case ${args[0]} in
+      enable | disable) os_run systemctl --global "${args[@]}" ;;
+      *) os_log "${_os_d}skip (image build):${_os_0} systemctl --user $*" ;;
+    esac
   elif [[ $user == "$(id -un)" ]] && systemctl --user show-environment >/dev/null 2>&1; then
     os_run systemctl --user "$@"
   elif os_is_root && os_systemd_live; then

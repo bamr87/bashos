@@ -23,6 +23,13 @@ unset _src _dir
 source "$OS_SRC/os/lib.sh"
 os_conf_load
 
+# A configuration problem exits 78 (EX_CONFIG): the unit does not restart-loop on it
+# (RestartPreventExitStatus=78); the installer starts it again once the problem is fixed.
+cfg_die() {
+  printf 'bashos-harness: %s\n' "$*" >&2
+  exit 78
+}
+
 ENV_FILE="$HOME/.config/bashos/harness.env"
 if [[ -r $ENV_FILE ]]; then
   set -a
@@ -38,13 +45,13 @@ host=${BASHOS_HARNESS_HOST:-127.0.0.1}
 port=${BASHOS_HARNESS_PORT:-4001}
 
 [[ $mode == off ]] && { echo "bashos-harness: BASHOS_HARNESS=off — nothing to serve"; exit 0; }
-[[ $mode == native || $mode == compose ]] || os_die "BASHOS_HARNESS=$mode (native | compose | off)"
-[[ -d $hub/tools/console ]] || os_die "no hub checkout at $hub — run: bashos os install --only harness (or set BASHOS_HUB_DIR)"
+[[ $mode == native || $mode == compose ]] || cfg_die "BASHOS_HARNESS=$mode (native | compose | off)"
+[[ -d $hub/tools/console ]] || cfg_die "no hub checkout at $hub — run: bashos os install --only harness (or set BASHOS_HUB_DIR)"
 
 # A LAN listener without a token would hand the console's operations to the network.
 if ! os_loopback "$host"; then
   [[ -n ${DASH_CONSOLE_TOKEN:-} ]] ||
-    os_die "refusing to bind $host without DASH_CONSOLE_TOKEN (set it in ~/.config/bashos/harness.env)"
+    cfg_die "refusing to bind $host without DASH_CONSOLE_TOKEN (set it in ~/.config/bashos/harness.env)"
   short=$(hostname -s 2>/dev/null || hostname)
   export DASH_CONSOLE_ALLOWED_HOSTS="${DASH_CONSOLE_ALLOWED_HOSTS:-$short,$short.local,localhost,127.0.0.1}"
 fi
@@ -59,7 +66,7 @@ if [[ $mode == native ]]; then
   export CONSOLE_HOST="$host" CONSOLE_PORT="$port"
   cmd=("$hub/tools/console/run.sh")
 else
-  os_has docker || os_die "BASHOS_HARNESS=compose needs docker"
+  os_has docker || cfg_die "BASHOS_HARNESS=compose needs docker"
   files=(-f "$hub/docker-compose.yml")
   # The hub's forge overlay publishes on every interface; only a LAN bind wants it.
   if ! os_loopback "$host" && [[ -f $hub/compose/forge.yml ]]; then

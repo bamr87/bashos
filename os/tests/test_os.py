@@ -332,7 +332,7 @@ def test_harness_native_runs_the_hub_console(env, hub):
 @needs_bash
 def test_harness_refuses_a_lan_bind_without_a_token(env, hub):
     p = harness(env, "BASHOS_HARNESS_HOST=0.0.0.0\n")
-    assert p.returncode == 1 and "without DASH_CONSOLE_TOKEN" in p.stderr
+    assert p.returncode == 78 and "without DASH_CONSOLE_TOKEN" in p.stderr
     p = harness(env, "BASHOS_HARNESS_HOST=0.0.0.0\n", "DASH_CONSOLE_TOKEN=s3cret\n")
     assert p.returncode == 0, p.stderr
     assert "s3cret" not in p.stdout + p.stderr
@@ -355,7 +355,7 @@ def test_harness_compose_adds_the_forge_overlay_only_for_a_lan_bind(env, hub, tm
 @needs_bash
 def test_harness_without_a_hub_says_how_to_get_one(env):
     p = harness(env)
-    assert p.returncode == 1 and "no hub checkout" in p.stderr
+    assert p.returncode == 78 and "no hub checkout" in p.stderr  # EX_CONFIG: no restart loop
 
 
 @needs_bash
