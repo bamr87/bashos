@@ -46,8 +46,14 @@ ensure_session() {
 }
 
 attach() {
+  local rc=0
   ensure_session
-  exec tmux attach-session -t "=$SESSION"
+  tmux attach-session -t "=$SESSION" || rc=$?
+  if ((rc != 0)) && [[ -d $STATE ]]; then
+    printf '%s attach exited %s (sessions: %s)\n' "$(date -Is)" "$rc" \
+      "$(tmux list-sessions -F '#{session_name}' 2>&1 | paste -sd, -)" >>"$STATE/console.log"
+  fi
+  exit "$rc"
 }
 
 heal() {
@@ -67,6 +73,11 @@ want_kiosk() {
 }
 
 console() {
+  # The monitor's errors would scroll past unseen (or not render at all): keep them.
+  mkdir -p "$STATE"
+  exec 2> >(tee -a "$STATE/console.log" >&2)
+  printf '%s start tty=%s TERM=%s size=%s\n' "$(date -Is)" "$(tty 2>/dev/null)" "${TERM:-}" \
+    "$(stty size 2>/dev/null | tr ' ' x)" >>"$STATE/console.log"
   if want_kiosk; then
     local rc=0
     cage -s -- foot --font="${BASHOS_CONSOLE_FONT:-monospace:size=11}" /usr/local/bin/bashos-console --attach || rc=$?

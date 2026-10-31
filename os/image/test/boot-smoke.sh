@@ -5,7 +5,7 @@
 # a command (dry run, no credential needed), and with --harness the Harness Console answers.
 #
 #   bashos os image test [--image FILE] [--arch x86-64|arm64] [--disk SIZE] [--timeout SECS]
-#                        [--harness] [--keep] [--docker]
+#                        [--harness [--harness-wait SECS]] [--keep] [--docker]
 #
 # Needs qemu-system-<arch>, UEFI firmware (Debian: ovmf | qemu-efi-aarch64), qemu-utils, mtools,
 # openssh-client — or --docker, which runs it inside debian:trixie with those. KVM is used
@@ -24,7 +24,7 @@ case $(uname -m) in
   aarch64 | arm64) arch=arm64 ;;
   *) arch=$(uname -m) ;;
 esac
-image="" disk=16G timeout=1200 harness=0 keep=0 docker=0
+image="" disk=16G timeout=1200 harness=0 harness_wait=1200 keep=0 docker=0
 OUT=${OUT:-$IMAGE_DIR/mkosi.output/smoke}
 while (($#)); do
   case $1 in
@@ -33,6 +33,7 @@ while (($#)); do
     --disk) disk=${2:?}; shift ;;
     --timeout) timeout=${2:?}; shift ;;
     --harness) harness=1 ;;
+    --harness-wait) harness_wait=${2:?}; shift ;;
     --keep) keep=1 ;;
     --docker) docker=1 ;;
     -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -50,7 +51,7 @@ if ((docker)); then
   mkdir -p "$OUT"
   img_dir=$(cd "$(dirname "$image")" && pwd)
   flags=(--arch "$arch" --disk "$disk" --timeout "$timeout")
-  ((harness)) && flags+=(--harness)
+  ((harness)) && flags+=(--harness --harness-wait "$harness_wait")
   ((keep)) && flags+=(--keep)
   exec docker run --rm --platform "$platform" "${kvm[@]}" \
     -v "$OS_SRC:/src:ro" -v "$img_dir:/img:ro" -v "$(cd "$OUT" && pwd):/out" -e OUT=/out \
@@ -141,7 +142,14 @@ check layer 'bashos-os version && test -x /opt/bashos/.venv/bin/bashos && comman
 check route 'cd /tmp && bashos run -n "/sh list the five largest files here"'
 check console 'tmux has-session -t =console && tmux list-windows -t =console -F "#{window_name}" | grep -qx bashos'
 if ((harness)); then
-  check harness 'for i in $(seq 1 120); do curl -fsS -o /dev/null http://127.0.0.1:4001/api/health && exit 0; sleep 10; done; journalctl --user -u bashos-harness -n 80 --no-pager; exit 1'
+  # A first start installs the console's requirements and builds its page: slow under TCG.
+  check harness "for i in \$(seq 1 $((harness_wait / 10))); do curl -fsS -o /dev/null http://127.0.0.1:4001/api/health && exit 0; sleep 10; done; exit 1"
+fi
+if ((fail)); then
+  vm 'journalctl -b --no-pager -u getty@tty1 | tail -30; echo; journalctl -b --no-pager _UID=$(id -u) | tail -80;
+      echo; cat ~/.local/state/bashos/console.log 2>/dev/null; echo; loginctl list-sessions --no-legend;
+      echo; systemctl --user --no-pager status bashos-harness.service | tail -20;
+      journalctl --user --no-pager -u bashos-harness -n 80' >"$OUT/diagnostics.txt" 2>&1 || true
 fi
 # Evidence, not a gate: the engine boots from the root-owned layer (a live model call needs a
 # credential the test does not have).
