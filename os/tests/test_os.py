@@ -441,3 +441,11 @@ def test_bin_bashos_reaches_the_os_layer_through_a_symlink(tmp_path, env):
 def test_os_dispatch_refuses_unknown_commands(env):
     p = run(str(OS / "os.sh"), "nope", env=env, check=False)
     assert p.returncode == 2 and "usage: bashos os" in p.stderr
+
+
+@needs_bash
+def test_settings_load_without_a_home(env):
+    """A system service (bashos-provision) runs with no $HOME: loading settings must not trip set -u."""
+    e = {k: v for k, v in env.items() if k not in ("HOME", "BASHOS_HUB_DIR")}
+    p = run("-c", f'set -u; source "{OS}/lib.sh"; os_conf_load; printf %s "$BASHOS_HUB_DIR"', env=e)
+    assert p.stdout == "~/dev/bamr87"

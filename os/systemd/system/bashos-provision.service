@@ -12,10 +12,11 @@ Before=getty@tty1.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/sbin/bashos-provision
-# Without a seed it asks on the monitor.
+# Without a seed it asks on the monitor; what it says goes to the journal and the console
+# (the monitor on hardware, the serial port in a VM — where the boot test reads it).
 StandardInput=tty
-StandardOutput=tty
-StandardError=tty
+StandardOutput=journal+console
+StandardError=journal+console
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes

@@ -245,7 +245,8 @@ os_conf_load() {
   local f env
   # As `export` lines: an eval'd `declare` inside a function would make the variables local.
   env=$(declare -px | sed -n 's/^declare -x \(BASHOS_[A-Za-z0-9_]*=\)/export \1/p')
-  for f in "$OS_DIR/config/os.conf" "$(os_path /etc/bashos/os.conf)" "${BASHOS_USER_HOME:-$HOME}/.config/bashos/os.conf"; do
+  local user_home=${BASHOS_USER_HOME:-${HOME:-}}
+  for f in "$OS_DIR/config/os.conf" "$(os_path /etc/bashos/os.conf)" ${user_home:+"$user_home/.config/bashos/os.conf"}; do
     # shellcheck source=config/os.conf
     [[ -r $f ]] && source "$f"
   done

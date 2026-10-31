@@ -33,6 +33,9 @@ BASHOS_HUB_REPO BASHOS_CHANNEL"
 SEED_CONF="BASHOS_CONSOLE BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT BASHOS_LAN_CIDR BASHOS_HUB_REPO BASHOS_CHANNEL"
 
 os_is_root || os_die "bashos-provision runs as root (bashos-provision.service)"
+# A system service gets no $HOME; on a failure, name the command that failed.
+export HOME=${HOME:-/root}
+trap 'os_warn "bashos-provision: line $LINENO failed: $BASH_COMMAND"' ERR
 [[ -e $DONE && ${1:-} != --force ]] && { echo "bashos-provision: already provisioned ($DONE)"; exit 0; }
 mkdir -p /var/lib/bashos
 exec > >(tee -a /var/log/bashos-provision.log) 2>&1
