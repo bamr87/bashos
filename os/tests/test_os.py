@@ -402,6 +402,8 @@ def test_mkosi_builds_a_bootable_debian_13_disk():
     assert conf["Output"]["Format"] == "disk"
     assert conf["Content"]["Bootable"] == "yes"
     assert conf["Content"]["Bootloader"] == "systemd-boot"
+    packages = conf["Content"]["Packages"].split()
+    assert {"login", "passwd"} <= set(packages)  # tty1 autologin needs /bin/login (found in QEMU)
     x86 = _ini(OS / "image/mkosi.conf.d/10-x86-64.conf")
     assert x86["Match"]["Architecture"] == "x86-64"
     assert "linux-image-amd64" in x86["Content"]["Packages"].split()
