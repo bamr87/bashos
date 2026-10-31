@@ -252,3 +252,39 @@ features:
     surface: ui
     link: "src/bashos/gui"
     docs: "docs/frontend/PRD-os-shell.md"
+  - id: BASHOS-027
+    title: "OS layer: bashos os install / update / uninstall"
+    description: "Omarchy-style layer on Debian 13: ordered install phases (preflight, packages, runtime, system as root; console, harness, finish as the user) put bashOS at /opt/bashos (root-owned) with its commands on /usr/local/bin; update pulls, re-applies and runs timestamped migrations; uninstall removes what install added. Dry run and fake-root tested; not yet run on forge."
+    implemented: true
+    status: partial
+    prd: [TBD]
+    surface: cli
+    link: "os/install.sh"
+    docs: "docs/OS.md"
+  - id: BASHOS-028
+    title: "Bootable bashOS image (mkosi)"
+    description: "GPT disk image of Debian 13 with the layer applied: systemd-boot + UKI, root grown to the disk on first boot, first-boot provisioning (user, hostname, ssh keys, harness secrets) from a BASHOS-SEED drive or tty1. Built and boot-tested in QEMU; not yet booted on forge hardware."
+    implemented: true
+    status: partial
+    prd: [TBD]
+    surface: cli
+    link: "os/image/build.sh"
+    docs: "os/image/README.md"
+  - id: BASHOS-029
+    title: "Console on the physical monitor"
+    description: "tty1 auto-logs in to the shared tmux session 'console' whose bashos window runs the desktop — in a cage + foot kiosk when a GPU allows, else the Linux console; ssh logins join it; a 10-minute heal timer restores the window without stealing focus. Adopts forge's existing console mirror."
+    implemented: true
+    status: partial
+    prd: [TBD]
+    surface: infra
+    link: "os/bin/bashos-console"
+    docs: "docs/OS.md"
+  - id: BASHOS-030
+    title: "Harness Console service"
+    description: "bashos-harness.service serves the bamr87 hub's Harness Console (tools/console) from the hub checkout, native or via compose, loopback by default; a LAN bind requires DASH_CONSOLE_TOKEN."
+    implemented: true
+    status: partial
+    prd: [TBD]
+    surface: infra
+    link: "os/bin/bashos-harness"
+    docs: "docs/OS.md"

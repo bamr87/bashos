@@ -197,12 +197,16 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | [BASHOS-024](../../features/features.yml) | Optional Docker services | shipped | [`docker-compose.yml`](../../docker-compose.yml) · [`README.md`](../../README.md) | TBD |
 | [BASHOS-025](../../features/features.yml) | chui terminal environment (macOS) | shipped | [`chui`](../../chui) · [`README.md`](../../README.md) | TBD |
 | [BASHOS-026](../../features/features.yml) | Window list and layout serialization | partial | [`src/bashos/gui`](../../src/bashos/gui) · [`docs/frontend/PRD-os-shell.md`](PRD-os-shell.md) | §7 |
+| [BASHOS-027](../../features/features.yml) | OS layer: bashos os install / update / uninstall | partial | [`os/install.sh`](../../os/install.sh) · [`docs/OS.md`](../OS.md) | TBD |
+| [BASHOS-028](../../features/features.yml) | Bootable bashOS image (mkosi) | partial | [`os/image/build.sh`](../../os/image/build.sh) · [`os/image/README.md`](../../os/image/README.md) | TBD |
+| [BASHOS-029](../../features/features.yml) | Console on the physical monitor | partial | [`os/bin/bashos-console`](../../os/bin/bashos-console) · [`docs/OS.md`](../OS.md) | TBD |
+| [BASHOS-030](../../features/features.yml) | Harness Console service | partial | [`os/bin/bashos-harness`](../../os/bin/bashos-harness) · [`docs/OS.md`](../OS.md) | TBD |
 
 **Requirement → feature trace**
 
 | Requirement | Features |
 | --- | --- |
-| TBD | BASHOS-001, BASHOS-002, BASHOS-003, BASHOS-004, BASHOS-005, BASHOS-006, BASHOS-007, BASHOS-008, BASHOS-009, BASHOS-010, BASHOS-011, BASHOS-012, BASHOS-021, BASHOS-024, BASHOS-025 |
+| TBD | BASHOS-001, BASHOS-002, BASHOS-003, BASHOS-004, BASHOS-005, BASHOS-006, BASHOS-007, BASHOS-008, BASHOS-009, BASHOS-010, BASHOS-011, BASHOS-012, BASHOS-021, BASHOS-024, BASHOS-025, BASHOS-027, BASHOS-028, BASHOS-029, BASHOS-030 |
 | §6 | BASHOS-013, BASHOS-014, BASHOS-015, BASHOS-016, BASHOS-017, BASHOS-018, BASHOS-019, BASHOS-020 |
 | §7 | BASHOS-019, BASHOS-020, BASHOS-026 |
 | §9 | BASHOS-022, BASHOS-023 |

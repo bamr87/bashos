@@ -28,7 +28,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 - **No API key** — your Claude Code OAuth reaches the engine through its environment, never disk; `ANTHROPIC_API_KEY` is the fallback.
 - **Deny-by-default tool policy**, enforced by the engine rather than a prompt; approval requests are refused, never awaited.
 - **Dry runs** — `bashos run -n` shows the routing and the rendered prompt without calling a model.
-- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, Phoenix tracing and a LangGraph API server.
+- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, Phoenix tracing and a LangGraph API server.
 
 ## Quick start
 
@@ -106,6 +106,17 @@ chui restore                          # roll back to the snapshot
 ```
 
 `bashos chui …` is plain shell, so it works on a fresh Mac before any virtualenv exists. Install is idempotent and never deletes a file. Coming from the standalone `bamr87/chui` clone? See [chui/README.md](chui/README.md#moving-from-the-standalone-bamr87chui-clone).
+
+## The operating system (Linux) — os
+
+bashOS can also be the machine itself. **[os/](os/README.md)** is an Omarchy-style layer on Debian 13: the monitor auto-logs in to one shared tmux console whose first window is the bashOS desktop (in a cage + foot kiosk when there is a GPU), every ssh login joins it, the bamr87 hub's Harness Console runs as a supervised service, and `bashos os update` pulls, re-applies and migrates. Install it in place, or build the bootable disk image ([docs/OS.md](docs/OS.md)).
+
+```bash
+./bin/bashos os install --dry-run     # the plan for this machine, nothing changed
+./bin/bashos os install               # Debian 13: layer + console + harness (sudo asks once)
+bashos os status                      # [ OK ]/[WARN]/[CRIT] per piece
+./bin/bashos os image build --docker  # the bootable image (mkosi), then: bashos os image test --docker
+```
 
 ## Auth — Claude Code OAuth, wired into the engine
 

@@ -1,0 +1,27 @@
+# bashOS first boot: the machine's user, name and keys from a BASHOS-SEED drive (or tty1).
+[Unit]
+Description=bashOS first-boot provisioning
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md
+ConditionPathExists=!/var/lib/bashos/provisioned
+# The seed and the network (the hub clone) first; the monitor's login after, so tty1 sees the user.
+After=local-fs.target network-online.target systemd-user-sessions.service
+Wants=network-online.target
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/bashos-provision
+# Without a seed it asks on the monitor; what it says goes to the journal and the console
+# (the monitor on hardware, the serial port in a VM — where the boot test reads it).
+StandardInput=tty
+StandardOutput=journal+console
+StandardError=journal+console
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+# A first boot clones the hub and installs the console's requirements.
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

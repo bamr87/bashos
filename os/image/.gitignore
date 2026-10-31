@@ -1,0 +1,4 @@
+# mkosi build output: images, the staged tree, caches
+mkosi.output/
+mkosi.cache/
+mkosi.tools/

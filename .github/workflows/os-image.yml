@@ -1,0 +1,62 @@
+name: os image
+
+# Builds the bootable bashOS image (os/image, mkosi in debian:trixie) for forge's architecture and
+# boots it under KVM with a BASHOS-SEED drive: first-boot provisioning, ssh with the seed's key,
+# root growth, the layer, a kernel dry run, the console and the Harness Console must all hold
+# (os/image/test/boot-smoke.sh). Heavy, so it runs only when the OS layer moves, or by hand.
+on:
+  pull_request:
+    paths: ["os/**", "bin/bashos", ".github/workflows/os-image.yml"]
+  push:
+    branches: [main]
+    paths: ["os/**", "bin/bashos", ".github/workflows/os-image.yml"]
+  workflow_dispatch:
+    inputs:
+      upload_image:
+        description: "Upload the compressed disk image as an artifact (~1 GB, kept 7 days)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: os-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: build + boot (x86-64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+      - name: free disk space (the image and its build tree need ~15 GB)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: build (mkosi in debian:trixie, privileged)
+        run: os/image/build.sh --docker --arch x86-64
+      - name: boot test (QEMU + KVM, seed drive)
+        run: os/image/test/boot-smoke.sh --docker --arch x86-64 --harness --timeout 1800
+      - name: evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: os-image-smoke
+          path: os/image/mkosi.output/smoke/
+          if-no-files-found: ignore
+      - name: compress the image
+        if: inputs.upload_image
+        run: zstd -T0 -12 --rm os/image/mkosi.output/bashos*.raw
+      - name: upload the image
+        if: inputs.upload_image
+        uses: actions/upload-artifact@v7
+        with:
+          name: bashos-x86-64
+          path: os/image/mkosi.output/bashos*.raw.zst
+          retention-days: 7
+          compression-level: 0

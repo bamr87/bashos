@@ -1,0 +1,6 @@
+# The kiosk console (BASHOS_CONSOLE=auto|kiosk): a Wayland compositor whose only window is a
+# terminal running the shared tmux session — truecolor and real fonts on the physical monitor,
+# where the bare Linux console has 16 colours. Same line format as base.list.
+cage
+foot foot-terminfo
+fonts-jetbrains-mono
