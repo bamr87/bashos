@@ -14,6 +14,7 @@ import re
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -239,6 +240,107 @@ def test_uninstall_removes_what_install_added(env, root, home):
     assert not (root / "opt/bashos").exists() and not (root / "etc/bashos").exists()
 
 
+# ---------------------------------------------------------------- the monitor: rotation, VNC
+
+
+def _shim(where: Path, name: str, body: str) -> None:
+    f = where / name
+    f.write_text("#!/bin/sh\n" + body)
+    f.chmod(0o755)
+
+
+def _kiosk_shims(tmp_path: Path) -> tuple[Path, Path]:
+    shims, calls = tmp_path / "shims", tmp_path / "calls"
+    shims.mkdir()
+    # wlr-randr lists one output when asked nothing; every call with arguments is recorded.
+    _shim(shims, "wlr-randr", f"""[ $# -eq 0 ] && printf 'HDMI-A-1 "Dell U2415"\\n  Enabled: yes\\nDP-1 "Other"\\n  Enabled: yes\\n' && exit 0
+echo "wlr-randr $*" >>{calls}
+""")
+    _shim(shims, "wayvnc", f'echo "wayvnc $*" >>{calls}\n')
+    _shim(shims, "foot", f'echo "foot $*" >>{calls}\n')
+    return shims, calls
+
+
+def _calls(calls: Path, wait_for: str = "") -> list[str]:
+    for _ in range(50):  # wayvnc starts in the background
+        lines = calls.read_text().splitlines() if calls.exists() else []
+        if not wait_for or any(c.startswith(wait_for) for c in lines):
+            return lines
+        time.sleep(0.1)
+    return lines
+
+
+@needs_bash
+def test_kiosk_turns_the_outputs_and_serves_vnc_on_loopback(env, home, tmp_path):
+    shims, calls = _kiosk_shims(tmp_path)
+    (home / ".config/bashos").mkdir(parents=True)
+    (home / ".config/bashos/wayvnc.conf").write_text("enable_auth=true\n")
+    e = dict(env, PATH=f"{shims}:{env['PATH']}", BASHOS_CONSOLE_ROTATE="left", BASHOS_CONSOLE_VNC="yes")
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=e)
+    lines = _calls(calls, "wayvnc")
+    # forge's portrait Dell: `left` is Wayland's 90 (270 turned it upside down). Every output
+    # goes in one call, as one configuration.
+    assert "wlr-randr --output HDMI-A-1 --transform 90 --output DP-1 --transform 90" in lines
+    assert f"wayvnc -C {home}/.config/bashos/wayvnc.conf -L warning 127.0.0.1 5900" in lines
+    assert any(c.startswith("foot --font=") and c.endswith("/usr/local/bin/bashos-console --attach") for c in lines)
+
+
+@needs_bash
+@pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="needs /proc")
+def test_what_the_kiosk_starts_never_holds_cages_pipe(env, home, tmp_path):
+    # cage ends only when the last holder of its client pipe exits: a tmux server or wayvnc
+    # started inside the kiosk must not inherit it.
+    shims, calls = _kiosk_shims(tmp_path)
+    _shim(shims, "wayvnc", f'ls /proc/$$/fd >>{calls}.fds\n')
+    (home / ".config/bashos").mkdir(parents=True)
+    (home / ".config/bashos/wayvnc.conf").write_text("enable_auth=true\n")
+    e = dict(env, PATH=f"{shims}:{env['PATH']}", BASHOS_CONSOLE_VNC="yes")
+    script = f'exec 7>{tmp_path}/pipe; exec "{OS}/bin/bashos-console" --kiosk'
+    run("-c", script, env=e)
+    fds = Path(f"{calls}.fds")
+    for _ in range(50):
+        if fds.exists() and fds.read_text().strip():
+            break
+        time.sleep(0.1)
+    assert "7" not in fds.read_text().split()
+
+
+@needs_bash
+def test_kiosk_defaults_turn_nothing_and_a_bad_rotation_is_logged(env, home, tmp_path):
+    shims, calls = _kiosk_shims(tmp_path)
+    e = dict(env, PATH=f"{shims}:{env['PATH']}")
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=e)
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=dict(e, BASHOS_CONSOLE_ROTATE="sideways"))
+    lines = _calls(calls)
+    assert [c.split()[0] for c in lines] == ["foot", "foot"]
+    assert "BASHOS_CONSOLE_ROTATE=sideways" in (home / ".local/state/bashos/console.log").read_text()
+
+
+@needs_bash
+def test_the_vnc_account_is_private_generated_once_and_only_when_asked(env, home):
+    conf = home / ".config/bashos/wayvnc.conf"
+    install(env)
+    assert not conf.exists()
+    e = dict(env, BASHOS_CONSOLE_VNC="yes")
+    out = install(e)
+    text = conf.read_text()
+    assert stat.S_IMODE(conf.stat().st_mode) == 0o600
+    assert {"enable_auth=true", "relax_encryption=true", "username=amr"} <= set(text.splitlines())
+    password = re.search(r"^password=([A-Za-z0-9]{20})$", text, re.M)
+    assert password and password.group(1) not in out.stdout + out.stderr  # never printed
+    install(e)
+    assert conf.read_text() == text  # never rewritten
+
+
+@needs_bash
+def test_the_linux_console_rotation_follows_the_setting(env, root):
+    rule = root / "etc/udev/rules.d/90-bashos-console-rotate.rules"
+    install(dict(env, BASHOS_CONSOLE_ROTATE="left"))
+    assert "echo 3 > /sys/class/graphics/fbcon/rotate_all" in rule.read_text()  # fbcon: CCW
+    install(dict(env, BASHOS_CONSOLE_ROTATE="normal"))
+    assert not rule.exists()
+
+
 # ---------------------------------------------------------------- packages
 
 
@@ -302,6 +404,22 @@ def test_migrations_run_once_in_order_and_stop_on_failure(env, home, tmp_path):
     p = run(str(OS / "os.sh"), "migrate", env=e, check=False)
     assert p.returncode == 1 and "1800000002.sh failed" in p.stderr
     assert not (home / ".local/state/bashos/migrations/1800000002.sh").exists()
+
+
+@needs_bash
+def test_image_machines_migrate_to_online_with_any_nic(env, root):
+    # forge: two NICs, one cable — network-online (and first-boot provisioning) waited 2 minutes.
+    m = next(p for p in sorted((OS / "migrations").glob("*.sh")) if "wait-online" in p.read_text())
+    e = dict(env, OS_SRC=str(REPO))
+    dropin = root / "etc/systemd/system/systemd-networkd-wait-online.service.d/10-bashos-any.conf"
+    run(str(m), env=e)
+    assert not dropin.exists()  # an in-place install on Debian: not networkd, nothing to do
+    net = root / "etc/systemd/network/80-bashos-wired.network"
+    net.parent.mkdir(parents=True)
+    net.write_text("[Match]\nName=en* eth*\n")
+    run(str(m), env=e)
+    run(str(m), env=e)  # idempotent
+    assert "systemd-networkd-wait-online --any" in dropin.read_text()
 
 
 @needs_bash

@@ -27,10 +27,11 @@ DONE=/var/lib/bashos/provisioned
 SEED_LABEL=BASHOS-SEED
 SEED_MNT=/run/bashos-seed
 SEED_KEYS="BASHOS_USER BASHOS_HOSTNAME BASHOS_TIMEZONE BASHOS_LOCALE BASHOS_SHELL BASHOS_PASSWORD_HASH
-BASHOS_SUDO_NOPASSWD BASHOS_CONSOLE BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT BASHOS_LAN_CIDR
-BASHOS_HUB_REPO BASHOS_CHANNEL"
+BASHOS_SUDO_NOPASSWD BASHOS_CONSOLE BASHOS_CONSOLE_ROTATE BASHOS_CONSOLE_VNC BASHOS_HARNESS BASHOS_HARNESS_HOST
+BASHOS_HARNESS_PORT BASHOS_LAN_CIDR BASHOS_HUB_REPO BASHOS_CHANNEL"
 # What the seed sets in /etc/bashos/os.conf (the rest is first-boot only).
-SEED_CONF="BASHOS_CONSOLE BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT BASHOS_LAN_CIDR BASHOS_HUB_REPO BASHOS_CHANNEL"
+SEED_CONF="BASHOS_CONSOLE BASHOS_CONSOLE_ROTATE BASHOS_CONSOLE_VNC BASHOS_HARNESS BASHOS_HARNESS_HOST BASHOS_HARNESS_PORT
+BASHOS_LAN_CIDR BASHOS_HUB_REPO BASHOS_CHANNEL"
 
 os_is_root || os_die "bashos-provision runs as root (bashos-provision.service)"
 # A system service gets no $HOME; on a failure, name the command that failed.
@@ -129,6 +130,8 @@ name_machine() {
     printf '127.0.1.1\t%s\n' "$host" >>/etc/hosts
   fi
   os_ok "hostname $host"
+  # avahi announced the image's name when it started; HOST.local must answer from now on.
+  systemctl try-restart avahi-daemon.service 2>/dev/null || true
   if [[ -n ${BASHOS_TIMEZONE:-} ]]; then
     timedatectl set-timezone "$BASHOS_TIMEZONE" 2>/dev/null ||
       ln -sf "/usr/share/zoneinfo/$BASHOS_TIMEZONE" /etc/localtime
@@ -188,6 +191,7 @@ main() {
   source "$OS_DIR/install/system.sh"
   os_console_login "$user"
   os_linger "$user"
+  os_console_rotate
   systemctl daemon-reload
 
   # The user phases, as the user, against their own manager (linger has started it).
@@ -196,6 +200,10 @@ main() {
     PATH=/usr/local/bin:/usr/bin:/bin XDG_RUNTIME_DIR="/run/user/$uid" \
     BASHOS_USER="$user" NO_COLOR=1 "$OS_DIR/install.sh" --user-only ||
     os_warn "the user phases failed — rerun as $user: bashos os install --user-only"
+
+  # The image ships without package lists (mkosi cleans them): fetch them once, so `apt install`
+  # works from the first login instead of after apt-daily's first run.
+  if apt-get update -qq >/dev/null 2>&1; then os_ok "apt package lists"; else os_warn "apt-get update failed — run it once online"; fi
 
   date -Is >"$DONE"
   [[ $seed == "$SEED_MNT" ]] && umount "$SEED_MNT" 2>/dev/null || true

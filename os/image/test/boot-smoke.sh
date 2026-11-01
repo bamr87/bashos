@@ -2,7 +2,9 @@
 # os/image/test/boot-smoke.sh — boot a built bashOS image the way forge would meet it, and check
 # what its person would: the first boot provisions itself from a seed drive, ssh works with the
 # seed's key, the root filesystem grew into the disk, `bashos-os status` holds, the kernel routes
-# a command (dry run, no credential needed), and with --harness the Harness Console answers.
+# a command (dry run, no credential needed), HOST.local resolves, the kiosk runs on a virtual GPU
+# (turned as the seed says, served over VNC, and able to end and come back), and with --harness
+# the Harness Console answers. Like forge, the VM has a second NIC with no cable.
 #
 #   bashos os image test [--image FILE] [--arch x86-64|arm64] [--disk SIZE] [--memory MB] [--timeout SECS]
 #                        [--harness [--harness-wait SECS]] [--keep] [--docker]
@@ -84,6 +86,8 @@ BASHOS_HOSTNAME=bashos-smoke
 BASHOS_SHELL=zsh
 BASHOS_SUDO_NOPASSWD=yes
 BASHOS_HARNESS=native
+BASHOS_CONSOLE_ROTATE=left
+BASHOS_CONSOLE_VNC=yes
 EOF
 mformat -C -f 1440 -v BASHOS-SEED -i "$work/seed.img" ::
 mcopy -i "$work/seed.img" "$work/seed.env" "$work/authorized_keys" ::
@@ -94,7 +98,7 @@ qemu-img create -q -f qcow2 -b "$(cd "$(dirname "$image")" && pwd)/$(basename "$
 # TCG's translation cache defaults to 1 GB on top of the guest's RAM; 256 MB is plenty here.
 accel=tcg,tb-size=256 cpu=max
 [[ -w /dev/kvm ]] && accel=kvm cpu=host
-port=$((20000 + RANDOM % 20000))
+port=$((20000 + RANDOM % 20000)) mon=$((port + 1))
 case $arch in
   x86-64)
     qemu=(qemu-system-x86_64 -machine q35 -accel "$accel" -bios /usr/share/ovmf/OVMF.fd)
@@ -111,9 +115,16 @@ os_step "boot $(basename "$image") · $arch · ${accel%%,*} · ${memory} MB · d
   -drive "if=virtio,file=$work/disk.qcow2,format=qcow2" \
   -drive "if=virtio,file=$work/seed.img,format=raw,readonly=on" \
   -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$port-:22" -device virtio-net-pci,netdev=n0,romfile= \
+  -netdev user,id=n1 -device virtio-net-pci,netdev=n1,romfile= \
+  -vga none -device virtio-gpu-pci \
+  -monitor "tcp:127.0.0.1:$mon,server,nowait" \
   -smbios "type=11,value=io.systemd.stub.kernel-cmdline-extra=console=$serial" \
   -serial "file:$OUT/serial.log" &
 qemu_pid=$!
+# The second NIC loses its cable before the guest boots: forge's eno2. Network-online (and the
+# provisioning that waits for it) must not wait on it.
+for _ in 1 2 3 4 5 6 7 8 9 10; do { exec 3<>"/dev/tcp/127.0.0.1/$mon"; } 2>/dev/null && break; sleep 0.5; done
+if { printf 'set_link n1 off\n' >&3; } 2>/dev/null; then sleep 0.5; exec 3>&-; else os_warn "could not unplug the second NIC"; fi
 
 deadline=$((SECONDS + timeout))
 until grep -q 'bashos-provision: ready' "$OUT/serial.log" 2>/dev/null; do
@@ -136,7 +147,8 @@ diagnose() { # what the console and the harness were doing, from inside the VM
   vm 'journalctl -b --no-pager -u getty@tty1 | tail -30; echo; journalctl -b --no-pager _UID=$(id -u) | tail -80;
       echo; cat ~/.local/state/bashos/console.log 2>/dev/null; echo; loginctl list-sessions --no-legend;
       echo; systemctl --user --no-pager status bashos-harness.service | tail -20;
-      journalctl --user --no-pager -u bashos-harness -n 80' >>"$OUT/diagnostics.txt" 2>&1 || true
+      journalctl --user --no-pager -u bashos-harness -n 80; echo; cat ~/.local/state/bashos/wayvnc.log 2>/dev/null;
+      networkctl list --no-pager; systemctl --no-pager status systemd-networkd-wait-online | tail -5' >>"$OUT/diagnostics.txt" 2>&1 || true
 }
 check() { # check NAME CMD… — run CMD in the VM, keep its output as evidence
   local name=$1 rc=0
@@ -150,6 +162,48 @@ check layer 'bashos-os version && test -x /opt/bashos/.venv/bin/bashos && comman
 check route 'cd /tmp && bashos run -n "/sh list the five largest files here"'
 # Quoted targets: checks run in the user's login shell, and zsh expands a bare =word.
 check console 'tmux has-session -t "=console" && tmux list-windows -t "=console" -F "#{window_name}" | grep -qx bashos'
+# avahi must announce the provisioned name, not the image's (forge answered as bashos.local).
+check mdns 'getent hosts "$(hostname).local"'
+# The kiosk on the virtual GPU (the only one: -vga none, like forge's single card), turned as the
+# seed says (left = Wayland's 90) on every enabled output, and served over VNC.
+check kiosk bash -s <<'SH'
+for _ in $(seq 1 60); do pgrep -u "$USER" -x wayvnc >/dev/null && break; sleep 2; done
+pgrep -a cage && pgrep -a wayvnc
+export XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0
+# Every enabled output turned, not just one.
+wlr-randr | awk '/^[^ \t]/ { if (n) print n, e, t; n = $1; e = ""; t = "" }
+  /^ +Enabled:/ { e = $2 } /^ +Transform:/ { t = $2 }
+  END { if (n) print n, e, t }' | tee /dev/stderr |
+  awk '$2 == "yes" { on++; if ($3 != "90") bad++ } END { exit !(on > 0 && bad == 0) }'
+SH
+check vnc bash -s <<'SH'
+python3 - <<'PY'
+import socket
+s = socket.create_connection(("127.0.0.1", 5900), 5)
+assert s.recv(12).startswith(b"RFB"), "not a VNC server"
+s.sendall(b"RFB 003.008\n")
+n = s.recv(1)[0]
+types = list(s.recv(n))
+print("security types", types)
+assert 30 in types, "no Apple Diffie-Hellman (macOS Screen Sharing)"
+PY
+SH
+# The kiosk ends when its terminal does, and tty1 brings it back (on forge, the tmux server that
+# started inside it held cage's client pipe, so cage never ended).
+check kiosk-restart bash -s <<'SH'
+old=$(pgrep -x cage)
+client=$(tmux list-clients -t '=console' -F '#{client_tty} #{client_termname}' | awk '/foot/ { print $1 }')
+[ -n "$client" ] || { echo "no kiosk client on the console session"; exit 1; }
+tmux detach-client -t "$client"
+new=""
+for _ in $(seq 1 30); do
+  new=$(pgrep -x cage || true)
+  [ -n "$new" ] && [ "$new" != "$old" ] && pgrep -x wayvnc >/dev/null && break
+  sleep 2
+done
+echo "cage $old -> ${new:-none}"
+[ -n "$new" ] && [ "$new" != "$old" ]
+SH
 ((fail)) && diagnose
 if ((harness)); then
   # A first start installs the console's requirements and builds its page: slow under TCG.

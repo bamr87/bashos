@@ -18,7 +18,7 @@ The output lands in `os/image/mkosi.output/` (gitignored): `bashos_<version>.raw
 | `mkosi.conf` | Debian trixie (+ `non-free-firmware`), disk format, systemd-boot, UKI, the base packages |
 | `mkosi.conf.d/10-x86-64.conf`, `10-arm64.conf` | Kernel and firmware per architecture (forge: amd64 kernel, microcode, nouveau and NIC firmware) |
 | `mkosi.repart/` | The partitions: a 512 MB ESP and a minimised root flagged `GrowFileSystem=yes` |
-| `mkosi.extra/` | Files copied into the image: first-boot root growth (`usr/lib/repart.d`), DHCP on wired NICs, resolved kept off mDNS |
+| `mkosi.extra/` | Files copied into the image: first-boot root growth (`usr/lib/repart.d`), DHCP on wired NICs, network-online once any one of them is up (forge has two, one cabled), resolved kept off mDNS |
 | `mkosi.postinst.chroot` | The layer's system phases inside the image |
 | `seed.example/` | A documented `BASHOS-SEED` drive ([README](seed.example/README.md)) |
 | `test/boot-smoke.sh` | The boot test |
@@ -48,4 +48,4 @@ sudo dd if=os/image/mkosi.output/bashos_<v>.raw of=/dev/rdiskN bs=4m
 
 Put the seed on a second stick (or a second partition you create after writing the image) labelled `BASHOS-SEED`. Firmware: UEFI with Secure Boot **off** (`mokutil --sb-state`; the image's systemd-boot is unsigned).
 
-**On forge, once, without touching its disk:** plug the stick in, find its boot entry with `efibootmgr`, then `sudo efibootmgr --bootnext XXXX && sudo reboot`. forge boots bashOS one time and returns to Debian at the next reboot. Writing the image over `sda` replaces forge's Debian, its LVM volumes and the restic repository on them — that is a separate, explicitly approved step after an off-box backup ([docs/OS.md § forge, step by step](../../docs/OS.md#forge-step-by-step)).
+**On forge, once, without touching its disk:** plug the stick into a **black USB 2.0 port** (forge's firmware can't boot from its blue USB 3.0 ports), add an entry with `sudo efibootmgr --create-only --disk /dev/sdX --part 1 --label 'bashOS USB' --loader '\EFI\BOOT\BOOTX64.EFI'` (the boot order stays Debian's), then `sudo efibootmgr --bootnext XXXX && sudo reboot`. forge boots bashOS one time and returns to Debian at the next reboot. Writing the image over `sda` replaces forge's Debian, its LVM volumes and the restic repository on them — that is a separate, explicitly approved step after an off-box backup ([docs/OS.md § forge, step by step](../../docs/OS.md#forge-step-by-step)).

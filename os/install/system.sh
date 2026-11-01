@@ -66,6 +66,34 @@ os_console_login() {
   os_autologin_conf "$user" | os_write_file /etc/systemd/system/getty@tty1.service.d/bashos-autologin.conf
 }
 
+# The plain Linux console's orientation (the kiosk turns its own outputs): fbcon counts clockwise
+# quarter turns. The rule runs when a framebuffer appears, after fbcon has taken it over.
+OS_ROTATE_RULE=/etc/udev/rules.d/90-bashos-console-rotate.rules
+os_console_rotate() {
+  local q
+  case ${BASHOS_CONSOLE_ROTATE:-normal} in
+    left) q=3 ;;
+    right) q=1 ;;
+    inverted) q=2 ;;
+    normal | "") q=0 ;;
+    *) os_warn "BASHOS_CONSOLE_ROTATE=$BASHOS_CONSOLE_ROTATE: normal | left | right | inverted"; return 0 ;;
+  esac
+  if ((q == 0)); then
+    [[ -e $(os_path "$OS_ROTATE_RULE") ]] || return 0
+    os_root rm -f "$(os_path "$OS_ROTATE_RULE")"
+    os_dry || os_ok "removed $OS_ROTATE_RULE (BASHOS_CONSOLE_ROTATE=normal)"
+  else
+    os_write_file "$OS_ROTATE_RULE" <<EOF
+# bashOS: turn the Linux console (BASHOS_CONSOLE_ROTATE=$BASHOS_CONSOLE_ROTATE in /etc/bashos/os.conf).
+ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="/bin/sh -c 'echo $q > /sys/class/graphics/fbcon/rotate_all'"
+EOF
+  fi
+  if os_systemd_live && [[ -d /sys/class/graphics/fbcon ]]; then
+    os_root udevadm control --reload
+    os_root udevadm trigger --action=add --subsystem-match=graphics
+  fi
+}
+
 os_linger() {
   local user=$1 marker
   marker=$(os_path "/var/lib/systemd/linger/$user")
@@ -110,5 +138,6 @@ phase_system() {
   fi
   os_console_login "$OS_USER"
   os_linger "$OS_USER"
+  os_console_rotate
   os_harness_firewall
 }

@@ -4,3 +4,6 @@
 cage
 foot foot-terminfo
 fonts-jetbrains-mono
+# turning the monitor (BASHOS_CONSOLE_ROTATE) and serving it over VNC (BASHOS_CONSOLE_VNC)
+wlr-randr
+wayvnc
