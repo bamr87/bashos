@@ -285,6 +285,26 @@ def test_kiosk_turns_the_outputs_and_serves_vnc_on_loopback(env, home, tmp_path)
 
 
 @needs_bash
+@pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="needs /proc")
+def test_what_the_kiosk_starts_never_holds_cages_pipe(env, home, tmp_path):
+    # cage ends only when the last holder of its client pipe exits: a tmux server or wayvnc
+    # started inside the kiosk must not inherit it.
+    shims, calls = _kiosk_shims(tmp_path)
+    _shim(shims, "wayvnc", f'ls /proc/$$/fd >>{calls}.fds\n')
+    (home / ".config/bashos").mkdir(parents=True)
+    (home / ".config/bashos/wayvnc.conf").write_text("enable_auth=true\n")
+    e = dict(env, PATH=f"{shims}:{env['PATH']}", BASHOS_CONSOLE_VNC="yes")
+    script = f'exec 7>{tmp_path}/pipe; exec "{OS}/bin/bashos-console" --kiosk'
+    run("-c", script, env=e)
+    fds = Path(f"{calls}.fds")
+    for _ in range(50):
+        if fds.exists() and fds.read_text().strip():
+            break
+        time.sleep(0.1)
+    assert "7" not in fds.read_text().split()
+
+
+@needs_bash
 def test_kiosk_defaults_turn_nothing_and_a_bad_rotation_is_logged(env, home, tmp_path):
     shims, calls = _kiosk_shims(tmp_path)
     e = dict(env, PATH=f"{shims}:{env['PATH']}")

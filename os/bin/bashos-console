@@ -33,6 +33,20 @@ BASHOS_BIN=/usr/local/bin/bashos
 # The desktop; quitting it leaves a login shell in the window rather than closing it.
 DESKTOP="$BASHOS_BIN; exec ${SHELL:-/bin/bash} -l"
 
+# nofds CMD… — run CMD with every descriptor above stderr closed. cage knows its client is gone
+# only when the last holder of the pipe it hands that client exits: a tmux server or wayvnc
+# started from inside the kiosk would keep it open, and the kiosk would never end (forge did
+# exactly this — foot exited, cage stayed).
+nofds() {
+  local fd
+  for fd in /proc/$BASHPID/fd/*; do
+    fd=${fd##*/}
+    [[ $fd =~ ^[0-9]+$ ]] && ((fd > 2)) || continue
+    eval "exec $fd>&-" 2>/dev/null || true
+  done
+  "$@"
+}
+
 ensure_window() {
   tmux list-windows -t "=$SESSION" -F '#{window_name}' 2>/dev/null | grep -qx bashos && return 0
   # -d: created in the background, so whatever the monitor shows stays shown.
@@ -43,7 +57,7 @@ ensure_session() {
   if tmux has-session -t "=$SESSION" 2>/dev/null; then
     ensure_window
   else
-    tmux new-session -d -s "$SESSION" -n bashos "$DESKTOP"
+    (nofds tmux new-session -d -s "$SESSION" -n bashos "$DESKTOP")
   fi
 }
 
@@ -95,7 +109,7 @@ remote() {
   local conf=$HOME/.config/bashos/wayvnc.conf
   os_has wayvnc || { note "BASHOS_CONSOLE_VNC=yes but no wayvnc"; return 0; }
   [[ -r $conf ]] || { note "BASHOS_CONSOLE_VNC=yes but no $conf (bashos os install --only console)"; return 0; }
-  wayvnc -C "$conf" -L warning 127.0.0.1 "${BASHOS_CONSOLE_VNC_PORT:-5900}" >>"$STATE/wayvnc.log" 2>&1 &
+  (nofds wayvnc -C "$conf" -L warning 127.0.0.1 "${BASHOS_CONSOLE_VNC_PORT:-5900}") >>"$STATE/wayvnc.log" 2>&1 &
 }
 
 kiosk() {
