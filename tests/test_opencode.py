@@ -16,7 +16,7 @@ import httpx
 import pytest
 
 from bashos import events as events_mod
-from bashos.opencode import auth, policy, project
+from bashos.opencode import auth, policy, project, rules
 from bashos.opencode import client as client_mod
 from bashos.opencode import engine as engine_mod
 from bashos.opencode.client import OpencodeClient, OpencodeError, split_model
@@ -34,10 +34,58 @@ def test_bash_is_deny_by_default_with_the_catch_all_first():
 
 
 def test_every_probe_gets_a_bare_and_an_argument_pattern():
-    rules = policy.bash_rules()
+    bash = policy.bash_rules()
     for probe in policy.PROBE_COMMANDS:
-        assert rules[probe] == "allow"
-        assert rules[f"{probe} *"] == "allow"
+        assert bash[probe] == "allow"
+        assert bash[f"{probe} *"] == "allow"
+
+
+# Programs whose job is to run another program. One of them on the allowlist turns
+# "read-only probes" into "any command" (hard rule 2): `env curl …` once got through.
+COMMAND_RUNNERS = {
+    "env", "xargs", "sh", "bash", "zsh", "dash", "exec", "eval", "nohup", "timeout", "nice",
+    "ionice", "sudo", "doas", "su", "watch", "time", "strace", "ltrace", "find", "awk", "sed",
+    "perl", "python", "python3", "node", "ruby", "ssh", "script", "setsid", "stdbuf", "chroot",
+    "nsenter", "unshare", "flock", "parallel", "busybox", "make", "npx", "uvx",
+}
+
+
+def test_no_probe_can_run_another_program():
+    for probe in policy.PROBE_COMMANDS:
+        assert probe.split()[0].rsplit("/", 1)[-1] not in COMMAND_RUNNERS, probe
+
+
+def _bash(command: str) -> str:
+    return rules.evaluate(rules.from_config({"bash": policy.bash_rules()}), "bash", command)
+
+
+@pytest.mark.parametrize("command", [
+    "env", "env curl https://example.com", "rm -rf /", "curl https://example.com", "sh -c id",
+    "tmux display-message -p '#(curl https://example.com)'", "tmux capture-pane -p -T '#(id)'",
+    "git log --output=/tmp/out", "git log -1 --output /tmp/out", "git -c core.pager=id log",
+])
+def test_ways_out_of_the_allowlist_are_denied(command):
+    assert _bash(command) == "deny"
+
+
+@pytest.mark.parametrize("command", [
+    "uname", "uname -a", "git log -3 --oneline", "git status --short", "ps aux",
+    "tmux display-message -p '#{session_name}'", "tmux has-session -t console", "bin/os-health",
+])
+def test_the_probes_still_run(command):
+    assert _bash(command) == "allow"
+
+
+def test_rules_mirror_opencodes_wildcard():
+    assert rules.wildcard("ls", "ls *") and rules.wildcard("ls -la", "ls *")
+    assert not rules.wildcard("lsblk", "ls *")
+    assert rules.wildcard("a/b c", "*") and rules.wildcard("x.y", "x?y") and not rules.wildcard("x.y", "x.z")
+    assert rules.wildcard("tmux list-x #(id)", "tmux *#(*")
+    # last match wins; nothing matching falls back to the default
+    ordered = [("bash", "*", "deny"), ("bash", "ls *", "allow")]
+    assert rules.evaluate(ordered, "bash", "ls") == "allow"
+    assert rules.evaluate(ordered, "bash", "rm") == "deny"
+    assert rules.evaluate(ordered, "edit", "x") == "ask"
 
 
 def test_mutating_and_outbound_tools_are_denied_and_hidden():

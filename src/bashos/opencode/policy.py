@@ -27,16 +27,24 @@ from __future__ import annotations
 
 # Read-only diagnostic probes the agent may run through `bash`. Anything not
 # matching one of these patterns is refused by the engine before it executes.
+# Never a command runner: `env` was here, and `env *` allowed `env curl …` —
+# any command, network included — while bare `env` printed the engine's
+# environment, which carries the Claude credential (opencode/auth.py).
 PROBE_COMMANDS = (
     "uname", "uptime", "df", "du", "ps", "top", "vm_stat", "free",
     "sw_vers", "sysctl", "ls", "which", "whoami", "id", "date",
-    "netstat", "head", "wc", "file", "stat", "env", "git status", "git log",
+    "netstat", "head", "wc", "file", "stat", "git status", "git log",
     # the deterministic health floor (docs/FORGE.md) — read-only by contract
     "bin/os-health", "./bin/os-health",
     # read-only tmux verbs, so /health can inspect a dashboard session;
     # deliberately narrow — never bare "tmux" (that would allow kill-server)
     "tmux list-", "tmux capture-pane", "tmux has-session", "tmux display-message",
 )
+
+# Ways out of an allowlisted verb, refused after the allowlist so they win
+# ("last match wins"): tmux formats run `#(shell command)`, and `git log
+# --output` writes a file wherever the user can.
+BASH_ESCAPES = ("tmux *#(*", "git log *--output*")
 
 # OpenCode tool ids (GET /experimental/tool/ids), sorted into what bashOS
 # permits and what it refuses.
@@ -55,11 +63,13 @@ ALL_TOOLS = ("bash", *READ_TOOLS, *DENIED_TOOLS, "todowrite", "question", "skill
 
 
 def bash_rules() -> dict[str, str]:
-    """Deny-by-default bash patterns: the catch-all first, probes after."""
+    """Deny-by-default bash patterns: the catch-all first, probes after, escapes last."""
     rules: dict[str, str] = {"*": "deny"}
     for probe in PROBE_COMMANDS:
         rules[probe] = "allow"
         rules[f"{probe} *"] = "allow"
+    for escape in BASH_ESCAPES:
+        rules[escape] = "deny"
     return rules
 
 

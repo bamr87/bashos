@@ -66,8 +66,6 @@
           "file *": "allow",
           "stat": "allow",
           "stat *": "allow",
-          "env": "allow",
-          "env *": "allow",
           "git status": "allow",
           "git status *": "allow",
           "git log": "allow",
@@ -83,7 +81,9 @@
           "tmux has-session": "allow",
           "tmux has-session *": "allow",
           "tmux display-message": "allow",
-          "tmux display-message *": "allow"
+          "tmux display-message *": "allow",
+          "tmux *#(*": "deny",
+          "git log *--output*": "deny"
         },
         "read": "allow",
         "glob": "allow",
