@@ -169,8 +169,11 @@ check kiosk bash -s <<'SH'
 for _ in $(seq 1 60); do pgrep -u "$USER" -x wayvnc >/dev/null && break; sleep 2; done
 pgrep -a cage && pgrep -a wayvnc
 export XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0
-wlr-randr | grep -E '^[^ ]|Transform'
-wlr-randr | grep -q 'Transform: 90'
+# Every enabled output turned, not just one.
+wlr-randr | awk '/^[^ \t]/ { if (n) print n, e, t; n = $1; e = ""; t = "" }
+  /^ +Enabled:/ { e = $2 } /^ +Transform:/ { t = $2 }
+  END { if (n) print n, e, t }' | tee /dev/stderr |
+  awk '$2 == "yes" { on++; if ($3 != "90") bad++ } END { exit !(on > 0 && bad == 0) }'
 SH
 check vnc bash -s <<'SH'
 python3 - <<'PY'

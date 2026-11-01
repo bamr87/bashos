@@ -92,14 +92,18 @@ transform() {
   esac
 }
 
+# Every output in one wlr-randr call: each call re-sends the whole layout, so turning outputs one
+# call at a time can put back what the previous call turned (CI's two virtual outputs did).
 rotate() {
-  local t out
+  local t out args=()
   t=$(transform) || { note "BASHOS_CONSOLE_ROTATE=$BASHOS_CONSOLE_ROTATE: normal | left | right | inverted"; return 0; }
   [[ $t != normal ]] || return 0
   os_has wlr-randr || { note "BASHOS_CONSOLE_ROTATE=$BASHOS_CONSOLE_ROTATE but no wlr-randr"; return 0; }
   while read -r out; do
-    wlr-randr --output "$out" --transform "$t" || note "wlr-randr could not turn $out"
+    args+=(--output "$out" --transform "$t")
   done < <(wlr-randr | awk '/^[^ \t]/ { print $1 }')
+  ((${#args[@]})) || return 0
+  wlr-randr "${args[@]}" || note "wlr-randr could not apply: ${args[*]}"
 }
 
 # Remote keyboard and mouse: wayvnc, on loopback whatever its config says (reach it through
