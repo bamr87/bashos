@@ -17,4 +17,5 @@ Add an ADR in the same PR as the change it justifies.
 | ID | Title | Status |
 | --- | --- | --- |
 | 0001 | [Record architecture decisions](0001-record-architecture-decisions.md) | accepted |
-| 0002 | [bashOS the OS is an Omarchy-style layer on Debian 13, imaged with mkosi](0002-bashos-os-debian-mkosi.md) | proposed |
+| 0002 | [bashOS the OS is an Omarchy-style layer on Debian 13, imaged with mkosi](0002-bashos-os-debian-mkosi.md) | superseded by 0003 |
+| 0003 | [bashOS by BASH Consulting is a fork of Omarchy, kept current by an AI-assisted upstream sync](0003-bashos-on-omarchy.md) | proposed |
