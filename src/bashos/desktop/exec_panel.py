@@ -23,6 +23,10 @@ class ShellRunner:
     def __init__(self, app) -> None:
         self._app = app
         self._counter = 0
+        # The outcome of the most recent captured run, recorded as it happens —
+        # independent of when RichLog gets around to rendering it.
+        self.last_exit: int | None = None
+        self.last_output: list[str] = []
 
     async def run_captured(self, command: str) -> None:
         """Run in the user's shell, streaming output into a new window."""
@@ -36,6 +40,8 @@ class ShellRunner:
         )
 
     async def _pump(self, command: str, log: RichLog) -> None:
+        self.last_exit = None
+        self.last_output = []
         proc = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,
@@ -48,9 +54,12 @@ class ShellRunner:
                 line = await proc.stdout.readline()
                 if not line:
                     break
-                log.write(line.decode(errors="replace").rstrip("\n"))
+                text = line.decode(errors="replace").rstrip("\n")
+                self.last_output.append(text)
+                log.write(text)
         finally:
             code = await proc.wait()
+            self.last_exit = code
             log.write(f"[exit {code}]")
 
     def run_attached(self, command: str) -> int:
