@@ -2,7 +2,8 @@
 # shellcheck shell=bash disable=SC2154  # the _os_* colours come from lib.sh, which install.sh sources first
 
 # os_packages [--all] LIST… — the package names those lists ask for, one per line. A line whose
-# `cmd:NAME` guard is already on PATH is skipped, unless --all (an image starts from nothing).
+# `cmd:NAME` guard is already installed (on PATH or in the person's own tool directories,
+# os_user_bins) is skipped, unless --all (an image starts from nothing).
 os_packages() {
   local all=0 list line guard words
   [[ ${1:-} == --all ]] && { all=1; shift; }
@@ -16,7 +17,7 @@ os_packages() {
         guard=${words[-1]#cmd:}
         unset 'words[-1]'
       fi
-      if [[ -n $guard ]] && ((!all)) && os_has "$guard"; then
+      if [[ -n $guard ]] && ((!all)) && os_user_has "$guard"; then
         continue
       fi
       printf '%s\n' "${words[@]}"
