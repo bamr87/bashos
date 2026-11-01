@@ -14,6 +14,7 @@ import re
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -237,6 +238,86 @@ def test_uninstall_removes_what_install_added(env, root, home):
     assert (root / "opt/bashos").is_dir() and (root / "etc/bashos/os.conf").is_file()  # kept without --purge
     run(str(OS / "os.sh"), "uninstall", "--purge", env=env)
     assert not (root / "opt/bashos").exists() and not (root / "etc/bashos").exists()
+
+
+# ---------------------------------------------------------------- the monitor: rotation, VNC
+
+
+def _shim(where: Path, name: str, body: str) -> None:
+    f = where / name
+    f.write_text("#!/bin/sh\n" + body)
+    f.chmod(0o755)
+
+
+def _kiosk_shims(tmp_path: Path) -> tuple[Path, Path]:
+    shims, calls = tmp_path / "shims", tmp_path / "calls"
+    shims.mkdir()
+    # wlr-randr lists one output when asked nothing; every call with arguments is recorded.
+    _shim(shims, "wlr-randr", f"""[ $# -eq 0 ] && printf 'HDMI-A-1 "Dell U2415"\\n  Enabled: yes\\n' && exit 0
+echo "wlr-randr $*" >>{calls}
+""")
+    _shim(shims, "wayvnc", f'echo "wayvnc $*" >>{calls}\n')
+    _shim(shims, "foot", f'echo "foot $*" >>{calls}\n')
+    return shims, calls
+
+
+def _calls(calls: Path, wait_for: str = "") -> list[str]:
+    for _ in range(50):  # wayvnc starts in the background
+        lines = calls.read_text().splitlines() if calls.exists() else []
+        if not wait_for or any(c.startswith(wait_for) for c in lines):
+            return lines
+        time.sleep(0.1)
+    return lines
+
+
+@needs_bash
+def test_kiosk_turns_the_outputs_and_serves_vnc_on_loopback(env, home, tmp_path):
+    shims, calls = _kiosk_shims(tmp_path)
+    (home / ".config/bashos").mkdir(parents=True)
+    (home / ".config/bashos/wayvnc.conf").write_text("enable_auth=true\n")
+    e = dict(env, PATH=f"{shims}:{env['PATH']}", BASHOS_CONSOLE_ROTATE="left", BASHOS_CONSOLE_VNC="yes")
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=e)
+    lines = _calls(calls, "wayvnc")
+    # forge's portrait Dell: `left` is Wayland's 90 (270 turned it upside down).
+    assert "wlr-randr --output HDMI-A-1 --transform 90" in lines
+    assert f"wayvnc -C {home}/.config/bashos/wayvnc.conf -L warning 127.0.0.1 5900" in lines
+    assert any(c.startswith("foot --font=") and c.endswith("/usr/local/bin/bashos-console --attach") for c in lines)
+
+
+@needs_bash
+def test_kiosk_defaults_turn_nothing_and_a_bad_rotation_is_logged(env, home, tmp_path):
+    shims, calls = _kiosk_shims(tmp_path)
+    e = dict(env, PATH=f"{shims}:{env['PATH']}")
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=e)
+    run(str(OS / "bin/bashos-console"), "--kiosk", env=dict(e, BASHOS_CONSOLE_ROTATE="sideways"))
+    lines = _calls(calls)
+    assert [c.split()[0] for c in lines] == ["foot", "foot"]
+    assert "BASHOS_CONSOLE_ROTATE=sideways" in (home / ".local/state/bashos/console.log").read_text()
+
+
+@needs_bash
+def test_the_vnc_account_is_private_generated_once_and_only_when_asked(env, home):
+    conf = home / ".config/bashos/wayvnc.conf"
+    install(env)
+    assert not conf.exists()
+    e = dict(env, BASHOS_CONSOLE_VNC="yes")
+    out = install(e)
+    text = conf.read_text()
+    assert stat.S_IMODE(conf.stat().st_mode) == 0o600
+    assert {"enable_auth=true", "relax_encryption=true", "username=amr"} <= set(text.splitlines())
+    password = re.search(r"^password=([A-Za-z0-9]{20})$", text, re.M)
+    assert password and password.group(1) not in out.stdout + out.stderr  # never printed
+    install(e)
+    assert conf.read_text() == text  # never rewritten
+
+
+@needs_bash
+def test_the_linux_console_rotation_follows_the_setting(env, root):
+    rule = root / "etc/udev/rules.d/90-bashos-console-rotate.rules"
+    install(dict(env, BASHOS_CONSOLE_ROTATE="left"))
+    assert "echo 3 > /sys/class/graphics/fbcon/rotate_all" in rule.read_text()  # fbcon: CCW
+    install(dict(env, BASHOS_CONSOLE_ROTATE="normal"))
+    assert not rule.exists()
 
 
 # ---------------------------------------------------------------- packages

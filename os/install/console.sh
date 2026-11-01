@@ -55,4 +55,34 @@ fi'
 
   # tmux reads bashOS's defaults first, so every line the user wrote below still wins.
   os_block_put "$OS_HOME/.tmux.conf" "source-file -q $BASHOS_OS_PATH/os/config/tmux.conf" top
+
+  [[ ${BASHOS_CONSOLE_VNC:-no} == yes ]] && os_vnc_conf
+  return 0
+}
+
+# The kiosk's VNC account (BASHOS_CONSOLE_VNC=yes): mode 0600, created once with a generated
+# password, never rewritten and never printed. bashos-console binds wayvnc to loopback.
+os_vnc_conf() {
+  local conf="$OS_HOME/.config/bashos/wayvnc.conf" pw
+  if [[ -f $conf ]]; then
+    os_log "${_os_d}kept${_os_0} ${conf/#$OS_HOME/\~}"
+    return 0
+  fi
+  if os_dry; then
+    os_run "create ${conf/#$OS_HOME/\~} (0600, a generated password)"
+    return 0
+  fi
+  pw=$(head -c 30 /dev/urandom | base64 | tr -d '/+=\n')
+  mkdir -p "$(dirname "$conf")"
+  (umask 077 && cat >"$conf" <<EOF
+# wayvnc for the kiosk (BASHOS_CONSOLE_VNC=yes) — mode 0600, never committed. bashos-console
+# binds it to 127.0.0.1, so it is reached through ssh, and the tunnel is the encryption: Apple
+# Diffie-Hellman (relax_encryption) is the password scheme macOS Screen Sharing speaks.
+enable_auth=true
+relax_encryption=true
+username=$OS_USER
+password=${pw:0:20}
+EOF
+  )
+  os_ok "created ${conf/#$OS_HOME/\~} (0600) — the VNC password is in it"
 }

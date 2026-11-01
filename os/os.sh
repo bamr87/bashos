@@ -87,6 +87,17 @@ cmd_status() {
     verdict WARN console "no tmux session '$session' (the monitor attaches it at login)"
   fi
 
+  if [[ ${BASHOS_CONSOLE_VNC:-no} == yes ]]; then
+    local vport=${BASHOS_CONSOLE_VNC_PORT:-5900}
+    if pgrep -u "$(id -u)" -x wayvnc >/dev/null 2>&1; then
+      verdict " OK " remote "wayvnc on 127.0.0.1:$vport — ssh -L 5901:127.0.0.1:$vport $(hostname -s 2>/dev/null), then vnc://localhost:5901"
+    elif pgrep -x cage >/dev/null 2>&1; then
+      verdict WARN remote "the kiosk runs without wayvnc — ~/.local/state/bashos/wayvnc.log"
+    else
+      verdict WARN remote "no kiosk on the monitor, so no VNC (BASHOS_CONSOLE=auto|kiosk; ssh joins the console)"
+    fi
+  fi
+
   if [[ ${BASHOS_HARNESS:-native} == off ]]; then
     verdict " OK " harness "off (BASHOS_HARNESS=off)"
   else
@@ -232,7 +243,8 @@ cmd_uninstall() {
   done
   for f in "$(os_path /usr/local/lib/systemd)"/{system,user}/bashos-* \
     "$(os_path /etc/systemd/system/getty@tty1.service.d/bashos-autologin.conf)" \
-    "$(os_path /etc/systemd/logind.conf.d/bashos-no-sleep.conf)"; do
+    "$(os_path /etc/systemd/logind.conf.d/bashos-no-sleep.conf)" \
+    "$(os_path /etc/udev/rules.d/90-bashos-console-rotate.rules)"; do
     [[ -e $f ]] && os_root rm -f "$f"
   done
   os_systemd_live && os_root systemctl daemon-reload

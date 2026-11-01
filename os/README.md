@@ -29,7 +29,7 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 | `packages/*.list` | Debian package names per concern; a trailing `cmd:NAME` skips the line when `NAME` is already installed — on PATH or in the person's own tool directories (fnm's Node, `~/.local/bin`; `os_user_bins`) |
 | `config/os.conf` | The shipped defaults, copied once to `/etc/bashos/os.conf` |
 | `config/tmux.conf` | tmux defaults, sourced first from `~/.tmux.conf` |
-| `bin/bashos-console` | tty1 → kiosk or Linux console → the shared tmux session; `--attach` (ssh), `--heal` (the timer) |
+| `bin/bashos-console` | tty1 → kiosk or Linux console → the shared tmux session; `--attach` (ssh), `--heal` (the timer), `--kiosk` (inside cage: turn the outputs per `BASHOS_CONSOLE_ROTATE`, start `wayvnc` on loopback per `BASHOS_CONSOLE_VNC`, then `foot`) |
 | `bin/bashos-harness` | Runs the hub's Harness Console (`native` / `compose` / `off`); `--print` shows the command |
 | `bin/bashos-provision` | An image's first boot: the user, hostname, keys and user phases, from a `BASHOS-SEED` drive or tty1 |
 | `systemd/` | `bashos-provision.service` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
