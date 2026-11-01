@@ -57,9 +57,9 @@ if ! os_loopback "$host"; then
 fi
 
 # systemd hands a unit a bare PATH: find the user's Node (fnm's default alias) and ~/.local/bin.
-for d in "$HOME/.local/share/fnm/aliases/default/bin" "$HOME/.local/bin" /usr/local/bin; do
+while IFS= read -r d; do
   [[ -d $d && :$PATH: != *:$d:* ]] && PATH="$d:$PATH"
-done
+done < <(os_user_bins "$HOME"; echo /usr/local/bin)
 export PATH
 
 if [[ $mode == native ]]; then

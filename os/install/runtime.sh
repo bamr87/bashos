@@ -83,7 +83,7 @@ os_engines() {
   local pair cmd pkg npm=/usr/bin/npm
   for pair in "opencode:opencode-ai" "claude:@anthropic-ai/claude-code"; do
     cmd=${pair%%:*} pkg=${pair#*:}
-    if ! os_image && { os_has "$cmd" || [[ -x $OS_HOME/.opencode/bin/$cmd || -x $OS_HOME/.local/bin/$cmd ]]; }; then
+    if ! os_image && os_user_has "$cmd" "$OS_HOME"; then
       os_ok "$cmd present"
       continue
     fi

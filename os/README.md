@@ -26,7 +26,7 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 | `install.sh` | The phase runner; `--dry-run`, `--image`, `--user-only`, `--system-only`, `--only`/`--skip PHASE`, `--root DIR` |
 | `install/*.sh` | One phase each: `preflight`, `packages`, `runtime`, `system` (root) · `console`, `harness`, `finish` (the user) |
 | `lib.sh` | Every helper that changes the machine — and the three switches they all obey: `BASHOS_OS_DRY_RUN`, `BASHOS_OS_ROOT` (a fake root), `BASHOS_OS_IMAGE` |
-| `packages/*.list` | Debian package names per concern; a trailing `cmd:NAME` skips the line when `NAME` is already on PATH |
+| `packages/*.list` | Debian package names per concern; a trailing `cmd:NAME` skips the line when `NAME` is already installed — on PATH or in the person's own tool directories (fnm's Node, `~/.local/bin`; `os_user_bins`) |
 | `config/os.conf` | The shipped defaults, copied once to `/etc/bashos/os.conf` |
 | `config/tmux.conf` | tmux defaults, sourced first from `~/.tmux.conf` |
 | `bin/bashos-console` | tty1 → kiosk or Linux console → the shared tmux session; `--attach` (ssh), `--heal` (the timer) |

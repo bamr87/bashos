@@ -44,6 +44,18 @@ os_dry() { [[ $BASHOS_OS_DRY_RUN == 1 ]]; }
 os_fake_root() { [[ -n $BASHOS_OS_ROOT ]]; }
 os_image() { [[ $BASHOS_OS_IMAGE == 1 ]]; }
 os_has() { command -v "$1" >/dev/null 2>&1; }
+# os_user_bins HOME — where a person's own tools live, off the system PATH: fnm's default Node,
+# ~/.local/bin (claude), ~/.opencode/bin, Volta. Non-interactive shells and systemd units miss them.
+os_user_bins() {
+  printf '%s\n' "$1/.local/share/fnm/aliases/default/bin" "$1/.local/bin" "$1/.opencode/bin" "$1/.volta/bin"
+}
+# os_user_has CMD [HOME] — CMD is on PATH or in one of HOME's tool directories.
+os_user_has() {
+  local d
+  os_has "$1" && return 0
+  while IFS= read -r d; do [[ -x $d/$1 ]] && return 0; done < <(os_user_bins "${2:-${OS_HOME:-$HOME}}")
+  return 1
+}
 os_is_root() { [[ ${EUID:-$(id -u)} -eq 0 ]]; }
 
 # os_path /etc/x — a system path, under the fake root when there is one.

@@ -261,6 +261,17 @@ def test_package_guards_skip_what_is_already_provided(env, tmp_path):
     assert not any(p.startswith(("cmd:", "#")) for p in base)
 
 
+@needs_bash
+def test_package_guard_sees_a_node_outside_path(env, home):
+    # forge: Node comes from fnm, which a non-interactive ssh shell never puts on PATH.
+    fnm = home / ".local/share/fnm/aliases/default/bin"
+    fnm.mkdir(parents=True)
+    (fnm / "node").write_text("#!/bin/sh\n")
+    (fnm / "node").chmod(0o755)
+    assert "nodejs" not in _packages(env, "base")
+    assert {"nodejs", "npm"} <= set(_packages(env, "--all", "base"))  # an image still gets them
+
+
 def test_package_lists_are_plain_debian_names():
     for lst in (OS / "packages").glob("*.list"):
         for line in lst.read_text().splitlines():
