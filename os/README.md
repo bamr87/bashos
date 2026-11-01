@@ -25,6 +25,7 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 | `os.sh` | The dispatch table: `install`, `update`, `migrate`, `status`, `harness`, `console`, `heal`, `uninstall`, `image`, `version` |
 | `install.sh` | The phase runner; `--dry-run`, `--image`, `--user-only`, `--system-only`, `--only`/`--skip PHASE`, `--root DIR` |
 | `install/*.sh` | One phase each: `preflight`, `packages`, `runtime`, `system` (root) · `console`, `harness`, `finish` (the user) |
+| `install/engine.sh` | OpenCode as a managed dependency: npm's latest release, fetched from the registry and sha512-checked, verified with `bashos opencode verify`, promoted atomically, updated daily (`bashos os engine …`, `bashos-engine-update.timer`) |
 | `lib.sh` | Every helper that changes the machine — and the three switches they all obey: `BASHOS_OS_DRY_RUN`, `BASHOS_OS_ROOT` (a fake root), `BASHOS_OS_IMAGE` |
 | `packages/*.list` | Debian package names per concern; a trailing `cmd:NAME` skips the line when `NAME` is already installed — on PATH or in the person's own tool directories (fnm's Node, `~/.local/bin`; `os_user_bins`) |
 | `config/os.conf` | The shipped defaults, copied once to `/etc/bashos/os.conf` |
@@ -32,7 +33,7 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 | `bin/bashos-console` | tty1 → kiosk or Linux console → the shared tmux session; `--attach` (ssh), `--heal` (the timer), `--kiosk` (inside cage: turn the outputs per `BASHOS_CONSOLE_ROTATE`, start `wayvnc` on loopback per `BASHOS_CONSOLE_VNC`, then `foot`) |
 | `bin/bashos-harness` | Runs the hub's Harness Console (`native` / `compose` / `off`); `--print` shows the command |
 | `bin/bashos-provision` | An image's first boot: the user, hostname, keys and user phases, from a `BASHOS-SEED` drive or tty1 |
-| `systemd/` | `bashos-provision.service` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
+| `systemd/` | `bashos-provision.service`, `bashos-engine-update.{service,timer}` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
 | `migrations/` | One-shot `<timestamp>.sh` scripts for existing installs ([README](migrations/README.md)) |
 | `image/` | The mkosi image definition, its build wrapper and boot test ([README](image/README.md)) |
 | `tests/` | The offline suite: fake root, throwaway `$HOME`, no sudo/apt/systemctl/network |
