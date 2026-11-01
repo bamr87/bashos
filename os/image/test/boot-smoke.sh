@@ -162,6 +162,15 @@ check layer 'bashos-os version && test -x /opt/bashos/.venv/bin/bashos && comman
 check route 'cd /tmp && bashos run -n "/sh list the five largest files here"'
 # Quoted targets: checks run in the user's login shell, and zsh expands a bare =word.
 check console 'tmux has-session -t "=console" && tmux list-windows -t "=console" -F "#{window_name}" | grep -qx bashos'
+# The engine is bashOS's own (os/install/engine.sh): the runtime runs the managed copy, the daily
+# update is on, and that copy enforces the policy — the image installed it unverified, so this is
+# its contract check.
+check engine bash -s <<'SH'
+bashos-os engine status
+grep -qx /usr/local/lib/bashos/opencode/current/bin/opencode /etc/bashos/opencode
+systemctl is-enabled bashos-engine-update.timer
+cd ~ && bashos opencode verify
+SH
 # avahi must announce the provisioned name, not the image's (forge answered as bashos.local).
 check mdns 'getent hosts "$(hostname).local"'
 # The kiosk on the virtual GPU (the only one: -vga none, like forge's single card), turned as the

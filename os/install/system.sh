@@ -94,6 +94,15 @@ EOF
   fi
 }
 
+# The daily engine update (BASHOS_ENGINE_UPDATE): OpenCode's latest release, verified first.
+os_engine_timer() {
+  if [[ ${BASHOS_ENGINE_UPDATE:-daily} == off ]]; then
+    os_systemctl disable --now bashos-engine-update.timer 2>/dev/null || true
+  else
+    os_systemctl enable --now bashos-engine-update.timer
+  fi
+}
+
 os_linger() {
   local user=$1 marker
   marker=$(os_path "/var/lib/systemd/linger/$user")
@@ -129,6 +138,7 @@ phase_system() {
   fi
   os_never_sleep
   os_units
+  os_engine_timer
   if os_image; then
     # The user does not exist yet: bashos-provision creates them at first boot, then writes
     # their autologin and linger. Every user's manager starts the harness and the heal timer.

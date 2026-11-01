@@ -34,6 +34,28 @@ STARTUP_TIMEOUT = 60.0
 # opencode's server reads these; the username has a default we must match
 SERVER_USER = "opencode"
 
+# The OpenCode major whose API bashOS speaks. OpenCode 2 moved the server API under /api and
+# changed its flags; until the port (bamr87/bashos#71) lands, a 2.x engine is named, not crashed on.
+SUPPORTED_MAJOR = 1
+VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+
+
+def unsupported_hint(version: str, executable: str) -> str:
+    match = VERSION_RE.search(version)
+    version = match.group(0) if match else version
+    return (
+        f"opencode {version} ({executable}) speaks a newer API than bashOS: OpenCode 2 moved the\n"
+        f"server API under /api. bashOS runs on OpenCode {SUPPORTED_MAJOR} until the port lands (bamr87/bashos#71).\n"
+        "  on a bashOS machine: bashos os engine update   (the managed engine: the newest verified OpenCode 1)\n"
+        "  elsewhere:           npm i -g opencode-ai@1, then point bashOS at it with BASHOS_OPENCODE_BIN"
+    )
+
+
+def major_of(version: str) -> int | None:
+    match = VERSION_RE.search(version)
+    return int(match.group(1)) if match else None
+
+
 INSTALL_HINT = (
     "opencode is not installed — bashOS runs on the OpenCode engine.\n"
     "  install: npm i -g opencode-ai   (or: curl -fsSL https://opencode.ai/install | bash)\n"
@@ -73,8 +95,52 @@ class EngineHandle:
                 self.process.kill()
 
 
+# Where the OS layer records the engine it manages (os/install/engine.sh): a root-owned copy
+# kept on OpenCode's latest release, verified against policy.py before it is promoted.
+MANAGED_RECORD = Path("/etc/bashos/opencode")
+
+
+def managed_binary(record: Path | None = None) -> str | None:
+    """The OS layer's managed engine, when this is a bashOS machine and it is installed."""
+    try:
+        path = (record or MANAGED_RECORD).read_text().strip()
+    except OSError:
+        return None
+    return path if path and os.access(path, os.X_OK) else None
+
+
 def find_binary(name: str = DEFAULT_BINARY) -> str | None:
+    """The engine to run: BASHOS_OPENCODE_BIN, then the managed engine, then PATH.
+
+    The managed copy wins over PATH on a bashOS machine, so a stale or user-writable
+    `opencode` earlier on PATH never becomes the engine that enforces the policy.
+    """
+    if pinned := os.environ.get("BASHOS_OPENCODE_BIN", "").strip():
+        return pinned if os.access(pinned, os.X_OK) else None
+    if name == DEFAULT_BINARY and (managed := managed_binary()):
+        return managed
     return shutil.which(name)
+
+
+def binary_source(path: str) -> str:
+    """Where `find_binary` found `path`, for the engine status rows."""
+    if os.environ.get("BASHOS_OPENCODE_BIN", "").strip():
+        return "BASHOS_OPENCODE_BIN"
+    if path == managed_binary():
+        return "managed by bashOS"
+    return "PATH"
+
+
+async def _binary_version(executable: str) -> str:
+    """`opencode --version`, or "" when it cannot say (spawn then tries anyway)."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            executable, "--version", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except (OSError, TimeoutError):
+        return ""
+    return out.decode(errors="replace").strip()
 
 
 def configured_url() -> str | None:
@@ -126,6 +192,9 @@ async def spawn(
     executable = find_binary(binary)
     if executable is None:
         raise OpencodeError(INSTALL_HINT)
+    version = await _binary_version(executable)
+    if (major := major_of(version)) is not None and major != SUPPORTED_MAJOR:
+        raise OpencodeError(unsupported_hint(version, executable))
 
     auth = (SERVER_USER, secrets.token_urlsafe(32))
     env = {

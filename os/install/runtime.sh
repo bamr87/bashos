@@ -1,6 +1,8 @@
 # os/install/runtime.sh — the layer at $BASHOS_OS_PATH, its .venv, the engine CLIs, and the
 # commands on /usr/local/bin (absolute paths: tmux panes and systemd units get a bare PATH).
 # shellcheck shell=bash disable=SC2154  # the _os_* colours come from lib.sh, which install.sh sources first
+# shellcheck source=engine.sh
+source "$OS_DIR/install/engine.sh"
 
 # The layer is root-owned on purpose: the platform is not writable by the user's processes
 # (or the agents they run). `bashos os update` changes it, through sudo.
@@ -77,27 +79,25 @@ os_venv() {
   os_dry || os_ok "$venv (bashos $("$venv/bin/python" -c 'import bashos; print(bashos.__version__)'))"
 }
 
-# The engine and the credential source: kept if the user already has them on PATH (forge
-# installed opencode under ~/.opencode), else installed system-wide from Debian's npm.
+# The engine is bashOS's to keep current (engine.sh). The credential source is kept if the user
+# already has it, else installed system-wide from Debian's npm.
 os_engines() {
-  local pair cmd pkg npm=/usr/bin/npm
-  for pair in "opencode:opencode-ai" "claude:@anthropic-ai/claude-code"; do
-    cmd=${pair%%:*} pkg=${pair#*:}
-    if ! os_image && os_user_has "$cmd" "$OS_HOME"; then
-      os_ok "$cmd present"
-      continue
-    fi
-    if os_fake_root; then
-      os_log "${_os_d}skip (fake root):${_os_0} npm install -g --prefix /usr/local $pkg"
-      continue
-    fi
-    if [[ ! -x $npm ]] && ! os_dry; then
-      os_warn "no system npm ($npm) — install $cmd yourself: npm i -g $pkg"
-      continue
-    fi
-    os_root "$npm" install -g --prefix /usr/local --no-fund --no-audit --loglevel=error "$pkg"
-    os_dry || os_ok "$cmd installed (/usr/local/bin/$cmd)"
-  done
+  local npm=/usr/bin/npm
+  os_engine_update
+  if ! os_image && os_user_has claude "$OS_HOME"; then
+    os_ok "claude present"
+    return 0
+  fi
+  if os_fake_root; then
+    os_log "${_os_d}skip (fake root):${_os_0} npm install -g --prefix /usr/local @anthropic-ai/claude-code"
+    return 0
+  fi
+  if [[ ! -x $npm ]] && ! os_dry; then
+    os_warn "no system npm ($npm) — install claude yourself: npm i -g @anthropic-ai/claude-code"
+    return 0
+  fi
+  os_root "$npm" install -g --prefix /usr/local --no-fund --no-audit --loglevel=error @anthropic-ai/claude-code
+  os_dry || os_ok "claude installed (/usr/local/bin/claude)"
 }
 
 os_commands() {

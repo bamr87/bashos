@@ -13,6 +13,8 @@ OS_SRC="$(cd "$(dirname "$_src")/.." && pwd)"
 unset _src _dir
 # shellcheck source=lib.sh
 source "$OS_SRC/os/lib.sh"
+# shellcheck source=install/engine.sh
+source "$OS_DIR/install/engine.sh"
 
 usage() {
   cat <<'EOF'
@@ -22,6 +24,8 @@ usage: bashos os <command>
   update [-n] [--system]  pull the layer, re-apply it, run pending migrations (--system: apt too)
   migrate [--pending]     run pending migrations (--pending: list them; exit 1 when none)
   status                  what is running, as [ OK ]/[WARN]/[CRIT] verdicts (exit = worst)
+  engine [verb]           status | update | verify | latest | fetch VERSION DIR — OpenCode, kept
+                          on npm's latest release once it passes the policy contract
   harness <verb>          start | stop | restart | status | logs | url
   console                 attach the shared tmux console (what tty1 shows)
   heal                    add a missing bashos window to the console (the timer's job)
@@ -57,11 +61,7 @@ cmd_status() {
   else
     verdict CRIT runtime "no working $BASHOS_OS_PATH/.venv"
   fi
-  if os_has opencode || [[ -x $HOME/.opencode/bin/opencode ]]; then
-    verdict " OK " engine "opencode $(opencode --version 2>/dev/null || "$HOME/.opencode/bin/opencode" --version 2>/dev/null | head -1)"
-  else
-    verdict CRIT engine "no opencode on PATH (npm i -g opencode-ai)"
-  fi
+  engine_verdict
   if [[ -n ${CLAUDE_CODE_OAUTH_TOKEN:-} ]]; then
     verdict " OK " auth "CLAUDE_CODE_OAUTH_TOKEN"
   elif [[ -f $HOME/.claude/.credentials.json ]]; then
@@ -241,6 +241,8 @@ cmd_uninstall() {
     /usr/local/bin/bashos-harness /usr/local/sbin/bashos-provision; do
     [[ -L $(os_path "$l") && $(readlink "$(os_path "$l")") == "$BASHOS_OS_PATH"/* ]] && os_root rm -f "$(os_path "$l")"
   done
+  l=/usr/local/bin/opencode
+  [[ -L $(os_path "$l") && $(readlink "$(os_path "$l")") == "$OS_ENGINE_BIN" ]] && os_root rm -f "$(os_path "$l")"
   for f in "$(os_path /usr/local/lib/systemd)"/{system,user}/bashos-* \
     "$(os_path /etc/systemd/system/getty@tty1.service.d/bashos-autologin.conf)" \
     "$(os_path /etc/systemd/logind.conf.d/bashos-no-sleep.conf)" \
@@ -249,11 +251,65 @@ cmd_uninstall() {
   done
   os_systemd_live && os_root systemctl daemon-reload
   if ((purge)); then
-    os_root rm -rf "$(os_path "$BASHOS_OS_PATH")" "$(os_path /etc/bashos)"
+    os_root rm -rf "$(os_path "$BASHOS_OS_PATH")" "$(os_path /etc/bashos)" "$(os_path "$OS_ENGINE_HOME")" \
+      "$(os_path "$OS_ENGINE_STATE")"
   fi
-  os_log "kept: the hub checkout, linger, masked sleep targets$( ((purge)) || printf ', %s and /etc/bashos (--purge removes them)' "$BASHOS_OS_PATH")"
+  os_log "kept: the hub checkout, linger, masked sleep targets$( ((purge)) || printf ', %s, /etc/bashos and the engine in %s (--purge removes them)' "$BASHOS_OS_PATH" "$OS_ENGINE_HOME")"
   os_dry && printf '\n%sdry run: nothing was changed%s\n' "$_os_b" "$_os_0"
   return 0
+}
+
+# ---------------------------------------------------------------------------- engine
+
+engine_field() { sed -n "s/^$1=//p" "$OS_ENGINE_STATE" 2>/dev/null | head -1; }
+
+engine_verdict() {
+  local current verdict version detail checked age
+  current=$(os_engine_current)
+  if [[ -z $current ]]; then
+    if os_has opencode; then
+      verdict WARN engine "opencode $(opencode --version 2>/dev/null | head -1) from PATH, not managed — bashos os engine update"
+    else
+      verdict CRIT engine "no engine — bashos os engine update"
+    fi
+    return 0
+  fi
+  verdict=$(engine_field verdict) version=$(engine_field version) detail=$(engine_field detail)
+  checked=$(engine_field checked)
+  age=$((($(date +%s) - $(date -d "${checked:-@0}" +%s 2>/dev/null || echo 0)) / 86400))
+  if [[ -z $checked ]]; then
+    verdict WARN engine "opencode $current (managed) · never checked — bashos os engine update"
+  elif ((age > 3)); then
+    verdict WARN engine "opencode $current (managed) · last checked $age days ago (bashos-engine-update.timer)"
+  elif [[ $verdict == ok ]]; then
+    verdict " OK " engine "opencode $current (managed · $detail · checked ${checked%%T*})"
+  elif [[ $verdict == rejected ]]; then
+    verdict WARN engine "opencode $current (managed) · $version $detail"
+  else
+    verdict WARN engine "opencode $current (managed) · last check: $detail (${checked%%T*})"
+  fi
+}
+
+cmd_engine() {
+  os_conf_load
+  case ${1:-status} in
+    status)
+      printf 'engine     %s\n' "$(os_engine_current || true)"
+      printf 'binary     %s\n' "$OS_ENGINE_BIN"
+      printf 'package    %s\n' "$(cat "$OS_ENGINE_HOME/current/PACKAGE" 2>/dev/null || os_engine_package)"
+      printf 'record     %s → %s\n' "$OS_ENGINE_RECORD" "$(cat "$OS_ENGINE_RECORD" 2>/dev/null || echo none)"
+      printf 'kept       %s\n' "$(cd "$OS_ENGINE_HOME" 2>/dev/null && ls -d [0-9]* 2>/dev/null | paste -sd' ' - || true)"
+      [[ -r $OS_ENGINE_STATE ]] && sed 's/^/last check /' "$OS_ENGINE_STATE"
+      if os_has opencode && [[ $(command -v opencode) != /usr/local/bin/opencode ]]; then
+        printf 'on PATH    %s (%s) — not the engine bashOS runs\n' "$(command -v opencode)" "$(opencode --version 2>/dev/null | head -1)"
+      fi
+      ;;
+    update) os_step "engine"; os_engine_update ;;
+    verify) os_engine_verify "$OS_ENGINE_BIN" ;;
+    latest) os_engine_latest ;;
+    fetch) shift; os_engine_fetch "${1:?usage: bashos os engine fetch VERSION DIR}" "${2:?DIR}" ;;
+    *) os_die "usage: bashos os engine [status|update|verify|latest|fetch VERSION DIR]" ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------- dispatch
@@ -266,6 +322,7 @@ case $cmd in
   migrate) cmd_migrate "$@" ;;
   status) cmd_status ;;
   harness) cmd_harness "$@" ;;
+  engine) cmd_engine "$@" ;;
   console) exec "$OS_DIR/bin/bashos-console" --attach ;;
   heal) exec "$OS_DIR/bin/bashos-console" --heal ;;
   uninstall) cmd_uninstall "$@" ;;

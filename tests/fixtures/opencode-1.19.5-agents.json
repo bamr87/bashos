@@ -1,0 +1,537 @@
+[
+ {
+  "name": "bashos",
+  "permission": [
+   {
+    "permission": "*",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "doom_loop",
+    "pattern": "*",
+    "action": "ask"
+   },
+   {
+    "permission": "external_directory",
+    "pattern": "*",
+    "action": "ask"
+   },
+   {
+    "permission": "question",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "plan_enter",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "plan_exit",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "read",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env",
+    "action": "ask"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env.*",
+    "action": "ask"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env.example",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "bash",
+    "pattern": "uname",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "uname *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "uptime",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "uptime *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "df",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "df *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "du",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "du *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "ps",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "ps *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "top",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "top *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "vm_stat",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "vm_stat *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "free",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "free *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "sw_vers",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "sw_vers *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "sysctl",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "sysctl *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "ls",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "ls *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "which",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "which *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "whoami",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "whoami *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "id",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "id *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "date",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "date *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "netstat",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "netstat *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "head",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "head *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "wc",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "wc *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "file",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "file *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "stat",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "stat *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "git status",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "git status *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "git log",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "git log *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "bin/os-health",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "bin/os-health *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "./bin/os-health",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "./bin/os-health *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux list-",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux list- *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux capture-pane",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux capture-pane *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux has-session",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux has-session *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux display-message",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux display-message *",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "tmux *#(*",
+    "action": "deny"
+   },
+   {
+    "permission": "bash",
+    "pattern": "git log *--output*",
+    "action": "deny"
+   },
+   {
+    "permission": "read",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "glob",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "grep",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "list",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "edit",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "apply_patch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "webfetch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "websearch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "task",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "write",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "external_directory",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "question",
+    "pattern": "*",
+    "action": "deny"
+   }
+  ]
+ },
+ {
+  "name": "bashos-sealed",
+  "permission": [
+   {
+    "permission": "*",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "doom_loop",
+    "pattern": "*",
+    "action": "ask"
+   },
+   {
+    "permission": "external_directory",
+    "pattern": "*",
+    "action": "ask"
+   },
+   {
+    "permission": "question",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "plan_enter",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "plan_exit",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "read",
+    "pattern": "*",
+    "action": "allow"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env",
+    "action": "ask"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env.*",
+    "action": "ask"
+   },
+   {
+    "permission": "read",
+    "pattern": "*.env.example",
+    "action": "allow"
+   },
+   {
+    "permission": "bash",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "read",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "glob",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "grep",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "list",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "edit",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "apply_patch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "webfetch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "websearch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "task",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "todowrite",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "question",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "skill",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "*",
+    "pattern": "*",
+    "action": "deny"
+   }
+  ]
+ }
+]

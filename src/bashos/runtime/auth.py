@@ -40,8 +40,11 @@ def _engine_check() -> Check:
     if url := server.configured_url():
         return Check("engine", True, f"pinned to {url} (BASHOS_OPENCODE_URL)")
     if binary := server.find_binary():
-        return Check("engine", True, f"opencode {_version_of(binary, '--version')}")
-    return Check("engine", False, "opencode not found — npm i -g opencode-ai")
+        version = _version_of(binary, "--version")
+        if (major := server.major_of(version)) is not None and major != server.SUPPORTED_MAJOR:
+            return Check("engine", False, server.unsupported_hint(version, binary))
+        return Check("engine", True, f"opencode {version} ({server.binary_source(binary)}: {binary})")
+    return Check("engine", False, "opencode not found — npm i -g opencode-ai (or, on a bashOS machine: bashos os engine update)")
 
 
 def _credential_check() -> Check:

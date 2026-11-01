@@ -1,0 +1,60 @@
+name: engine canary
+
+# OpenCode is the engine every bashOS command runs on, and bashOS machines follow its latest
+# release. Each day this fetches npm's latest OpenCode exactly the way a bashOS machine does
+# (os/install/engine.sh: the platform binary from the registry, sha512 checked) and runs the
+# engine contract (`bashos opencode verify`) against it. A release that reads bashOS's policy
+# differently — or a new major bashOS does not speak yet (bamr87/bashos#71) — turns this red the
+# day it ships, while every machine's own gate keeps it on the last release that passed.
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/bashos/opencode/**"
+      - "os/install/engine.sh"
+      - ".github/workflows/engine-canary.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  latest:
+    name: npm latest OpenCode enforces the policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: install bashOS
+        run: pip install -e .
+      - name: fetch npm's latest OpenCode, as a bashOS machine does
+        id: fetch
+        run: |
+          version=$(os/os.sh engine latest)
+          echo "npm latest: opencode-ai $version"
+          os/os.sh engine fetch "$version" "$RUNNER_TEMP/engine"
+          cat "$RUNNER_TEMP/engine/PACKAGE"
+          "$RUNNER_TEMP/engine/bin/opencode" --version
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: the engine contract (bashos opencode verify)
+        run: bashos opencode verify --binary "$RUNNER_TEMP/engine/bin/opencode"
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "### engine canary: opencode ${{ steps.fetch.outputs.version }}"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "npm's latest OpenCode passes the engine contract: bashOS machines will promote it."
+            else
+              echo "npm's latest OpenCode does **not** pass the engine contract. bashOS machines keep the last release that passed; see the log, and bamr87/bashos#71 for OpenCode 2."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
