@@ -92,8 +92,9 @@ transform() {
   esac
 }
 
-# Every output in one wlr-randr call: each call re-sends the whole layout, so turning outputs one
-# call at a time can put back what the previous call turned (CI's two virtual outputs did).
+# Every output in one wlr-randr call, as one configuration. cage commits each output on its own,
+# so one that cannot turn (CI's VM once had a second GPU whose output could not) leaves the
+# others turned; the failure lands in console.log.
 rotate() {
   local t out args=()
   t=$(transform) || { note "BASHOS_CONSOLE_ROTATE=$BASHOS_CONSOLE_ROTATE: normal | left | right | inverted"; return 0; }

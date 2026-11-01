@@ -278,8 +278,8 @@ def test_kiosk_turns_the_outputs_and_serves_vnc_on_loopback(env, home, tmp_path)
     e = dict(env, PATH=f"{shims}:{env['PATH']}", BASHOS_CONSOLE_ROTATE="left", BASHOS_CONSOLE_VNC="yes")
     run(str(OS / "bin/bashos-console"), "--kiosk", env=e)
     lines = _calls(calls, "wayvnc")
-    # forge's portrait Dell: `left` is Wayland's 90 (270 turned it upside down). Every output in
-    # one call, so a later call cannot put an earlier output back.
+    # forge's portrait Dell: `left` is Wayland's 90 (270 turned it upside down). Every output
+    # goes in one call, as one configuration.
     assert "wlr-randr --output HDMI-A-1 --transform 90 --output DP-1 --transform 90" in lines
     assert f"wayvnc -C {home}/.config/bashos/wayvnc.conf -L warning 127.0.0.1 5900" in lines
     assert any(c.startswith("foot --font=") and c.endswith("/usr/local/bin/bashos-console --attach") for c in lines)

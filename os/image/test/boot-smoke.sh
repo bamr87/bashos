@@ -116,7 +116,7 @@ os_step "boot $(basename "$image") · $arch · ${accel%%,*} · ${memory} MB · d
   -drive "if=virtio,file=$work/seed.img,format=raw,readonly=on" \
   -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$port-:22" -device virtio-net-pci,netdev=n0,romfile= \
   -netdev user,id=n1 -device virtio-net-pci,netdev=n1,romfile= \
-  -device virtio-gpu-pci \
+  -vga none -device virtio-gpu-pci \
   -monitor "tcp:127.0.0.1:$mon,server,nowait" \
   -smbios "type=11,value=io.systemd.stub.kernel-cmdline-extra=console=$serial" \
   -serial "file:$OUT/serial.log" &
@@ -164,7 +164,8 @@ check route 'cd /tmp && bashos run -n "/sh list the five largest files here"'
 check console 'tmux has-session -t "=console" && tmux list-windows -t "=console" -F "#{window_name}" | grep -qx bashos'
 # avahi must announce the provisioned name, not the image's (forge answered as bashos.local).
 check mdns 'getent hosts "$(hostname).local"'
-# The kiosk on the virtual GPU, turned as the seed says (left = Wayland's 90) and served over VNC.
+# The kiosk on the virtual GPU (the only one: -vga none, like forge's single card), turned as the
+# seed says (left = Wayland's 90) on every enabled output, and served over VNC.
 check kiosk bash -s <<'SH'
 for _ in $(seq 1 60); do pgrep -u "$USER" -x wayvnc >/dev/null && break; sleep 2; done
 pgrep -a cage && pgrep -a wayvnc
