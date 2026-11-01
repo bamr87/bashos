@@ -18,7 +18,7 @@ The output lands in `os/image/mkosi.output/` (gitignored): `bashos_<version>.raw
 | `mkosi.conf` | Debian trixie (+ `non-free-firmware`), disk format, systemd-boot, UKI, the base packages |
 | `mkosi.conf.d/10-x86-64.conf`, `10-arm64.conf` | Kernel and firmware per architecture (forge: amd64 kernel, microcode, nouveau and NIC firmware) |
 | `mkosi.repart/` | The partitions: a 512 MB ESP and a minimised root flagged `GrowFileSystem=yes` |
-| `mkosi.extra/` | Files copied into the image: first-boot root growth (`usr/lib/repart.d`), DHCP on wired NICs, resolved kept off mDNS |
+| `mkosi.extra/` | Files copied into the image: first-boot root growth (`usr/lib/repart.d`), DHCP on wired NICs, network-online once any one of them is up (forge has two, one cabled), resolved kept off mDNS |
 | `mkosi.postinst.chroot` | The layer's system phases inside the image |
 | `seed.example/` | A documented `BASHOS-SEED` drive ([README](seed.example/README.md)) |
 | `test/boot-smoke.sh` | The boot test |

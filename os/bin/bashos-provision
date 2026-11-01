@@ -201,6 +201,10 @@ main() {
     BASHOS_USER="$user" NO_COLOR=1 "$OS_DIR/install.sh" --user-only ||
     os_warn "the user phases failed — rerun as $user: bashos os install --user-only"
 
+  # The image ships without package lists (mkosi cleans them): fetch them once, so `apt install`
+  # works from the first login instead of after apt-daily's first run.
+  if apt-get update -qq >/dev/null 2>&1; then os_ok "apt package lists"; else os_warn "apt-get update failed — run it once online"; fi
+
   date -Is >"$DONE"
   [[ $seed == "$SEED_MNT" ]] && umount "$SEED_MNT" 2>/dev/null || true
   # On the console (a VM's serial port, the monitor otherwise): the boot test waits for this.

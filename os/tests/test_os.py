@@ -406,6 +406,22 @@ def test_migrations_run_once_in_order_and_stop_on_failure(env, home, tmp_path):
 
 
 @needs_bash
+def test_image_machines_migrate_to_online_with_any_nic(env, root):
+    # forge: two NICs, one cable — network-online (and first-boot provisioning) waited 2 minutes.
+    m = next(p for p in sorted((OS / "migrations").glob("*.sh")) if "wait-online" in p.read_text())
+    e = dict(env, OS_SRC=str(REPO))
+    dropin = root / "etc/systemd/system/systemd-networkd-wait-online.service.d/10-bashos-any.conf"
+    run(str(m), env=e)
+    assert not dropin.exists()  # an in-place install on Debian: not networkd, nothing to do
+    net = root / "etc/systemd/network/80-bashos-wired.network"
+    net.parent.mkdir(parents=True)
+    net.write_text("[Match]\nName=en* eth*\n")
+    run(str(m), env=e)
+    run(str(m), env=e)  # idempotent
+    assert "systemd-networkd-wait-online --any" in dropin.read_text()
+
+
+@needs_bash
 def test_a_fresh_install_marks_shipped_migrations_applied(env, home, tmp_path):
     mig = tmp_path / "migrations"
     mig.mkdir()
