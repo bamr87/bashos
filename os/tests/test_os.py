@@ -513,7 +513,7 @@ def test_units_exec_the_commands_the_runtime_links():
         if unit.suffix == ".service":
             exe = cp["Service"]["ExecStart"].split()[0]
             assert exe in linked, f"{unit.name}: {exe} is not linked by os/install/runtime.sh"
-        if unit.name != "bashos-heal.service":  # started by its timer, never enabled itself
+        if unit.name not in {"bashos-heal.service", "bashos-engine-update.service"}:  # timer-started
             assert cp.has_section("Install"), unit.name
 
 

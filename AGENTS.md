@@ -39,9 +39,11 @@ python3 tools/docs_index.py --write              # regenerate the docs/README.md
 .venv/bin/bashos run -n "/sh ..."                # dry-run: routing + rendered prompt, no auth needed
 .venv/bin/bashos doctor                          # auth/backend diagnosis (offline)
 .venv/bin/bashos opencode status                 # boot the engine, report live state
+.venv/bin/bashos opencode verify                 # prove the engine still enforces the tool policy
 .venv/bin/bashos gui --browser                   # the GUI desktop, in a browser tab
 bin/bashos chui install --dry-run                # macOS terminal environment: the plan, nothing changed
 bin/bashos os install --dry-run                  # Linux OS layer: the plan for this machine, nothing changed
+bin/bashos os engine update                      # OpenCode → npm's latest, verified before it is promoted
 bin/bashos os image build --docker               # the bootable Debian 13 disk image (mkosi, privileged container)
 bin/bashos os image test --docker                # boot it in QEMU with a seed drive and check it like a user
 ```

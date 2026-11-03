@@ -134,6 +134,15 @@ Inside the REPL, `engine` prints the same status table.
 | `BASHOS_OPENCODE_SYNC=0` | do not regenerate `opencode.jsonc` at start |
 | `BASHOS_BACKEND` | `opencode` (default), `claude-code`, or `api` |
 
+## Keeping the engine current
+
+bashOS follows OpenCode's latest release, but it trusts a new one only after proving it still enforces the policy. `bashos opencode verify [--binary PATH]` boots an engine with no credential and reads back the permission rules it resolved for each agent (`GET /agent`, an ordered rule list where the last match wins). It judges them with OpenCode's own matching ([`opencode/rules.py`](../src/bashos/opencode/rules.py) mirrors `Wildcard.match`) against `policy.py` ([`opencode/contract.py`](../src/bashos/opencode/contract.py)), and exits 1 on any gap. The test fixture is a real OpenCode 1.19.5 engine's answer, so the contract is held to the engine's format, not ours.
+
+- **On a bashOS machine** the OS layer manages the engine: fetched from the registry, checked, verified, promoted, updated daily. See [OS.md § The engine](OS.md#the-engine).
+- **Elsewhere:** `npm i -g opencode-ai` (npm's `latest` is OpenCode 1), then `bashos opencode verify`.
+- **OpenCode 2** (Homebrew's and Arch's `opencode` today) moved the server API under `/api` and changed its flags, and bashOS speaks OpenCode 1's API. An OpenCode 2 binary is named in `bashos doctor` and at engine start, with the way out (the managed engine, or `opencode-ai@1` via `BASHOS_OPENCODE_BIN`), instead of failing on a flag. The port is [#71](https://github.com/bamr87/bashos/issues/71).
+- **Which binary:** `BASHOS_OPENCODE_BIN`, then the OS layer's managed engine (`/etc/bashos/opencode`), then `PATH`. `bashos doctor` says which one it found.
+
 ## When the engine is not installed
 
 `resolve_backend()` falls back to the Claude Agent SDK (`claude-code`) and then to the direct API (`api`). Both are completion-only escape hatches: they can serve the `prompt` and `refine` loops, but not `react`, whose policy is expressed in OpenCode's permission model and has nowhere else to be enforced. `bashos doctor` reports which backend is live and why.

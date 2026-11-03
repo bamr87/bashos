@@ -97,6 +97,16 @@ An existing hand-made hook is adopted, never duplicated: if `~/.zprofile` alread
 
 It binds `127.0.0.1:4001` by default; reach it from another machine with `ssh -L 4001:127.0.0.1:4001 forge`. A LAN address (`BASHOS_HARNESS_HOST=0.0.0.0`) is refused unless `DASH_CONSOLE_TOKEN` is set in `harness.env`; it then answers to `HOST`, `HOST.local` and loopback (`DASH_CONSOLE_ALLOWED_HOSTS`), and with `BASHOS_LAN_CIDR` set the installer opens the port in ufw for that subnet only. The console keeps its own rules — allowlisted operations, confirm-gated GitHub writes, never commits or merges — bashOS only supervises the process.
 
+## The engine
+
+OpenCode is the dependency every bashOS command runs on, so a bashOS machine owns its own copy and keeps it on OpenCode's latest release ([`os/install/engine.sh`](../os/install/engine.sh)). `latest` means what npm's `latest` tag names for `opencode-ai`.
+
+- **Fetched, not npm-installed.** bashOS downloads OpenCode's own platform binary straight from the registry and checks it against the registry's sha512, so no Node is needed. It lives root-owned in `/usr/local/lib/bashos/opencode/<version>`, so nothing running as the user can swap the binary that enforces the policy. On x86-64 it always takes the `-baseline` build: one disk boots on any CPU, and forge's i7-3820 has no AVX2.
+- **Verified before it's trusted.** A new release is promoted (one atomic rename of `current`) only after `bashos opencode verify` passes against it. That command boots the engine and judges the permission rules *it* resolved from `opencode.jsonc` against `opencode/policy.py`: denied tools refused, bash refusing every known way out, probes and reads still running, the sealed agent with no tools at all. A release that fails is never installed, and the machine stays on the last one that passed. If `latest` is a new major the contract rejects (OpenCode 2 today, [#71](https://github.com/bamr87/bashos/issues/71)), the machine moves to the newest release of the major it runs instead. The previous release is kept for a rollback.
+- **Daily.** `bashos-engine-update.timer` runs `bashos os engine update` once a day (`BASHOS_ENGINE_UPDATE=daily`; `off` leaves it to `bashos os update`). `bashos os status` shows the version, the last verdict and how old it is. `bashos os engine status` shows the build, the kept releases, and any other `opencode` on PATH.
+- **Preferred over PATH.** `/etc/bashos/opencode` names the managed binary, and bashOS runs it ahead of whatever `opencode` is first on PATH (`BASHOS_OPENCODE_BIN` still overrides). `/usr/local/bin/opencode` points at it unless that name belongs to something else.
+- **Watched upstream.** The `engine canary` workflow fetches npm's latest OpenCode every day the way a machine does and runs the contract, so an incompatible release shows up the day it ships.
+
 ## Updates
 
 `bashos os update` is Omarchy's update: fetch the channel (`BASHOS_CHANNEL`, default `main`) into `/opt/bashos` with a fast-forward merge (an image's staged copy becomes a checkout on its first update), re-run the idempotent installer from the new code, run pending migrations, restart the harness. `--system` adds `apt-get full-upgrade`; Debian's unattended-upgrades already applies security fixes daily. `-n` previews all of it.

@@ -1,0 +1,14 @@
+[Unit]
+Description=bashOS: OpenCode, the engine, on its latest release that passes the policy contract
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md#the-engine
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/usr/local/bin/bashos-os
+
+[Service]
+Type=oneshot
+# The engine and bashos write their state under HOME; a system unit gets none of its own.
+Environment=HOME=/root
+ExecStart=/usr/local/bin/bashos-os engine update
+Nice=10
+IOSchedulingClass=idle

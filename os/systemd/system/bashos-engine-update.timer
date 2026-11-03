@@ -1,0 +1,12 @@
+[Unit]
+Description=bashOS: check for a new OpenCode release once a day (BASHOS_ENGINE_UPDATE)
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md#the-engine
+
+[Timer]
+OnCalendar=*-*-* 04:17
+RandomizedDelaySec=2h
+# A machine that was off at the hour checks once it is back.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
