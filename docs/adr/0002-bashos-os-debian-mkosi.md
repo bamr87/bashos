@@ -1,6 +1,6 @@
 # ADR 0002 — bashOS the OS is an Omarchy-style layer on Debian 13, imaged with mkosi
 
-- **Status**: proposed
+- **Status**: superseded by [ADR 0003](0003-bashos-on-omarchy.md) (2026-11-01)
 - **Date**: 2026-10-30
 - **Deciders**: the maintainer (ratified by merging the PR that adds `os/`)
 - **Related**: [docs/OS.md](../OS.md), [docs/FORGE.md](../FORGE.md), [docs/ARCHITECTURE.md](../ARCHITECTURE.md) L0
