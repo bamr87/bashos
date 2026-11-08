@@ -1,0 +1,64 @@
+# manifest.yaml — every external artifact is pinned and checksummed.
+# Paths under `file:` are relative to the root of the Ventoy data partition (P1).
+schema: 1
+
+ventoy:
+  version: "1.1.18"
+  url: "https://github.com/ventoy/Ventoy/releases/download/v1.1.18/ventoy-1.1.18-linux.tar.gz"
+  sha256: "d86ff9de63d94c8b8f1f6b14d23c55af4b88e8207bf2893890892a6a97b1ad54"
+  options:
+    partition_style: gpt                 # Ventoy2Disk -g
+    secure_boot: true                    # Ventoy2Disk -s
+    reserve_mb: 0                        # Ventoy2Disk -r  (Phase 8 → 20480)
+  menu_timeout: 10
+
+lightos:
+  builder: live-build
+  distribution: trixie                   # Debian 13
+  architecture: amd64
+  desktop: xfce                          # xfce | lxqt | none
+  file: ISO/oneusb-lightos.iso
+  persistence_mb: 4096
+  extra_packages: [gparted, network-manager, firmware-linux, debootstrap,
+                   arch-install-scripts, curl, yq, smartmontools, testdisk]
+
+# Phase 0 decisions (docs/spike.md):
+# - netboot files live under /ISO so VTOY_DEFAULT_SEARCH_ROOT can stay at /ISO.
+# - netboot.xyz.iso keeps its EFI loader only inside the El Torito image, which
+#   Ventoy can't boot in UEFI mode. UEFI gets the standalone .efi, BIOS the .iso;
+#   `mode` hides each file in the other firmware mode.
+# - No separate -sb variant: after the one-time MOK enrollment Ventoy boots the
+#   plain .efi under Secure Boot.
+netboot:
+  - name: netboot.xyz-efi
+    file: ISO/netboot.xyz.efi
+    url: "https://boot.netboot.xyz/ipxe/netboot.xyz.efi"
+    sha256: "d04887416b509b6dbe00a64bc37f43439d1696886e5944f6c977af77ca9f3c98"
+    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    alias: "Network install (netboot.xyz)"
+    mode: uefi
+    ci: true
+  - name: netboot.xyz-bios
+    file: ISO/netboot.xyz.iso
+    url: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso"
+    sha256: "0d365dcb553932a3723525758cb1bd884219757cb1a7034658a9187d7d8dee9b"
+    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    alias: "Network install (netboot.xyz)"
+    mode: legacy
+    ci: true
+
+isos:
+  - name: ubuntu-server
+    file: ISO/ubuntu-server.iso
+    url: "https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso"
+    sha256: "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
+    alias: "Ubuntu Server 26.04 installer (offline)"
+    ci: true
+    optional: true                       # 3 GB: skipped unless FETCH_LARGE=1
+    large: true
+  - name: windows11
+    file: ISO/windows11.iso
+    source: user-supplied                # placed in ./local-isos/ by the user
+    alias: "Windows 11 setup (offline)"
+    optional: true
+    ci: false                            # never downloaded or redistributed by CI

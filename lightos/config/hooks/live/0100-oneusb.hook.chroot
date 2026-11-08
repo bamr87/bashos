@@ -1,0 +1,10 @@
+#!/bin/sh
+# Enable the self-test unit and make sure the serial console gets a login.
+set -e
+systemctl enable oneusb-selftest.service
+systemctl enable serial-getty@ttyS0.service
+# Live user may run the oneusb tools without a password prompt.
+cat >/etc/sudoers.d/oneusb <<'SUDO'
+user ALL=(ALL) NOPASSWD: /usr/local/bin/oneusb-restock, /usr/local/bin/oneusb-install
+SUDO
+chmod 0440 /etc/sudoers.d/oneusb
