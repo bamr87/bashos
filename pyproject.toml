@@ -36,14 +36,14 @@ dependencies = [
   #   npm i -g opencode-ai   (or: curl -fsSL https://opencode.ai/install | bash)
   "httpx>=0.28.1",
   # fallback model runtime (Claude Code OAuth harness, no tool policy)
-  "claude-agent-sdk>=0.2.174",
+  "claude-agent-sdk>=0.2.176",
   # terminal
   "typer>=0.27.3",
   "rich>=15.0.0",
   # the desktop: windowed terminal UI (shares rich's renderable protocol)
   "textual>=8.2.8,<9",
   # foundation
-  "pydantic>=2.14.1",
+  "pydantic>=2.14.2",
   "pyyaml>=6.0.3",
   "python-dotenv>=1.2.4",
 ]
