@@ -43,7 +43,7 @@ dependencies = [
   # the desktop: windowed terminal UI (shares rich's renderable protocol)
   "textual>=8.2.8,<9",
   # foundation
-  "pydantic>=2.14.2",
+  "pydantic>=2.14.3",
   "pyyaml>=6.0.3",
   "python-dotenv>=1.2.4",
 ]
