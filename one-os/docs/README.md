@@ -36,6 +36,7 @@ tested from code before it touches hardware.
 3. [Flashing from the command line](operator-guide/03-flashing-cli.md) — Linux and macOS, safety guards
 4. [Maintenance](operator-guide/04-maintenance.md) — updating pins, refreshing sticks, release checklist
 5. [The network boot server](operator-guide/05-network-boot-server.md) — PXE from your Mac: run, change, troubleshoot, SteamOS over the LAN
+6. [Remote sessions](operator-guide/06-remote-sessions.md) — drive a machine's desktop and run recorded Claude Code sessions on it over SSH
 
 **Developer guide** — for whoever changes the project
 1. [Architecture](developer-guide/01-architecture.md) — boot chain, disk layout, build and flash flows (diagrams)

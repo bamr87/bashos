@@ -351,3 +351,12 @@ features:
     surface: cli
     link: "one-os/docs/epics/0001-bashos-and-amrchy.md"
     docs: "one-os/docs/epics/0001-bashos-and-amrchy.md"
+  - id: BASHOS-038
+    title: "one-os: remote sessions (oneos-remote)"
+    description: "Drive an installed machine from another one over SSH: screenshots of its desktop, keyboard and pointer input through uinput (no dropped keys, no VNC password), Claude Code sessions in tmux that are started, sent text, read back and recorded, one-shot headless prompts, a log of VNC and SSH connections, and screen recording while a VNC client is connected."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/scripts/oneos-remote"
+    docs: "one-os/docs/operator-guide/06-remote-sessions.md"

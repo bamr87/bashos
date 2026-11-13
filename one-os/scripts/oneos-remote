@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# oneos-remote: watch and drive another machine's desktop and run Claude Code sessions on
+# it, over SSH. Nothing here needs the VNC password: screenshots and input go through the
+# agent installed on the machine (remote/agent/), and VNC stays for people to look on.
+#
+#   oneos-remote [-H user@host] COMMAND …        host: -H, $ONEOS_REMOTE, or ~/.config/one-os/remote-host
+#
+#   install | uninstall         put the agent on the machine and start its two user services
+#   status                      who is connected (VNC, SSH), Claude sessions, recordings
+#   events [N]                  the last N lines of the connection and session log (default 30)
+#
+#   shot [OUT] [--max PIXELS]   screenshot of the desktop → local file (default: scaled to 1700 px)
+#   click X Y [--button right] [--count 2] | move X Y      pixels in the last shot
+#   key COMBO… | type TEXT | scroll DY                     e.g. key ctrl+shift+p · type 'hello'
+#
+#   claude start NAME [--cwd DIR] [--prompt TEXT]   an interactive Claude Code session in tmux
+#   claude send NAME TEXT | keys NAME KEY… | view NAME | wait NAME | list | stop NAME | log NAME
+#   claude run [--cwd DIR] PROMPT                   one headless prompt; prints the answer
+#   attach NAME                                     open the session's terminal here (Ctrl-b d to leave)
+#
+#   record on | off | list | pull [DIR]         force screen recording, list or fetch the MP4s
+#   ssh [COMMAND…]                              a shell (or a command) on the machine
+#
+# Works under macOS's stock bash 3.2.
+set -Eeuo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+AGENT="$ROOT/remote/agent"
+RBIN='.local/share/oneos-remote/bin'
+
+die() { echo "oneos-remote: $*" >&2; exit 1; }
+usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; }
+
+HOST="${ONEOS_REMOTE:-}"
+if [[ "${1:-}" == -H ]]; then HOST="${2:-}"; shift 2 || die "-H needs user@host"; fi
+if [[ -z "$HOST" && -r "$HOME/.config/one-os/remote-host" ]]; then HOST="$(head -1 "$HOME/.config/one-os/remote-host")"; fi
+cmd="${1:-}"; shift || true
+case "$cmd" in "" | -h | --help | help) usage; exit 0 ;; esac
+[[ -n "$HOST" ]] || die "no host: pass -H user@host, set ONEOS_REMOTE, or write it to ~/.config/one-os/remote-host"
+
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10)
+# Run a command on the machine with its arguments quoted exactly once.
+rsh() { "${SSH[@]}" "$HOST" "$(printf '%q ' "$@")"; }
+agent() { local tool="$1"; shift; rsh "$RBIN/$tool" "$@"; }
+
+install() {
+  [[ -d "$AGENT" ]] || die "agent folder missing: $AGENT"
+  "${SSH[@]}" "$HOST" "mkdir -p $RBIN .config/systemd/user && pkill -f '[/]tmp/oneos-input serve'; true"
+  scp -q -o BatchMode=yes "$AGENT"/oneos-input "$AGENT"/oneos-gui "$AGENT"/oneos-claude "$AGENT"/oneos-monitor "$AGENT"/oneos-lib.sh "$HOST:$RBIN/"
+  scp -q -o BatchMode=yes "$AGENT"/oneos-input.service "$AGENT"/oneos-monitor.service "$HOST:.config/systemd/user/"
+  "${SSH[@]}" "$HOST" "chmod 755 $RBIN/oneos-input $RBIN/oneos-gui $RBIN/oneos-claude $RBIN/oneos-monitor
+    export XDG_RUNTIME_DIR=/run/user/\$(id -u)
+    systemctl --user daemon-reload
+    systemctl --user enable --now oneos-input.service oneos-monitor.service
+    systemctl --user restart oneos-input.service oneos-monitor.service
+    sleep 2
+    for t in tmux script spectacle ffmpeg python3 ss; do command -v \$t >/dev/null || echo \"warning: \$t is not installed on \$(uname -n)\"; done
+    [ -w /dev/uinput ] || echo 'warning: /dev/uinput is not writable by this user: key/type/click will not work'
+    systemctl --user is-active oneos-input.service oneos-monitor.service | paste -sd' ' -"
+  echo "installed on $HOST"
+}
+
+uninstall() {
+  "${SSH[@]}" "$HOST" "export XDG_RUNTIME_DIR=/run/user/\$(id -u)
+    systemctl --user disable --now oneos-input.service oneos-monitor.service 2>/dev/null
+    rm -f .config/systemd/user/oneos-input.service .config/systemd/user/oneos-monitor.service
+    systemctl --user daemon-reload; rm -rf .local/share/oneos-remote
+    echo 'removed the agent; recordings and logs are still in ~/.local/state/oneos-remote'"
+}
+
+shot() {
+  local out="" max=1700
+  while (($#)); do
+    case "$1" in
+      --max) max="$2"; shift 2 ;;
+      *) out="$1"; shift ;;
+    esac
+  done
+  if [[ -z "$out" ]]; then mkdir -p "$ROOT/build/remote"; out="$ROOT/build/remote/shot-$(date +%Y%m%d-%H%M%S).jpg"; fi
+  local ext="${out##*.}" tmp
+  tmp="/tmp/oneos-shot-$$.$ext"
+  agent oneos-gui shot "$tmp" --max "$max" | sed "s|: $tmp\$||"
+  scp -q -o BatchMode=yes "$HOST:$tmp" "$out"
+  rsh rm -f "$tmp"
+  echo "$out"
+}
+
+record() {
+  local state='.local/state/oneos-remote'
+  case "${1:-}" in
+    on) rsh touch "$state/record-on"; echo "recording forced on (until: oneos-remote record off)" ;;
+    off) rsh rm -f "$state/record-on"; echo "forced recording off (VNC sessions are still recorded)" ;;
+    list) "${SSH[@]}" "$HOST" "ls -lh $state/screen/*/screen-*.mp4 2>/dev/null | awk '{print \$5, \$NF}' || true" ;;
+    pull)
+      local dest="${2:-$ROOT/build/remote/recordings}"; mkdir -p "$dest"
+      rsync -a --include='*/' --include='screen-*.mp4' --exclude='*' -e "ssh -o BatchMode=yes" "$HOST:$state/screen/" "$dest/"
+      echo "$dest" ;;
+    *) die "usage: oneos-remote record on|off|list|pull [DIR]" ;;
+  esac
+}
+
+case "$cmd" in
+  install) install ;;
+  uninstall) uninstall ;;
+  status) agent oneos-monitor status ;;
+  events) rsh tail -n "${1:-30}" .local/state/oneos-remote/events.jsonl ;;
+  shot) shot "$@" ;;
+  click | move | key | type | scroll) agent oneos-gui "$cmd" "$@" ;;
+  claude) (($#)) || die "usage: oneos-remote claude start|send|keys|view|wait|list|stop|log|run …"; agent oneos-claude "$@" ;;
+  attach) (($#)) || die "usage: oneos-remote attach NAME"; exec ssh -t "$HOST" "tmux -L oneos attach -t =oneos-$(printf %q "$1")" ;;
+  record) record "$@" ;;
+  ssh) if (($#)); then rsh "$@"; else exec ssh "$HOST"; fi ;;
+  *) usage >&2; exit 2 ;;
+esac

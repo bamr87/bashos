@@ -10,7 +10,7 @@
 | `CI` | — | fetch.sh | `true`: only fetch `ci: true` artifacts |
 | `CACHE_DIR`, `BUILD_DIR`, `PAYLOAD_DIR` | `cache/`, `build/`, `build/payload/` | scripts | output locations |
 | `LIGHTOS_ISO` | `build/oneos-lightos.iso` | stage-payload.sh | ISO to stage |
-| `IMAGE`, `IMAGE_SIZE` | `build/one-os-test.img`, `16G` | build-test-image.sh | image path and size |
+| `IMAGE`, `IMAGE_SIZE` | `build/one-os-test.img`, at least `16G` (sized to the payload + `reserve_mb`) | build-test-image.sh | image path and size |
 | `CARD_IMAGE` | `build/one-os-card.img` | flash-macos.sh | image to flash |
 | `SOURCE_DATE_EPOCH` | `1767225600` (2026-01-01) | lib.sh | reproducible timestamps |
 | `LB_WORKDIR` | `/var/tmp/oneos-lightos` | build-lightos.sh | live-build work dir (in the container) |

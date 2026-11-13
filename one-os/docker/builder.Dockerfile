@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-pil \
     && rm -rf /var/lib/apt/lists/*
 
 # Network boot (iPXE loaders served over TFTP) and docs rendering for the stick.
-RUN apt-get update && apt-get install -y --no-install-recommends ipxe python3-markdown \
+# bzip2/lbzip2: stick-add-steamos.sh unpacks Valve's .img.bz2 recovery image.
+RUN apt-get update && apt-get install -y --no-install-recommends ipxe python3-markdown bzip2 lbzip2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /work

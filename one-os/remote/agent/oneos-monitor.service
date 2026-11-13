@@ -1,0 +1,13 @@
+[Unit]
+Description=one-os: log remote connections and record the screen during VNC sessions
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/share/oneos-remote/bin/oneos-monitor serve
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

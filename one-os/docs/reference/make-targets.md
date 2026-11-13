@@ -10,7 +10,7 @@ the builder container; `flash`, `card-boot`, `wizard`, `run` and `vm` run on the
 | `make fetch` | download + verify everything in `manifest.yaml` into `cache/`, unpack Ventoy | `FETCH_LARGE=1` for large ISOs; `CI=true` only `ci: true` items |
 | `make lightos` | build `build/oneos-lightos.iso` with live-build | ~25 min on Apple Silicon |
 | `make payload` | stage `build/payload/` + `build/payload.SHA256SUMS` | needs the ISO |
-| `make image` | 16 GB sparse test image `build/one-os-test.img` | `IMAGE_SIZE=…` to change |
+| `make image` | Sparse test image `build/one-os-test.img`: 16 GB, or larger when the payload plus the reserved space needs it | `IMAGE_SIZE=…` to fix the size |
 | `make card-image DISK=diskN` | image exactly the size of a device → `build/one-os-card.img` | macOS; reads the size via `diskutil` |
 | `make flash DISK=diskN` | macOS: guarded write + verify + eject | admin password via macOS dialog; no sudo |
 | `make flash DEV=/dev/sdX` | Linux: guarded Ventoy install + payload copy | `FLASH_ARGS=--i-know-this-is-not-usb` for SSDs |

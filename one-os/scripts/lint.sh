@@ -7,12 +7,12 @@ rc=0
 
 log "shellcheck"
 mapfile -t sh_files < <(
-  { ls scripts/*.sh scripts/oneos-vm scripts/oneos-wizard lightos/auto/* lightos/config/hooks/live/*;
+  { ls scripts/*.sh scripts/oneos-vm scripts/oneos-wizard scripts/oneos-remote remote/agent/oneos-gui remote/agent/oneos-claude lightos/auto/* lightos/config/hooks/live/*;
     grep -l '^#!.*bash' lightos/config/includes.chroot/usr/local/bin/*; } | sort -u)
-shellcheck -x -P scripts "${sh_files[@]}" || rc=1
+shellcheck -x -P scripts -P remote/agent "${sh_files[@]}" || rc=1
 
 log "ruff"
-ruff check --config harness/pyproject.toml harness scripts/manifest.py scripts/write-image.py scripts/card-boot.py scripts/capture-steamos.py scripts/stick-add-netboot.py scripts/render-docs.py ui/server.py netboot/server.py netboot/watch.py \
+ruff check --config harness/pyproject.toml harness scripts/manifest.py scripts/write-image.py scripts/card-boot.py scripts/capture-steamos.py scripts/stick-add-netboot.py scripts/render-docs.py ui/server.py netboot/server.py netboot/watch.py remote/agent/oneos-input remote/agent/oneos-monitor \
   lightos/config/includes.chroot/usr/local/bin/oneos-restock || rc=1
 
 log "manifest"

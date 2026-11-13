@@ -82,5 +82,7 @@ Mermaid diagrams must parse (no `;` or `{}` in sequence messages).
 - `lightos/` — live-build tree; tools in `config/includes.chroot/usr/local/bin/`
 - `scripts/` — fetch, build, stage, install-to-device, flash (Linux/macOS), lint, bump
 - `ui/` — flash wizard (stdlib HTTP server + single page)
+- `remote/agent/` + `scripts/oneos-remote` — drive an installed machine over SSH: screenshots, uinput keyboard and
+  pointer, recorded Claude Code sessions in tmux, connection log and screen recording (operator guide 06)
 - `harness/oneos_harness/` — `qemu.py` (VM), `qga.py` (agent), `overlay.py` (P1 edits via nbd),
   `cli.py` (oneos-vm), `netcap.py`, `screen.py`; tests in `harness/tests/` (IDs in README)
