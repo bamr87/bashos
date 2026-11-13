@@ -5,4 +5,4 @@ Claude Code; a LangGraph kernel routes them through orchestration loops; the
 model runtime rides on Claude Code OAuth.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.0"  # x-release-please-version

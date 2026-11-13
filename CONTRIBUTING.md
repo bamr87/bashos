@@ -39,4 +39,4 @@ Claude Code slash command and a bashOS-routable program. Adding one requires no 
 
 ## Releasing
 
-Tag `vX.Y.Z` and push the tag — CI builds sdist/wheel, cuts a GitHub release, publishes to PyPI (once a trusted publisher is configured), and pushes the image to GHCR.
+release-please cuts releases from Conventional Commits; don't push tags by hand. Each push to `main` updates a release PR that bumps the version and `CHANGELOG.md`. Merging it tags `vX.Y.Z` and creates the GitHub release, and the same workflow run builds the sdist/wheel, attaches them to the release, publishes to PyPI (once a trusted publisher is configured) and pushes the image to GHCR. To re-publish an existing tag, dispatch `release.yml` with `tag`. [AGENTS.md § Releasing](AGENTS.md#releasing) has the details.

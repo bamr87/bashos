@@ -1,19 +1,74 @@
 name: Release
 
-# Tag a version to release:  git tag v0.1.0 && git push origin v0.1.0
+# Conventional Commits on main drive release-please (fleet standard, UPS-QA-32):
+# every push to main opens or updates a release PR that bumps pyproject.toml,
+# src/bashos/__init__.py and CHANGELOG.md. A human merges that PR; the push that
+# merge makes tags vX.Y.Z and creates the GitHub release, and the publish jobs
+# below run in the SAME run via `needs: release` on `release_created`. No
+# tag-push trigger is involved, so the GITHUB_TOKEN "tags don't trigger
+# workflows" rule never applies. RELEASE_PLEASE_TOKEN (a repo secret) opens the
+# release PR, because this repo's Actions setting forbids GITHUB_TOKEN from
+# creating pull requests.
+#
+# Recovery: `workflow_dispatch` with an existing tag re-runs the publish jobs
+# for that tag without going through release-please.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)publish, e.g. v0.2.0
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  release:
+    if: github.event_name == 'push'
+    uses: bamr87/.github/.github/workflows/release-please.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
+
+  target:
+    # One place that decides whether to publish and which tag, for both paths.
+    name: resolve release tag
+    needs: release
+    if: >-
+      always() &&
+      ((github.event_name == 'push' && needs.release.outputs.release_created == 'true') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+    steps:
+      - id: t
+        env:
+          RELEASED_TAG: ${{ needs.release.outputs.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${RELEASED_TAG:-$INPUT_TAG}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::not a release tag: '$tag'"; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   build:
     name: build sdist + wheel
+    needs: target
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.target.outputs.tag }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -26,8 +81,10 @@ jobs:
           path: dist/
 
   github-release:
-    name: GitHub release
-    needs: build
+    # release-please already created the release and its notes; this attaches
+    # the built distributions to it (or creates it on a manual recovery run).
+    name: attach dist to GitHub release
+    needs: [target, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -38,15 +95,15 @@ jobs:
           path: dist/
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.target.outputs.tag }}
           files: dist/*
-          generate_release_notes: true
 
   pypi:
     # Requires a PyPI "trusted publisher" configured for this repo + workflow
     # (pypi.org → project → Publishing). Until then this job fails harmlessly
     # while the GitHub release above still completes.
     name: publish to PyPI
-    needs: build
+    needs: [target, build]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -60,12 +117,15 @@ jobs:
 
   ghcr:
     name: publish image to GHCR
+    needs: target
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.target.outputs.tag }}
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -77,7 +137,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern={{version}},value=${{ needs.target.outputs.tag }}
             type=raw,value=latest
       - uses: docker/build-push-action@v7
         with:
