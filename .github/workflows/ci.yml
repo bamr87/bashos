@@ -29,6 +29,7 @@ jobs:
         run: |
           shellcheck bin/bashos
           shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
+          shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
       - name: compose config
         run: docker compose config --quiet
 

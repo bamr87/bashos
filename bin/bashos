@@ -2,15 +2,24 @@
 # bashOS launcher — bootstraps a virtualenv on first run, then hands off.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve symlinks: the OS layer puts this script on PATH as /usr/local/bin/bashos.
+_src="${BASH_SOURCE[0]}"
+while [[ -L $_src ]]; do
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  [[ $_src == /* ]] || _src="$_dir/$_src"
+done
+ROOT="$(cd "$(dirname "$_src")/.." && pwd)"
+unset _src _dir
 VENV="${ROOT}/.venv"
 
-# The macOS terminal environment (chui/) is plain shell: it runs before any Python exists,
-# so a fresh Mac can `bin/bashos chui install` without a virtualenv.
-if [[ "${1:-}" == chui ]]; then
-  shift
-  exec "${ROOT}/chui/tui.sh" "$@"
-fi
+# The macOS terminal environment (chui/) and the Linux OS layer (os/) are plain shell: they run
+# before any Python exists, so a fresh Mac can `bin/bashos chui install` and a fresh Debian box
+# `bin/bashos os install` without a virtualenv.
+case "${1:-}" in
+  chui) shift; exec "${ROOT}/chui/tui.sh" "$@" ;;
+  os) shift; exec "${ROOT}/os/os.sh" "$@" ;;
+esac
 
 if [[ ! -x "${VENV}/bin/bashos" ]]; then
   echo "bashos: first run — creating ${VENV}" >&2

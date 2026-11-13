@@ -1,0 +1,19 @@
+# The bamr87 hub's Harness Console, served by this machine (BASHOS_HARNESS in /etc/bashos/os.conf).
+[Unit]
+Description=bashOS harness: the bamr87 Harness Console
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md
+# A missing hub checkout fails fast instead of looping forever.
+StartLimitIntervalSec=10min
+StartLimitBurst=5
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/bashos-harness
+Restart=on-failure
+RestartSec=10s
+# 78: misconfigured (no hub checkout yet, a LAN bind without a token) — waiting cannot fix it.
+RestartPreventExitStatus=78
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

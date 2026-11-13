@@ -1,0 +1,11 @@
+# Every 10 minutes, the forge cadence: a console window that was closed comes back.
+[Unit]
+Description=bashOS heal every 10 minutes
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md
+
+[Timer]
+OnStartupSec=1min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

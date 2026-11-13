@@ -218,6 +218,48 @@ def engine_status() -> None:
         raise typer.Exit(1) from exc
 
 
+@engine_app.command("verify")
+def engine_verify(
+    binary: str = typer.Option("", "--binary", help="check this opencode instead of the one bashOS would run"),
+) -> None:
+    """Boot the engine and prove it still enforces the tool policy (exit 1 if not).
+
+    Judges the permission rules the engine itself resolved from opencode.jsonc — not
+    the file — so a new OpenCode release that reads the config differently fails here
+    before it is trusted. No credential is passed: nothing is prompted.
+    """
+    import os
+
+    from ..opencode import contract
+    from ..opencode.engine import OpencodeEngine
+
+    if binary:
+        os.environ["BASHOS_OPENCODE_BIN"] = binary
+    os.environ["BASHOS_OPENCODE_AUTH"] = "never"
+    os.environ.pop("BASHOS_OPENCODE_URL", None)  # always a fresh engine of this binary
+
+    async def go() -> tuple[str, list[contract.Finding]]:
+        engine = OpencodeEngine(KernelConfig.from_env())
+        try:
+            await engine.start()
+            return engine.version, contract.check(await engine.client.agents())
+        finally:
+            await engine.stop()
+
+    try:
+        version, findings = asyncio.run(go())
+    except Exception as exc:
+        render.print_error(str(exc))
+        raise typer.Exit(1) from exc
+    typer.echo(f"opencode {version}")
+    for f in findings:
+        typer.echo(f"  {'ok  ' if f.ok else 'FAIL'}  {f.name}: {f.detail}")
+    if not contract.passed(findings):
+        typer.echo("the engine does not enforce opencode/policy.py — do not run bashOS on it")
+        raise typer.Exit(1)
+    typer.echo("policy enforced")
+
+
 @engine_app.command("serve")
 def engine_serve() -> None:
     """Run an engine in the foreground; other bashOS processes can attach.
@@ -376,6 +418,36 @@ def chui(ctx: typer.Context) -> None:
         raise typer.Exit(1)
     # Plain shell, interactive menus included: hand it the terminal and pass its exit code on.
     raise typer.Exit(subprocess.call([str(root / "tui.sh"), *ctx.args]))
+
+
+def os_layer_root() -> Path | None:
+    """The os/ tree: $BASHOS_OS_LAYER_ROOT, else the source checkout this package runs from."""
+    import os
+
+    env = os.environ.get("BASHOS_OS_LAYER_ROOT")
+    root = Path(env) if env else Path(__file__).resolve().parents[3] / "os"
+    return root if (root / "os.sh").is_file() else None
+
+
+@app.command(
+    "os",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def os_layer(ctx: typer.Context) -> None:
+    """The Linux OS layer: install · update · status · harness · image (docs/OS.md)."""
+    import subprocess
+
+    root = os_layer_root()
+    if root is None:
+        typer.echo(
+            "bashos: the OS layer ships in the bashOS source tree, not the wheel.\n"
+            "  curl -fsSL https://raw.githubusercontent.com/bamr87/bashos/main/os/boot.sh | bash",
+            err=True,
+        )
+        raise typer.Exit(1)
+    # Plain shell that may ask for sudo: hand it the terminal and pass its exit code on.
+    raise typer.Exit(subprocess.call([str(root / "os.sh"), *ctx.args]))
 
 
 @app.command("desktop")

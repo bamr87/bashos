@@ -90,3 +90,22 @@ def test_chui_outside_a_source_tree_says_how_to_get_it(monkeypatch, tmp_path):
     result = runner.invoke(app, ["chui", "install"])
     assert result.exit_code == 1
     assert "gh repo clone bamr87/bashos" in result.output
+
+
+def test_os_layer_is_found_in_the_source_tree():
+    from bashos.shell.cli import os_layer_root
+
+    root = os_layer_root()
+    assert root is not None and (root / "install.sh").is_file()
+
+
+def test_os_passes_args_and_exit_code_through():
+    result = runner.invoke(app, ["os", "nope"])
+    assert result.exit_code == 2  # os.sh: unknown command
+
+
+def test_os_outside_a_source_tree_says_how_to_get_it(monkeypatch, tmp_path):
+    monkeypatch.setenv("BASHOS_OS_LAYER_ROOT", str(tmp_path))
+    result = runner.invoke(app, ["os", "install"])
+    assert result.exit_code == 1
+    assert "os/boot.sh" in result.output

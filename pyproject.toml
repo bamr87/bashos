@@ -28,7 +28,7 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
   # orchestration
-  "langgraph>=1.2.17",
+  "langgraph>=1.2.20",
   "langchain-core>=1.0",
   "langchain-anthropic>=1.7.6",
   # the engine: HTTP + SSE client for the local `opencode serve` process.
@@ -36,28 +36,28 @@ dependencies = [
   #   npm i -g opencode-ai   (or: curl -fsSL https://opencode.ai/install | bash)
   "httpx>=0.28.1",
   # fallback model runtime (Claude Code OAuth harness, no tool policy)
-  "claude-agent-sdk>=0.2.174",
+  "claude-agent-sdk>=0.2.179",
   # terminal
   "typer>=0.27.3",
   "rich>=15.0.0",
   # the desktop: windowed terminal UI (shares rich's renderable protocol)
   "textual>=8.2.8,<9",
   # foundation
-  "pydantic>=2.14.1",
+  "pydantic>=2.14.3",
   "pyyaml>=6.0.3",
-  "python-dotenv>=1.0",
+  "python-dotenv>=1.2.4",
 ]
 
 [project.optional-dependencies]
 # syrupy backs the desktop SVG snapshots (tests/desktop/conftest.py) in place
 # of pytest-textual-snapshot, whose syrupy==4.8.0 pin caps pytest below 9.
-dev = ["pytest>=9.1.1", "pytest-asyncio>=1.4.0", "syrupy>=5.0", "ruff"]
+dev = ["pytest>=9.2.0", "pytest-asyncio>=1.4.1.post1", "syrupy>=6.1.1", "ruff"]
 # the desktop window. The GUI itself needs nothing beyond the base install —
 # `bashos gui` serves it and falls back to your browser; this adds the native
 # window (platform webview, no bundled runtime).
 gui = ["pywebview>=6.2.1"]
 # observability: OpenInference spans exported to Arize Phoenix
-trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.80"]
+trace = ["arize-phoenix-otel>=0.6", "openinference-instrumentation-langchain>=0.1.81"]
 
 [project.urls]
 Repository = "https://github.com/bamr87/bashos"
@@ -71,7 +71,7 @@ bashos = "bashos.shell.cli:main"
 packages = ["src/bashos"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "chui/tests"]
+testpaths = ["tests", "chui/tests", "os/tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]

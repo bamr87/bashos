@@ -1,0 +1,10 @@
+#!/bin/bash
+# Inside the image, after its packages: apply the bashOS layer's system phases (os/install.sh
+# --image), then turn on the machine's services. The user phases run at first boot.
+set -Eeuo pipefail
+chown -R root:root /opt/bashos
+/opt/bashos/os/install.sh --image
+systemctl enable systemd-networkd.service systemd-resolved.service systemd-timesyncd.service \
+  ssh.service avahi-daemon.service
+# The engine CLIs' npm cache and pip's are build debris, not the image.
+rm -rf /root/.npm /root/.cache

@@ -1,0 +1,8 @@
+# Keeps the shared tmux console's bashos window present. Never attaches, prints or steals focus.
+[Unit]
+Description=bashOS heal: the console's bashos window
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bashos-console --heal

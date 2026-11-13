@@ -120,3 +120,15 @@ async def test_status_rows_shape_is_shared():
     assert dict(rows)["providers"] == "none"
     assert dict(rows)["agents"] == "bashos, bashos-sealed"
     assert "supervised" in dict(rows)["url"]
+
+
+def test_engine_log_falls_back_to_the_state_dir_when_the_root_is_read_only(tmp_path, monkeypatch):
+    """The OS layer installs bashOS root-owned at /opt/bashos: the log moves to XDG state."""
+    root = tmp_path / "opt-bashos"
+    root.mkdir()
+    eng = engine_mod.OpencodeEngine(KernelConfig(), root=root, registry={})
+    assert eng._log_path() == root / ".bashos" / "opencode.log"
+
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(engine_mod.os, "access", lambda path, mode: False)
+    assert eng._log_path() == tmp_path / "state" / "bashos" / "opencode.log"

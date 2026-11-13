@@ -1,0 +1,6 @@
+# bashOS: DHCP on every wired interface (container bridges and veths are not en*/eth*).
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
