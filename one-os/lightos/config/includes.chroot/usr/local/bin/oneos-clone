@@ -1,0 +1,18 @@
+#!/bin/bash
+# oneos-clone [DIR] — clone the one-os repository (default ~/one-os) from the git bundle
+# on the stick (oneos/src/one-os.bundle), else from the boot server.
+set -euo pipefail
+dest="${1:-$HOME/one-os}"
+[[ -e $dest ]] && { echo "$dest already exists"; exit 1; }
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+server="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^oneos\.server=//p' | tail -1)"
+if blkid -L Ventoy >/dev/null 2>&1; then
+  sudo mkdir -p /run/oneos/src-p1
+  sudo oneos-mount-p1 /run/oneos/src-p1 ro >/dev/null 2>&1 || true
+  [[ -f /run/oneos/src-p1/oneos/src/one-os.bundle ]] && cp /run/oneos/src-p1/oneos/src/one-os.bundle "$tmp/"
+fi
+[[ -f $tmp/one-os.bundle || -z $server ]] || curl -fsSL -o "$tmp/one-os.bundle" "$server/src/one-os.bundle"
+[[ -f $tmp/one-os.bundle ]] || { echo "no bundle on the stick or the boot server" >&2; exit 1; }
+git bundle verify "$tmp/one-os.bundle" >/dev/null
+git clone -q "$tmp/one-os.bundle" "$dest"
+echo "cloned into $dest ($(git -C "$dest" log --oneline -1))"

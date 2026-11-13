@@ -202,12 +202,18 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | [BASHOS-029](../../features/features.yml) | Console on the physical monitor | partial | [`os/bin/bashos-console`](../../os/bin/bashos-console) · [`docs/OS.md`](../OS.md) | TBD |
 | [BASHOS-030](../../features/features.yml) | Harness Console service | partial | [`os/bin/bashos-harness`](../../os/bin/bashos-harness) · [`docs/OS.md`](../OS.md) | TBD |
 | [BASHOS-031](../../features/features.yml) | Managed OpenCode engine, always latest and verified | partial | [`os/install/engine.sh`](../../os/install/engine.sh) · [`docs/OPENCODE.md`](../OPENCODE.md) | TBD |
+| [BASHOS-032](../../features/features.yml) | one-os: a multiboot stick built from a manifest | shipped | [`one-os/manifest.yaml`](../../one-os/manifest.yaml) · [`one-os/README.md`](../../one-os/README.md) | TBD |
+| [BASHOS-033](../../features/features.yml) | one-os: install an OS onto another drive | shipped | [`one-os/lightos/config/includes.chroot/usr/local/bin/oneos-install`](../../one-os/lightos/config/includes.chroot/usr/local/bin/oneos-install) · [`one-os/docs/user-guide/05-install-an-os.md`](../../one-os/docs/user-guide/05-install-an-os.md) | TBD |
+| [BASHOS-034](../../features/features.yml) | one-os: network boot server | shipped | [`one-os/netboot/server.py`](../../one-os/netboot/server.py) · [`one-os/docs/operator-guide/05-network-boot-server.md`](../../one-os/docs/operator-guide/05-network-boot-server.md) | TBD |
+| [BASHOS-035](../../features/features.yml) | one-os: deploy SteamOS onto a desktop | shipped | [`one-os/lightos/config/includes.chroot/usr/local/bin/oneos-steamos`](../../one-os/lightos/config/includes.chroot/usr/local/bin/oneos-steamos) · [`one-os/docs/user-guide/07-steamos.md`](../../one-os/docs/user-guide/07-steamos.md) | TBD |
+| [BASHOS-036](../../features/features.yml) | one-os: VMs you can drive (oneos-vm) | shipped | [`one-os/scripts/oneos-vm`](../../one-os/scripts/oneos-vm) · [`one-os/docs/reference/oneos-vm.md`](../../one-os/docs/reference/oneos-vm.md) | TBD |
+| [BASHOS-037](../../features/features.yml) | one-os: bashOS and Amrchy as bootable systems | planned | [`one-os/docs/epics/0001-bashos-and-amrchy.md`](../../one-os/docs/epics/0001-bashos-and-amrchy.md) | TBD |
 
 **Requirement → feature trace**
 
 | Requirement | Features |
 | --- | --- |
-| TBD | BASHOS-001, BASHOS-002, BASHOS-003, BASHOS-004, BASHOS-005, BASHOS-006, BASHOS-007, BASHOS-008, BASHOS-009, BASHOS-010, BASHOS-011, BASHOS-012, BASHOS-021, BASHOS-024, BASHOS-025, BASHOS-027, BASHOS-028, BASHOS-029, BASHOS-030, BASHOS-031 |
+| TBD | BASHOS-001, BASHOS-002, BASHOS-003, BASHOS-004, BASHOS-005, BASHOS-006, BASHOS-007, BASHOS-008, BASHOS-009, BASHOS-010, BASHOS-011, BASHOS-012, BASHOS-021, BASHOS-024, BASHOS-025, BASHOS-027, BASHOS-028, BASHOS-029, BASHOS-030, BASHOS-031, BASHOS-032, BASHOS-033, BASHOS-034, BASHOS-035, BASHOS-036, BASHOS-037 |
 | §6 | BASHOS-013, BASHOS-014, BASHOS-015, BASHOS-016, BASHOS-017, BASHOS-018, BASHOS-019, BASHOS-020 |
 | §7 | BASHOS-019, BASHOS-020, BASHOS-026 |
 | §9 | BASHOS-022, BASHOS-023 |

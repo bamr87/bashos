@@ -1,0 +1,131 @@
+# manifest.yaml — every external artifact is pinned and checksummed.
+# Paths under `file:` are relative to the root of the Ventoy data partition (P1).
+schema: 1
+
+ventoy:
+  version: "1.1.18"
+  url: "https://github.com/ventoy/Ventoy/releases/download/v1.1.18/ventoy-1.1.18-linux.tar.gz"
+  sha256: "d86ff9de63d94c8b8f1f6b14d23c55af4b88e8207bf2893890892a6a97b1ad54"
+  options:
+    partition_style: gpt                 # Ventoy2Disk -g
+    secure_boot: true                    # Ventoy2Disk -s
+    reserve_mb: 8192                     # Ventoy2Disk -r: space after Ventoy for steamos.recovery_on_stick
+  menu_timeout: 10
+  windows11:                           # Ventoy's Windows 11 setup tweaks
+    bypass_check: true                   # skip TPM 2.0 / Secure Boot / RAM / CPU checks
+    bypass_nro: true                     # allow setup without a Microsoft account (local user)
+
+steamos:
+  # Valve's SteamOS recovery stick inside the reserved space: Ventoy → F6 → "SteamOS recovery"
+  # boots Valve's own installer (scripts/stick-add-steamos.sh). Image: build/steamos/recovery.img,
+  # else the newest cache/steamos/*.img.bz2 (make steamos-fetch). Needs reserve_mb >= 8192.
+  recovery_on_stick: true
+
+lightos:
+  builder: live-build
+  distribution: trixie                   # Debian 13
+  architecture: amd64
+  desktop: xfce                          # xfce | lxqt | none
+  file: ISO/oneos-lightos.iso
+  persistence_mb: 4096
+  extra_packages: [gparted, network-manager, firmware-linux, debootstrap,
+                   arch-install-scripts, curl, yq, smartmontools, testdisk]
+  # Taken from <distribution>-backports instead (apt pin 990): new hardware needs a new kernel.
+  # trixie's 6.12 lacks e.g. the Realtek RTL8127 10 GbE (ASUS X870E boards) and is early for RDNA4.
+  backports: ["linux-image-*", "linux-headers-*", "linux-kbuild-*", "linux-base", "firmware-*",
+              "amd64-microcode", "intel-microcode"]
+
+# Phase 0 decisions (docs/spike.md):
+# - netboot files live under /ISO so VTOY_DEFAULT_SEARCH_ROOT can stay at /ISO.
+# - netboot.xyz.iso keeps its EFI loader only inside the El Torito image, which
+#   Ventoy can't boot in UEFI mode. UEFI gets the standalone .efi, BIOS the .iso;
+#   `mode` hides each file in the other firmware mode.
+# - No separate -sb variant: after the one-time MOK enrollment Ventoy boots the
+#   plain .efi under Secure Boot.
+netboot:
+  # SNP build: uses the firmware's network driver. The plain netboot.xyz.efi brings its own
+  # drivers, which take the USB controller from the firmware on some boards (dead keyboard).
+  - name: netboot.xyz-efi
+    file: ISO/netboot.xyz-snp.efi
+    url: "https://boot.netboot.xyz/ipxe/netboot.xyz-snp.efi"
+    sha256: "58be5a48642827a1b5ffa579c3e82e23866d8b50c90b355c770c2b34a16d048a"
+    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    alias: "Network install (netboot.xyz)"
+    mode: uefi
+    ci: true
+  - name: netboot.xyz-bios
+    file: ISO/netboot.xyz.iso
+    url: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso"
+    sha256: "0d365dcb553932a3723525758cb1bd884219757cb1a7034658a9187d7d8dee9b"
+    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    alias: "Network install (netboot.xyz)"
+    mode: legacy
+    ci: true
+
+isos:
+  - name: ubuntu-desktop
+    file: ISO/ubuntu-desktop.iso
+    url: "https://releases.ubuntu.com/resolute/ubuntu-26.04.1-desktop-amd64.iso"
+    sha256: "601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f"
+    sha256_from: "https://releases.ubuntu.com/resolute/SHA256SUMS"
+    alias: "Ubuntu 26.04.1 LTS Desktop (live + installer)"
+    optional: true                       # 6.5 GB: skipped unless FETCH_LARGE=1
+    large: true
+  - name: ubuntu-server
+    file: ISO/ubuntu-server.iso
+    url: "https://releases.ubuntu.com/resolute/ubuntu-26.04.1-live-server-amd64.iso"
+    sha256: "cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927"
+    sha256_from: "https://releases.ubuntu.com/resolute/SHA256SUMS"
+    alias: "Ubuntu Server 26.04.1 LTS installer (offline)"
+    ci: true
+    optional: true                       # 2.9 GB: skipped unless FETCH_LARGE=1
+    large: true
+  - name: debian-netinst
+    file: ISO/debian-netinst.iso
+    url: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.7.0-amd64-netinst.iso"
+    sha256: "a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355"
+    sha256_from: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS"
+    alias: "Debian 13.7 installer (network)"
+    optional: true
+  - name: fedora-workstation
+    file: ISO/fedora-workstation.iso
+    url: "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/Fedora-Workstation-Live-45-1.4.x86_64.iso"
+    sha256: "68338c6bfe4f0d64151f2e47efe9f44a8855ad05b460e56b844fb3fa2c9a3beb"
+    sha256_from: "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/Fedora-Workstation-45-1.4-x86_64-CHECKSUM"
+    alias: "Fedora Workstation 45 (live + installer)"
+    optional: true                       # 2.9 GB: skipped unless FETCH_LARGE=1
+    large: true
+  - name: linuxmint
+    file: ISO/linuxmint.iso
+    url: "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso"
+    sha256: "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4"
+    sha256_from: "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/sha256sum.txt"
+    alias: "Linux Mint 22.3 Cinnamon (live + installer)"
+    optional: true                       # 3.1 GB: skipped unless FETCH_LARGE=1
+    large: true
+  - name: archlinux
+    file: ISO/archlinux.iso
+    url: "https://geo.mirror.pkgbuild.com/iso/2026.11.01/archlinux-2026.11.01-x86_64.iso"
+    sha256: "01bcdcf01af2f7d58f2794899c834770d25c9bfc945bd092b32bb66672a4a216"
+    sha256_from: "https://geo.mirror.pkgbuild.com/iso/2026.11.01/sha256sums.txt"
+    alias: "Arch Linux 2026.11.01 (installer)"
+    optional: true
+  - name: proxmox-ve
+    file: ISO/proxmox-ve.iso
+    url: "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso"
+    sha256: "4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c"
+    sha256_from: "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso.sha256"
+    alias: "Proxmox VE 9.2 installer (hypervisor)"
+    optional: true
+  - name: systemrescue
+    file: ISO/systemrescue.iso
+    url: "https://downloads.sourceforge.net/project/systemrescuecd/sysresccd-x86/13.03/systemrescue-13.03-amd64.iso"
+    sha256: "b71b98ba6b92145524cb1a72206b9888a59861ad6fb05d127faf618ca0136891"
+    alias: "SystemRescue 13.03 (repair: disks, partitions, data recovery)"
+    optional: true
+  - name: windows11
+    file: ISO/windows11.iso
+    source: user-supplied                # placed in ./local-isos/ by the user
+    alias: "Windows 11 setup (offline)"
+    optional: true
+    ci: false                            # never downloaded or redistributed by CI

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=one-os Documentation
+Comment=User, operator and developer guides
+Exec=/usr/local/bin/oneos-docs
+Icon=help-browser
+Categories=Documentation;

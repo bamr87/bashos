@@ -1,0 +1,263 @@
+#!/bin/bash
+# oneos-steamos — install the latest SteamOS onto this PC's M.2 (NVMe) drive.
+#
+#   sudo oneos-steamos                 wizard (text UI; works on the desktop, a console or serial)
+#   sudo oneos-steamos --unattended --yes [--source URL] [--keep-image]
+#
+# How: download Valve's SteamOS recovery image (the LAN boot server's cached copy if
+# there is one, else Valve's "latest" link), decompress it sparsely into RAM (or onto the
+# one-os stick), mount its root filesystem and run Valve's own installer inside it:
+# repair_device.sh all (NOPROMPT=1). Valve's installer always writes /dev/nvme0n1. On
+# PCs that aren't a Steam Deck, Valve's BIOS/controller updaters are replaced with no-ops
+# through the installer's own "vendored tool" directories.
+#
+# Valve's image contains Valve's software under Valve's terms (the Steam Subscriber
+# Agreement is inside the image). SteamOS on non-Valve hardware is unsupported by Valve.
+set -uo pipefail
+
+TARGET=/dev/nvme0n1                  # fixed by Valve's installer
+VALVE_LATEST=https://steamdeck-images.steamos.cloud/recovery/steamdeck-repair-latest.img.bz2
+WORK=/run/oneos-steamos
+LOG=/var/log/oneos-steamos.log
+NEED_RAM_GB=5                        # sparse image ~3.5 GB + headroom
+
+unattended=0 yes=0 source="" keep=0 wizard=1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --unattended) unattended=1; wizard=0; shift ;;
+    --yes) yes=1; shift ;;
+    --source) source="$2"; shift 2 ;;
+    --keep-image) keep=1; shift ;;
+    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+[[ $EUID -eq 0 ]] || { echo "run as root: sudo oneos-steamos" >&2; exit 1; }
+[[ -t 0 && -t 1 ]] || wizard=0
+command -v whiptail >/dev/null || wizard=0
+
+cmdline_arg() { tr ' ' '\n' </proc/cmdline | sed -n "s/^$1=//p" | tail -1; }
+SERVER="$(cmdline_arg oneos.server)"
+MAC="$(cmdline_arg oneos.mac)"     # set by the network boot menu; the server remembers installs by MAC
+mkdir -p "$WORK" "$(dirname "$LOG")"
+exec 3>>"$LOG"
+
+# ------------------------------------------------------------------ reporting
+# ttyS0 is for the test VMs. On a real PC nothing may drain that UART, and a write to it blocks
+# forever (seen: the install stalled mid-way). Never wait on it, and never let stdout be it.
+# shellcheck disable=SC2016  # $1 expands in the inner shell
+to_serial() { [[ -w /dev/ttyS0 ]] && timeout 2 sh -c 'echo "$1" >/dev/ttyS0' _ "$1" 2>/dev/null; return 0; }
+case "$(readlink /proc/self/fd/1 2>/dev/null)" in /dev/ttyS*) exec >/dev/null ;; esac
+case "$(readlink /proc/self/fd/2 2>/dev/null)" in /dev/ttyS*) exec 2>/dev/null ;; esac
+# Every step goes to the log, the screen, ttyS0 (tests) and the boot server (its wizard).
+report() {  # report <stage> <pct|-> <message>
+  local stage="$1" pct="$2" msg="$3"
+  printf '%s %-10s %4s %s\n' "$(date +%T)" "$stage" "$pct" "$msg" >&3
+  [[ $wizard == 1 ]] || printf ':: [%s] %s\n' "$stage" "$msg" >&2
+  to_serial "ONEOS-STEAMOS $stage $pct $msg"
+  if [[ -n $SERVER ]]; then
+    curl -fsS -m 3 -G "$SERVER/report" --data-urlencode "stage=$stage" --data-urlencode "pct=${pct/-/}" \
+      --data-urlencode "msg=$msg" --data-urlencode "host=$(hostname)" --data-urlencode "mac=$MAC" \
+      --data-urlencode "version=${installed:-}" >/dev/null 2>&1 &
+  fi
+  return 0
+}
+fail() {
+  report failed - "$*"
+  if [[ $wizard == 1 ]]; then
+    whiptail --title "SteamOS install failed" --msgbox "$*\n\nNothing more will be done. Log: $LOG" 14 72
+  else
+    echo "oneos-steamos: $*" >&2
+  fi
+  exit 1
+}
+say() {  # dialog in the wizard, plain text otherwise
+  if [[ $wizard == 1 ]]; then whiptail --title "$1" --msgbox "$2" "${3:-16}" 76; else printf '\n== %s\n%s\n' "$1" "$2"; fi
+}
+ask() {  # ask <title> <text> → 0 yes / 1 no
+  [[ $yes == 1 ]] && return 0
+  if [[ $wizard == 1 ]]; then whiptail --title "$1" --yesno "$2" "${3:-18}" 76; return; fi
+  [[ $unattended == 1 ]] && fail "refusing to continue unattended without --yes"
+  read -r -p "$2 [y/N] " a; [[ $a == [yY]* ]]
+}
+
+# ------------------------------------------------------------------ checks
+cleanup() {
+  set +e
+  for m in "$WORK"/root/{tmp,run/udev,run,sys/firmware/efi/efivars,sys,proc,dev/pts,dev,home} "$WORK/root"; do mountpoint -q "$m" && umount -l "$m"; done
+  [[ -n ${LOOP:-} ]] && losetup -d "$LOOP"
+  if [[ $keep == 0 ]]; then rm -f "$WORK/stage/recovery.img"; mountpoint -q "$WORK/stage" && umount "$WORK/stage"; fi
+}
+trap cleanup EXIT
+
+[[ -d /sys/firmware/efi ]] || fail "This PC was started in legacy BIOS mode. SteamOS only boots with UEFI: enable UEFI in the firmware setup and network/USB-boot again."
+[[ -b $TARGET ]] || fail "No M.2/NVMe drive found ($TARGET). Valve's installer only installs to $TARGET."
+
+board="$(cat /sys/class/dmi/id/board_name 2>/dev/null || true)"
+vendor="$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null || true)"
+is_deck=0; [[ $vendor == Valve* && $board =~ ^(Jupiter|Galileo)$ ]] && is_deck=1
+gpu="$(lspci -mm 2>/dev/null | awk -F'"' '/VGA|Display|3D/ {print $4" "$6; exit}')"
+
+# The disk this system runs from (stick, or nothing when network-booted) must not be the target.
+for src in $(findmnt -rno SOURCE /run/live/medium /run/live/persistence/* 2>/dev/null) $(blkid -L Ventoy 2>/dev/null); do
+  for d in $(lsblk -lnspo NAME,TYPE "$src" 2>/dev/null | awk '$2=="disk"{print $1}'); do
+    [[ "$(readlink -f "$d")" == "$(readlink -f "$TARGET")" ]] && fail "$TARGET is the drive this system started from — refusing."
+  done
+done
+lsblk -nrpo MOUNTPOINTS "$TARGET" | grep -q . && fail "$TARGET has mounted partitions; unmount them first."
+
+model="$(lsblk -dno MODEL "$TARGET" | sed 's/ *$//')"; size="$(lsblk -dno SIZE "$TARGET")"
+serial="$(lsblk -dno SERIAL "$TARGET" | sed 's/ *$//')"
+contents="$(lsblk -no NAME,SIZE,FSTYPE,LABEL "$TARGET" | tail -n +2 | sed 's/^/    /')"
+mem_gb=$(( $(awk '/MemAvailable/ {print $2}' /proc/meminfo) / 1048576 ))
+
+# ------------------------------------------------------------------ wizard: welcome
+hw_note="Steam Deck detected — Valve's firmware updates run as usual."
+[[ $is_deck == 0 ]] && hw_note="This is not a Steam Deck (${vendor:-?} ${board:-?}). SteamOS on other PCs is unsupported by Valve; Valve's BIOS/controller updaters will be skipped."
+[[ $gpu == *AMD* || $gpu == *ATI* || $gpu == *"Advanced Micro"* ]] || hw_note+="\nGPU: ${gpu:-unknown}. SteamOS's gaming mode works best on AMD GPUs."
+report preflight - "target $TARGET ($model, $size), deck=$is_deck, gpu=${gpu:-?}, ram_avail=${mem_gb}G"
+
+say "Install SteamOS" "This installs the latest SteamOS onto this PC's M.2 drive:\n\n    $TARGET  $model  $size\n\nusing Valve's recovery image and Valve's own installer.\n\n$hw_note\n\nValve's image is Valve's software, provided under Valve's terms (the Steam Subscriber Agreement is included in the image)." 20
+
+# ------------------------------------------------------------------ source
+if [[ -z $source ]]; then
+  source="$(cmdline_arg oneos.steamos_url)"
+  if [[ -z $source && -n $SERVER ]] && meta="$(curl -fsS -m 5 "$SERVER/steamos/latest.json" 2>/dev/null)"; then
+    source="$SERVER$(python3 -c 'import json,sys; print(json.load(sys.stdin)["url_path"])' <<<"$meta")"
+  fi
+  [[ -n $source ]] || source="$VALVE_LATEST"
+fi
+report source - "resolving $source"
+resolved="$(curl -fsSIL -m 30 -o /dev/null -w '%{url_effective}' "$source")" || fail "Can't reach $source — check the network connection."
+csize="$(curl -fsSIL -m 30 "$resolved" | awk 'tolower($1)=="content-length:"{v=$2} END{print v+0}' | tr -d '\r')"
+version="$(sed -nE 's/.*-([0-9]+\.[0-9]+\.[0-9]+)\.img(\.bz2)?$/\1/p' <<<"$resolved")"
+# Valve publishes .img.bz2; a captured SteamOS stick (make steamos-capture) is served as a raw .img.
+decompress=(lbzip2 -dc); [[ $resolved == *.img ]] && decompress=(cat)
+if [[ -n ${meta:-} && -z $version ]]; then version="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version") or "")' <<<"$meta")"; fi
+expected_sha=""
+[[ -n ${meta:-} ]] && expected_sha="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha256") or "")' <<<"$meta")"
+report source - "SteamOS ${version:-?} from $resolved ($(( csize / 1000000 )) MB)"
+
+# Staging: RAM if there's room, else the one-os stick's data partition.
+stage_dir=""
+if (( mem_gb >= NEED_RAM_GB )); then
+  mkdir -p "$WORK/stage"; mount -t tmpfs -o size=6G,mode=0700 oneos-steamos "$WORK/stage" || fail "could not create a RAM disk"
+  stage_dir="$WORK/stage"; stage_desc="RAM (${mem_gb} GB available)"
+elif p1="$(blkid -L Ventoy 2>/dev/null)" && mkdir -p /mnt/oneos-p1 && oneos-mount-p1 /mnt/oneos-p1 rw 2>/dev/null; then
+  stage_dir=/mnt/oneos-p1/oneos/steamos-staging; mkdir -p "$stage_dir"; stage_desc="the one-os stick (${p1})"
+else
+  fail "Not enough RAM to stage the image (${mem_gb} GB available, ${NEED_RAM_GB} GB needed) and no one-os stick to stage on."
+fi
+
+ask "Erase $TARGET?" "ALL DATA on this drive will be destroyed:\n\n    $TARGET   $model   $size   ${serial:+serial $serial}\n$contents\n\nSource:  SteamOS ${version:-?} — $(( csize / 1000000 )) MB from\n         $resolved\nStaging: $stage_desc\n\nContinue?" 22 || fail "cancelled — nothing was changed"
+if [[ $wizard == 1 && $yes == 0 ]]; then
+  typed="$(whiptail --title "Confirm" --inputbox "Type ERASE to wipe $TARGET ($model) and install SteamOS:" 10 76 3>&1 1>&2 2>&3)" || fail "cancelled — nothing was changed"
+  [[ $typed == ERASE ]] || fail "confirmation did not match — nothing was changed"
+fi
+
+# ------------------------------------------------------------------ download + decompress (sparse)
+img="$stage_dir/recovery.img"
+report download 0 "downloading and decompressing SteamOS ${version:-?}"
+download() {
+  curl -fsSL --retry 3 "$resolved" | tee >(sha256sum | cut -d' ' -f1 >"$WORK/sha256") |
+    pv -f -n -s "${csize:-0}" 2>"$WORK/progress" | "${decompress[@]}" | dd of="$img" bs=1M conv=sparse iflag=fullblock status=none
+}
+if [[ $wizard == 1 ]]; then
+  download & dl=$!
+  { while kill -0 $dl 2>/dev/null; do p="$(tail -n1 "$WORK/progress" 2>/dev/null)"; echo "${p:-0}"; sleep 1; done; } |
+    whiptail --title "Install SteamOS" --gauge "Downloading SteamOS ${version:-} ($(( csize / 1000000 )) MB) and decompressing into $stage_desc…" 8 76 0
+  wait $dl; rc=$?
+else
+  download & dl=$!; last=-1
+  while kill -0 $dl 2>/dev/null; do
+    p="$(tail -n1 "$WORK/progress" 2>/dev/null)"; p="${p:-0}"
+    (( p / 10 != last / 10 )) && { report download "$p" "downloading"; last=$p; }
+    sleep 2
+  done
+  wait $dl; rc=$?
+fi
+(( rc == 0 )) || fail "download or decompression failed (exit $rc) — the image may be corrupt or the connection dropped"
+got_sha="$(cat "$WORK/sha256")"
+report download 100 "downloaded; sha256 $got_sha"
+if [[ -n $expected_sha && $got_sha != "$expected_sha" ]]; then
+  fail "checksum mismatch: server says $expected_sha, got $got_sha"
+fi
+
+# ------------------------------------------------------------------ mount the image, prepare Valve's installer
+report prepare - "mounting the SteamOS image"
+LOOP="$(losetup -fP --show "$img")" || fail "losetup failed"
+udevadm settle -t 10 2>/dev/null || true
+R="$WORK/root"; mkdir -p "$R"
+mount -o ro "${LOOP}p3" "$R" || fail "could not mount the image's rootfs (${LOOP}p3)"
+mount "${LOOP}p5" "$R/home" || fail "could not mount the image's home (${LOOP}p5)"
+for d in dev dev/pts proc sys; do mount --bind "/$d" "$R/$d"; done
+# A plain bind of /sys leaves out efivarfs: Valve's boot loader step (steamcl-install) then
+# dies with "EFI variables are not supported on this system" and no boot entry is written.
+mount -t efivarfs efivarfs "$R/sys/firmware/efi/efivars" 2>/dev/null ||
+  mount --bind /sys/firmware/efi/efivars "$R/sys/firmware/efi/efivars" ||
+  fail "could not reach this PC's UEFI variables (/sys/firmware/efi/efivars)"
+mount -t tmpfs tmpfs "$R/tmp"; mount -t tmpfs tmpfs "$R/run"
+# lsblk reads PARTUUID/FSTYPE/PARTTYPE from udev's database: without it Valve's boot loader
+# step (steamcl-install) finds an ESP with no PARTUUID and dies ("line 464: 3: unbound variable").
+mkdir -p "$R/run/udev"
+if ! { mount --bind /run/udev "$R/run/udev" && mount -o remount,bind,ro "$R/run/udev"; }; then
+  fail "could not share udev's device database (/run/udev) with Valve's installer"
+fi
+tools="$R/home/deck/tools/repair_device.sh"
+[[ -x $tools || -f $tools ]] || fail "Valve's installer (home/deck/tools/repair_device.sh) isn't in this image — the image format changed"
+if ! grep -q 'repair_steps' "$tools" || ! grep -q 'NOPROMPT' "$tools"; then
+  fail "Valve's installer changed in an unexpected way; not running it"
+fi
+image_ver="$(sed -n 's/^VERSION_ID=//p' "$R/etc/os-release")"
+report prepare - "Valve installer found; image is SteamOS $image_ver ($(sed -n 's/^VARIANT_ID=//p' "$R/etc/os-release"))"
+if [[ $is_deck == 0 ]]; then
+  # Valve's installer uses these directories' tools instead of its own when they exist.
+  for t in jupiter-bios/jupiter-biosupdate jupiter-controller-fw/jupiter-controller-update; do
+    mkdir -p "$R/home/deck/$(dirname "$t")"
+    printf '#!/bin/sh\necho "one-os: not a Steam Deck - skipping %s"\nexit 0\n' "$(basename "$t")" >"$R/home/deck/$t"
+    chmod 0755 "$R/home/deck/$t"
+  done
+  report prepare - "not a Steam Deck: Valve's BIOS and controller updaters replaced with no-ops"
+fi
+
+# ------------------------------------------------------------------ run Valve's installer
+report install 0 "running Valve's installer (repair_device.sh all) → $TARGET"
+run_valve() {
+  chroot "$R" /usr/bin/env -i PATH=/usr/bin:/usr/sbin:/bin:/sbin HOME=/root TERM=dumb NOPROMPT=1 REBOOTPROMPT= \
+    bash /home/deck/tools/repair_device.sh all 2>&1
+}
+steps=0
+while IFS= read -r line; do
+  echo "$line" >&3
+  [[ $wizard == 1 ]] || echo "$line"
+  if [[ $line == *":: "* ]]; then
+    steps=$((steps + 1)); msg="${line#*:: }"
+    # shellcheck disable=SC2001  # strip ANSI colour codes (a regex, not a fixed string)
+    msg="$(sed 's/\x1b\[[0-9;]*m//g' <<<"$msg")"
+    report install "$(( steps * 100 / 14 > 99 ? 99 : steps * 100 / 14 ))" "$msg"
+  fi
+done < <(run_valve; echo "ONEOS-RC $?")
+rc="$(tail -n 50 "$LOG" | sed -n 's/^ONEOS-RC //p' | tail -1)"
+[[ $rc == 0 ]] || fail "Valve's installer failed (exit ${rc:-?}). See $LOG"
+
+# ------------------------------------------------------------------ verify
+report verify - "checking the installed system"
+labels="$(lsblk -nro PARTLABEL "$TARGET" | tr '\n' ' ')"
+for l in esp efi-A efi-B rootfs-A rootfs-B var-A var-B home; do
+  [[ " $labels " == *" $l "* ]] || fail "partition $l missing on $TARGET after install (have: $labels)"
+done
+chk="$WORK/chk"; mkdir -p "$chk"
+mount -o ro "$(blkid -t PARTLABEL=rootfs-A -o device "$TARGET"* | head -1)" "$chk" && installed="$(sed -n 's/^VERSION_ID=//p' "$chk/etc/os-release")"; umount "$chk" 2>/dev/null
+mount -o ro "$(blkid -t PARTLABEL=esp -o device "$TARGET"* | head -1)" "$chk" && fallback="$(find "$chk" -ipath '*/efi/boot/bootx64.efi' | head -1)"; umount "$chk" 2>/dev/null
+[[ $installed == "$image_ver" ]] || fail "installed version '$installed' doesn't match the image ($image_ver)"
+[[ -n ${fallback:-} ]] || fail "no UEFI boot loader in the ESP"
+report complete 100 "SteamOS $installed installed on $TARGET ($model)"
+to_serial "ONEOS-STEAMOS-INSTALLED $installed"
+
+if [[ $wizard == 1 ]]; then
+  if whiptail --title "SteamOS installed" --yesno "SteamOS $installed is installed on $TARGET.\n\nRemove the one-os stick (or choose 'Boot from local disk' in the network menu) and restart.\nThe first start runs SteamOS setup and a system update.\n\nRestart now?" 14 76; then
+    systemctl reboot
+  fi
+else
+  echo "SteamOS $installed installed on $TARGET."
+fi

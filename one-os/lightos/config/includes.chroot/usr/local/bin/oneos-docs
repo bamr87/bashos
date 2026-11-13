@@ -1,0 +1,11 @@
+#!/bin/bash
+# oneos-docs — open the one-os documentation: from the stick, else from the boot server.
+set -u
+server="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^oneos\.server=//p' | tail -1)"
+mnt=/run/oneos/docs-p1
+if blkid -L Ventoy >/dev/null 2>&1; then
+  sudo mkdir -p "$mnt" && sudo oneos-mount-p1 "$mnt" ro >/dev/null 2>&1
+  [[ -f $mnt/oneos/docs/index.html ]] && exec xdg-open "file://$mnt/oneos/docs/index.html"
+fi
+[[ -n $server ]] && exec xdg-open "$server/docs/index.html"
+echo "No documentation found: no one-os stick and no boot server." >&2; exit 1

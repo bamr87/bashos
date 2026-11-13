@@ -1,0 +1,16 @@
+[Unit]
+Description=one-os self-test hook (ADR-0003) and ready marker
+Wants=network-online.target
+After=network-online.target systemd-user-sessions.service local-fs.target
+ConditionPathExists=/usr/local/bin/oneos-selftest
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/oneos-selftest
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target
