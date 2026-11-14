@@ -1,6 +1,7 @@
 """VM launcher: firmware profiles, USB-on-xHCI stick, target disk, pcap, QMP, guest agent (PLAN §7.1).
 
-Control channels of every VM, all unix sockets in its directory:
+Control channels of every VM, all unix sockets in its directory (or in a short one under /tmp
+when that path is too long for a socket: a deep checkout, a long test name):
   <name>.qmp         QEMU monitor (screendump, send-key, quit)
   <name>.serial      ttyS0, interactive; everything is also logged to <name>.serial.log
   <name>.qga         qemu-guest-agent (exec, files) — see qga.py / ADR-0004
@@ -12,6 +13,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -20,6 +22,8 @@ from .config import Config
 from .qga import QGA, ExecResult, wait_agent
 
 PROFILES = ("uefi", "bios", "uefi-sb")
+# A unix socket's path must fit in sun_path: 108 bytes on Linux, 104 on macOS.
+SOCK_PATH_MAX = 100
 
 
 class QMP:
@@ -89,12 +93,15 @@ class VM:
         # pxe: boot from the network first (QEMU's TFTP serves build/netboot/tftp/boot.ipxe, which
         # chains to netboot/server.py on the host); target_bus "nvme" makes the target /dev/nvme0n1.
         self.pxe, self.target_bus = pxe, target_bus
+        self.sock_dir = self.dir
+        if len(str(self.dir / f"{name}.serial")) > SOCK_PATH_MAX:
+            self.sock_dir = Path(tempfile.mkdtemp(prefix="oneos-vm-", dir="/tmp"))
         self.serial_log = self.dir / f"{name}.serial.log"
-        self.serial_sock = self.dir / f"{name}.serial"
-        self.qga_path = self.dir / f"{name}.qga"
+        self.serial_sock = self.sock_dir / f"{name}.serial"
+        self.qga_path = self.sock_dir / f"{name}.qga"
         self.pcap = self.dir / f"{name}.pcap"
         self.stderr_log = self.dir / f"{name}.qemu.log"
-        self.qmp_path = self.dir / f"{name}.qmp"
+        self.qmp_path = self.sock_dir / f"{name}.qmp"
         self.proc: subprocess.Popen | None = None
         self.qmp: QMP | None = None
         self._serial_pos = 0
@@ -186,6 +193,7 @@ class VM:
 
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> VM:
+        self.sock_dir.mkdir(exist_ok=True)  # kill() removes a short one; the VM may start again
         for p in (self.qmp_path, self.serial_sock, self.qga_path):
             p.unlink(missing_ok=True)
         argv = self.argv()
@@ -270,6 +278,8 @@ class VM:
                 self.proc.kill()
                 self.proc.wait(5)
         self._close_qmp()
+        if self.sock_dir != self.dir:
+            shutil.rmtree(self.sock_dir, ignore_errors=True)
 
     def _close_qmp(self) -> None:
         if self.qmp:
