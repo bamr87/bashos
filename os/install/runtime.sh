@@ -108,6 +108,7 @@ os_commands() {
   os_link "$layer/os/bin/bashos-console" /usr/local/bin/bashos-console
   os_link "$layer/os/bin/bashos-harness" /usr/local/bin/bashos-harness
   os_link "$layer/os/bin/bashos-provision" /usr/local/sbin/bashos-provision
+  os_link "$layer/os/bin/bashos-firstboot" /usr/local/sbin/bashos-firstboot
 }
 
 phase_runtime() {

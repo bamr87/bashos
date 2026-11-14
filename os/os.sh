@@ -32,7 +32,9 @@ usage: bashos os <command>
   console                 attach the shared tmux console (what tty1 shows)
   heal                    add a missing bashos window to the console (the timer's job)
   uninstall [-n] [--purge]  remove what install added (--purge: /opt/bashos and /etc/bashos too)
-  image <verb>            build | test — the bootable image (os/image/README.md)
+  iso <verb>              build | seed — bashOS on Amrchy: the ISO, and the cidata drive that
+                          installs it unattended (os/iso/README.md)
+  image <verb>            build | test — the Debian 13 disk image (os/image/README.md)
   version                 the installed layer's version
 EOF
 }
@@ -128,6 +130,10 @@ cmd_status() {
   fi
   if [[ -f /var/lib/bashos/provisioned ]]; then
     verdict " OK " provision "first boot done $(cat /var/lib/bashos/provisioned)"
+  elif [[ -f /var/lib/bashos/firstboot-failed ]]; then
+    verdict CRIT provision "first boot failed $(cat /var/lib/bashos/firstboot-failed) — /var/log/bashos-firstboot.log, then: sudo bashos-firstboot"
+  elif [[ -f /var/lib/bashos/firstboot-pending ]]; then
+    verdict WARN provision "first boot waiting for a user or the network — journalctl -u bashos-firstboot"
   fi
   return "$STATUS"
 }
@@ -258,7 +264,7 @@ cmd_uninstall() {
   done
   os_step "system"
   for l in /usr/local/bin/bashos /usr/local/bin/os-health /usr/local/bin/bashos-os /usr/local/bin/bashos-console \
-    /usr/local/bin/bashos-harness /usr/local/sbin/bashos-provision; do
+    /usr/local/bin/bashos-harness /usr/local/sbin/bashos-provision /usr/local/sbin/bashos-firstboot; do
     [[ -L $(os_path "$l") && $(readlink "$(os_path "$l")") == "$BASHOS_OS_PATH"/* ]] && os_root rm -f "$(os_path "$l")"
   done
   l=/usr/local/bin/opencode
@@ -351,6 +357,13 @@ case $cmd in
       build) shift; exec "$OS_DIR/image/build.sh" "$@" ;;
       test) shift; exec "$OS_DIR/image/test/boot-smoke.sh" "$@" ;;
       *) os_die "usage: bashos os image build|test [options] (os/image/README.md)" ;;
+    esac
+    ;;
+  iso)
+    case ${1:-} in
+      build) shift; exec "$OS_DIR/iso/build.sh" "$@" ;;
+      seed) shift; exec "$OS_DIR/iso/seed.sh" "$@" ;;
+      *) os_die "usage: bashos os iso build|seed [options] (os/iso/README.md)" ;;
     esac
     ;;
   version) printf 'bashos os %s (%s)\n' "$(os_version)" "$BASHOS_OS_PATH" ;;

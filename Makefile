@@ -14,7 +14,7 @@ lint:
 	$(VENV)/bin/ruff check .
 	shellcheck bin/bashos one-os/one-os.sh
 	shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
-	shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
+	shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/iso/*.sh os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
 
 repl:
 	$(VENV)/bin/bashos

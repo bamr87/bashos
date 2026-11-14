@@ -1,0 +1,24 @@
+# bashOS on Amrchy, first boot: the runtime, the engine and the hub, once the machine is online.
+# The ISO's layer (os/amrchy/layer/system.sh) installs and arms this; bashos-firstboot disarms it.
+[Unit]
+Description=bashOS first boot on Amrchy (runtime, engine, hub)
+Documentation=https://github.com/bamr87/bashos/blob/main/docs/OS.md
+ConditionPathExists=/var/lib/bashos/firstboot-pending
+# Amrchy masks NetworkManager-wait-online, so the network is not waited for here: the script
+# checks it, and exits 75 to be started again a minute later until it is up.
+After=network-online.target NetworkManager.service systemd-user-sessions.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bashos-firstboot
+Restart=on-failure
+RestartSec=60
+StandardOutput=journal+console
+StandardError=journal+console
+# A first boot creates the venv, fetches the engine and clones the hub.
+TimeoutStartSec=45min
+
+[Install]
+WantedBy=multi-user.target
