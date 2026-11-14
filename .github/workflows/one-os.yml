@@ -65,7 +65,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y live-build debootstrap squashfs-tools xorriso mtools isolinux syslinux-common \
             qemu-system-x86 qemu-utils ovmf seabios ipxe-qemu exfatprogs exfat-fuse dosfstools e2fsprogs \
-            parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil tesseract-ocr
+            parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil python3-markdown tesseract-ocr ipxe bzip2 lbzip2
           sudo modprobe nbd max_part=16
       - run: make fetch
       # In the builder container: Ubuntu's live-build is an older fork whose options differ from
@@ -115,7 +115,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y live-build debootstrap squashfs-tools xorriso mtools isolinux syslinux-common \
             qemu-system-x86 qemu-utils ovmf seabios ipxe-qemu exfatprogs exfat-fuse dosfstools e2fsprogs \
-            parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil tesseract-ocr
+            parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil python3-markdown tesseract-ocr ipxe bzip2 lbzip2
           sudo modprobe nbd max_part=16
       - name: Free disk space for large ISOs
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
