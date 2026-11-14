@@ -1,0 +1,21 @@
+# The bashOS layer on Arch (Amrchy) — the same groups as ../base.list, in Arch's package names.
+# Amrchy's own install set already carries most of them (tmux, git, jq, ripgrep, fd, bat, btop,
+# avahi, nss-mdns, ufw, openssh); `bashos os install` adds only what is missing, with pacman.
+# Line format as ../base.list: package names, then an optional `cmd:NAME` guard.
+
+# runtime: the kernel's Python (venv is part of it on Arch), the refine loop's shellcheck, the
+# engine's Node (Amrchy installs Node through mise: its shim satisfies the guard)
+python
+shellcheck
+nodejs npm cmd:node
+git ca-certificates curl rsync
+
+# the console: one shared tmux session on the desktop and every ssh login
+tmux zsh sudo less
+
+# what the probes and the verdict floor read
+procps-ng iproute2 lm_sensors smartmontools
+jq ripgrep fd bat btop
+
+# reaching the box: ssh, mDNS (HOST.local), a firewall
+openssh avahi nss-mdns ufw

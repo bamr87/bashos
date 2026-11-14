@@ -20,8 +20,10 @@ usage() {
   cat <<'EOF'
 usage: bashos os <command>
 
-  install [-n] [...]      turn this Debian 13 machine into a bashOS machine (install --help)
-  update [-n] [--system]  pull the layer, re-apply it, run pending migrations (--system: apt too)
+  install [-n] [...]      turn this Amrchy (Arch) or Debian 13 machine into a bashOS machine
+                          (install --help)
+  update [-n] [--system]  pull the layer, re-apply it, run pending migrations (--system: the
+                          system too — `omarchy update` on Amrchy, apt full-upgrade on Debian)
   migrate [--pending]     run pending migrations (--pending: list them; exit 1 when none)
   status                  what is running, as [ OK ]/[WARN]/[CRIT] verdicts (exit = worst)
   engine [verb]           status | update | verify | latest | fetch VERSION DIR — OpenCode, kept
@@ -51,6 +53,13 @@ cmd_status() {
   local v session=${BASHOS_CONSOLE_SESSION:-console} port=${BASHOS_HARNESS_PORT:-4001} code
   printf 'bashos os status · %s · %s\n\n' "$(hostname 2>/dev/null)" "$(date '+%Y-%m-%d %H:%M')"
 
+  case $(os_base) in
+    amrchy) verdict " OK " base "Amrchy $(os_amrchy_version) on Arch · kernel $(uname -r)" ;;
+    debian) verdict " OK " base "$(os_release PRETTY_NAME) · kernel $(uname -r)" ;;
+    arch) verdict WARN base "Arch without Amrchy — the desktop pieces are skipped" ;;
+    *) verdict WARN base "$(os_release PRETTY_NAME): not a base bashOS installs on" ;;
+  esac
+
   if [[ -x $BASHOS_OS_PATH/os/os.sh ]]; then
     verdict " OK " layer "$BASHOS_OS_PATH $(os_version)"
   else
@@ -72,7 +81,7 @@ cmd_status() {
     verdict WARN auth "no Claude credential — run: claude (sign in once)"
   fi
 
-  if [[ ${BASHOS_CONSOLE:-auto} == off ]]; then
+  if [[ $(os_console_mode) == off ]]; then
     verdict " OK " console "off (BASHOS_CONSOLE=off)"
   elif tmux has-session -t "=$session" 2>/dev/null; then
     local windows clients
@@ -183,8 +192,15 @@ cmd_update() {
   os_dry || os_ok "layer at $(os_version)"
   if ((system)); then
     os_step "system packages"
-    os_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    os_root env DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
+    if [[ $(os_base) == amrchy ]]; then
+      # The framework's own update path: packages, its migrations, its hooks (one sudo prompt).
+      os_run omarchy-update -y
+    elif os_arch_base; then
+      os_root pacman -Syu --noconfirm
+    else
+      os_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+      os_root env DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
+    fi
   fi
   # The freshly pulled code re-applies itself, then brings this install forward.
   local flags=()
@@ -235,6 +251,10 @@ cmd_uninstall() {
   fi
   for f in .zprofile .bash_profile .profile .zshrc .bashrc .tmux.conf; do
     os_block_drop "$HOME/$f"
+  done
+  os_block_drop "$HOME/.config/hypr/autostart.lua" --
+  for f in "$HOME"/.local/share/applications/{bashos-console,bashos}.desktop; do
+    [[ -e $f ]] && os_run rm -f "$f"
   done
   os_step "system"
   for l in /usr/local/bin/bashos /usr/local/bin/os-health /usr/local/bin/bashos-os /usr/local/bin/bashos-console \
