@@ -1,0 +1,50 @@
+name: upstream sync
+
+# Keeps this fork moving with upstream Omarchy. Each day an agent follows
+# agents/skills/upstream-sync.md: bin/upstream-sync merges upstream's new work onto a sync branch,
+# the agent declines what default/upstream.toml and the fork's divergence say to leave out,
+# resolves conflicts in the fork's favour, runs the checks, and opens ONE pull request with the
+# report. A person merges it; nothing here merges, pushes to main, or force-pushes.
+#
+# The lane (kill switch, credentials, the agent step, the result assertion) is the bamr87 hub's
+# ai-lane. It is a new scheduled agent loop, so it stays off until the repo variable
+# UPSTREAM_SYNC_ENABLED is "true"; a manual dispatch always runs.
+on:
+  schedule:
+    - cron: "41 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: bamr87/bamr87/.github/workflows/ai-lane.yml@main
+    with:
+      lane: upstream-sync
+      switch: UPSTREAM_SYNC_ENABLED
+      prompt: >-
+        Follow agents/skills/upstream-sync.md exactly: bring upstream Omarchy's new features and
+        improvements into this fork, decline what the policy and the fork's divergence say to
+        leave out (recording why), resolve conflicts in the fork's favour, run the checks, and
+        open ONE pull request against main with the report. Never merge, push to main, or
+        force-push. Write the pull request's URL, or "nothing pending", to upstream-sync-result.txt.
+      tools: "Bash,Read,Write,Edit,Grep,Glob"
+      setup-python: "3.12"
+      # The lane checks out shallow; the sync needs history and upstream.
+      pre-run: |
+        git fetch --quiet --unshallow origin || true
+        git config user.name "upstream-sync[bot]"
+        git config user.email "upstream-sync@users.noreply.github.com"
+        bin/upstream-sync status
+      max-turns: "120"
+      max-budget-usd: "15"
+      timeout-minutes: 90
+      result-file: upstream-sync-result.txt
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_PAT: ${{ secrets.FLEET_TOKEN }}

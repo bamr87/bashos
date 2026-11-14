@@ -1,0 +1,362 @@
+#!/usr/bin/python3
+"""Keep this fork moving with upstream Omarchy, one reviewed sync at a time.
+
+The mechanical half of the upstream sync. The judgment half (what is a feature or an
+improvement worth taking, how a conflict should come out) is an agent following
+agents/skills/upstream-sync.md. Policy lives in default/upstream.toml; decisions are
+recorded in .upstream/ledger.tsv.
+
+A sync is "merge, then diverge": upstream is merged into a sync branch, so git keeps it as an
+ancestor and the next sync brings only what is new, and an upstream change this fork leaves out
+is reverted on that branch with its reason in the ledger. Source stays in upstream's naming
+(bin/rebrand brands builds), so the merge conflicts only where this fork really diverged.
+
+  bin/upstream-sync status              what is pending, and the last sync
+  bin/upstream-sync plan [--json]       each pending upstream change, with policy flags
+  bin/upstream-sync merge               branch off the fork and merge upstream (exit 3: conflicts)
+  bin/upstream-sync decline SHA -r WHY  leave an upstream change out: revert it, record why
+  bin/upstream-sync check               the gates in default/upstream.toml, plus a marker scan
+  bin/upstream-sync finish              write the ledger, commit it, print the PR report's path
+
+--no-fetch skips fetching upstream (offline, or a test's local upstream).
+"""
+
+import argparse
+import datetime
+import json
+import re
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+CONFLICT = 3
+MARKER = re.compile(r"^(<{7}|>{7})( |$)", re.M)
+
+
+def git(*args, check=True, root=None):
+    proc = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+    if check and proc.returncode != 0:
+        raise SystemExit(f"git {' '.join(args)}: {proc.stderr.strip() or proc.stdout.strip()}")
+    return proc.stdout.strip()
+
+
+ROOT = Path(git("rev-parse", "--show-toplevel"))
+STATE = Path(git("rev-parse", "--git-dir", root=ROOT)).resolve() / "upstream-sync"
+LEDGER = ROOT / ".upstream" / "ledger.tsv"
+
+
+def config():
+    data = tomllib.loads((ROOT / "default" / "upstream.toml").read_text(encoding="utf-8"))
+    up, fork, policy = data.get("upstream", {}), data.get("fork", {}), data.get("policy", {})
+    for section, key in ((up, "url"), (up, "branch"), (fork, "branch")):
+        if not section.get(key):
+            raise SystemExit(f"default/upstream.toml: {key} is required")
+    up.setdefault("remote", "upstream")
+    fork.setdefault("sync_branch_prefix", "upstream-sync/")
+    return {
+        "upstream": up,
+        "fork": fork,
+        "owned": policy.get("fork_owned", []),
+        "decline": [_decline_rule(r) for r in policy.get("decline", [])],
+        "checks": data.get("checks", {}).get("commands", []),
+    }
+
+
+def _decline_rule(rule):
+    kind, _, pattern = rule.partition(":")
+    if kind not in ("subject", "path") or not pattern:
+        raise SystemExit(f'default/upstream.toml: decline rule {rule!r} must start "subject:" or "path:"')
+    return kind, re.compile(pattern)
+
+
+def load_state():
+    path = STATE / "state.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def save_state(state):
+    STATE.mkdir(parents=True, exist_ok=True)
+    (STATE / "state.json").write_text(json.dumps(state, indent=2) + "\n")
+
+
+def upstream_ref(cfg, fetch):
+    up = cfg["upstream"]
+    remotes = git("remote").split()
+    if up["remote"] not in remotes:
+        git("remote", "add", up["remote"], up["url"])
+    if fetch:
+        git("fetch", "--quiet", up["remote"], up["branch"])
+    return f"{up['remote']}/{up['branch']}"
+
+
+def owned(path, cfg):
+    return any(path == o or (o.endswith("/") and path.startswith(o)) for o in cfg["owned"])
+
+
+def change(sha, cfg):
+    """One upstream change: a PR's merge commit or a direct commit on upstream's branch."""
+    parents = git("rev-list", "--parents", "-n", "1", sha).split()[1:]
+    subject, _, body = git("log", "-1", "--format=%s%n%b", sha).partition("\n")
+    pr = None
+    if m := re.match(r"Merge pull request #(\d+)", subject):
+        pr = int(m.group(1))
+        subject = next((line for line in body.splitlines() if line.strip()), subject)
+    elif m := re.search(r"\(#(\d+)\)\s*$", subject):
+        pr = int(m.group(1))
+    files, added, removed = [], 0, 0
+    if parents:
+        for line in git("diff", "--numstat", parents[0], sha).splitlines():
+            a, d, path = line.split("\t", 2)
+            files.append(path)
+            added += int(a) if a.isdigit() else 0
+            removed += int(d) if d.isdigit() else 0
+    date, author = git("log", "-1", "--format=%cs%x09%an", sha).split("\t", 1)
+    declines = [f"{k}:{p.pattern}" for k, p in cfg["decline"]
+                if (k == "subject" and p.search(subject)) or (k == "path" and any(p.search(f) for f in files))]
+    return {
+        "sha": sha,
+        "date": date,
+        "author": author,
+        "subject": subject.strip(),
+        "pr": pr,
+        "merge": len(parents) > 1,
+        "files": len(files),
+        "added": added,
+        "removed": removed,
+        "fork_owned": sorted(f for f in files if owned(f, cfg)),
+        "decline_rules": declines,
+    }
+
+
+def pending(cfg, ref, base_rev="HEAD"):
+    base = git("merge-base", base_rev, ref)
+    shas = git("rev-list", "--first-parent", "--reverse", f"{base}..{ref}").split()
+    return base, [change(s, cfg) for s in shas]
+
+
+def ledger_last():
+    if not LEDGER.exists():
+        return None
+    rows = [line.split("\t") for line in LEDGER.read_text().splitlines() if line and not line.startswith("#")]
+    return rows[-1] if rows else None
+
+
+def describe(c, cfg):
+    url = cfg["upstream"]["url"].removesuffix(".git")
+    flags = ([f"FORK-OWNED: {', '.join(c['fork_owned'])}"] if c["fork_owned"] else []) + \
+            [f"DECLINE? {r}" for r in c["decline_rules"]]
+    pr = f"{url}/pull/{c['pr']}" if c["pr"] else f"{url}/commit/{c['sha'][:12]}"
+    line = f"{c['sha'][:9]} {c['date']} {c['subject']}  ({c['files']} files +{c['added']} -{c['removed']}) {pr}"
+    return line + ("".join(f"\n          ! {f}" for f in flags))
+
+
+# ---------------------------------------------------------------------------- commands
+
+
+def cmd_status(args, cfg):
+    ref = upstream_ref(cfg, args.fetch)
+    _, changes = pending(cfg, ref)
+    head = git("rev-parse", "--short", ref)
+    print(f"upstream   {cfg['upstream']['url']} {cfg['upstream']['branch']} @ {head}")
+    print(f"fork       {cfg['fork']['branch']} (here: {git('rev-parse', '--abbrev-ref', 'HEAD')})")
+    print(f"pending    {len(changes)} upstream change(s) not yet merged here")
+    if last := ledger_last():
+        print(f"last sync  {last[0]}: {last[1][:9]} {last[2]} — {last[3]}")
+    state = load_state()
+    if state.get("branch"):
+        print(f"in flight  {state['branch']}: merging up to {state['upstream_head'][:9]}, "
+              f"{len(state.get('declined', []))} declined, conflicts: {', '.join(state.get('conflicts', [])) or 'none'}")
+    return 0
+
+
+def cmd_plan(args, cfg):
+    ref = upstream_ref(cfg, args.fetch)
+    _, changes = pending(cfg, ref)
+    if args.json:
+        print(json.dumps(changes, indent=2))
+        return 0
+    if not changes:
+        print("nothing pending: this fork has every upstream change")
+        return 0
+    flagged = sum(1 for c in changes if c["fork_owned"] or c["decline_rules"])
+    print(f"{len(changes)} pending upstream change(s), {flagged} flagged:\n")
+    for c in changes:
+        print(describe(c, cfg))
+    return 0
+
+
+def cmd_merge(args, cfg):
+    if git("status", "--porcelain", "--untracked-files=no"):
+        raise SystemExit("the worktree has uncommitted changes — commit or stash them first")
+    ref = upstream_ref(cfg, args.fetch)
+    base, changes = pending(cfg, ref)
+    if not changes:
+        print("nothing pending: this fork has every upstream change")
+        return 0
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if not branch.startswith(cfg["fork"]["sync_branch_prefix"]):
+        name = cfg["fork"]["sync_branch_prefix"] + datetime.date.today().isoformat()
+        n = 2
+        while git("rev-parse", "--verify", "--quiet", name, check=False):
+            name = f"{cfg['fork']['sync_branch_prefix']}{datetime.date.today().isoformat()}-{n}"
+            n += 1
+        git("switch", "-c", name)
+        branch = name
+    head = git("rev-parse", ref)
+    state = {"branch": branch, "base": base, "upstream_head": head, "declined": [], "conflicts": [],
+             "checks": None, "started": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    message = (f"Merge upstream {cfg['upstream']['branch']}@{head[:9]} into {cfg['fork']['branch']} "
+               f"({len(changes)} changes)")
+    proc = subprocess.run(["git", "merge", "--no-ff", "-m", message, head], cwd=ROOT, capture_output=True, text=True)
+    if proc.returncode != 0:
+        state["conflicts"] = git("diff", "--name-only", "--diff-filter=U").splitlines()
+        save_state(state)
+        if not state["conflicts"]:
+            raise SystemExit(f"git merge failed: {proc.stderr.strip()}")
+        print(f"{branch}: merging {len(changes)} upstream change(s) stopped on {len(state['conflicts'])} conflict(s):")
+        for path in state["conflicts"]:
+            print(f"  {path}{'   (fork-owned: the fork wins)' if owned(path, cfg) else ''}")
+        print("resolve them (agents/skills/upstream-sync.md), `git add` each, then `git commit --no-edit`")
+        return CONFLICT
+    save_state(state)
+    print(f"{branch}: merged {len(changes)} upstream change(s) cleanly ({message})")
+    return 0
+
+
+def cmd_decline(args, cfg):
+    state = load_state()
+    if not state.get("branch") or git("rev-parse", "--abbrev-ref", "HEAD") != state["branch"]:
+        raise SystemExit("no sync in flight here — run `bin/upstream-sync merge` first")
+    if git("diff", "--name-only", "--diff-filter=U"):
+        raise SystemExit("finish the merge first: resolve, `git add`, `git commit --no-edit`")
+    sha = git("rev-parse", args.sha)
+    if subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"], cwd=ROOT).returncode != 0:
+        raise SystemExit(f"{sha[:9]} is not in this sync's merge")
+    c = change(sha, cfg)
+    revert = ["git", "revert", "--no-edit"] + (["-m", "1"] if c["merge"] else []) + [sha]
+    proc = subprocess.run(revert, cwd=ROOT, capture_output=True, text=True)
+    state["declined"].append({"sha": sha, "subject": c["subject"], "reason": args.reason})
+    save_state(state)
+    if proc.returncode != 0:
+        print(f"reverting {sha[:9]} conflicts with later upstream work — resolve, `git add`, then "
+              "`git revert --continue` (the decline is already recorded)")
+        return CONFLICT
+    message = git("log", "-1", "--format=%B")
+    git("commit", "--amend", "-m", f"{message}\n\nDeclined: {args.reason}\nUpstream-Declined: {sha}")
+    print(f"declined {sha[:9]} {c['subject']} — {args.reason}")
+    return 0
+
+
+def markers():
+    found = []
+    for path in git("ls-files").splitlines():
+        p = ROOT / path
+        try:
+            if MARKER.search(p.read_text(encoding="utf-8")):
+                found.append(path)
+        except (UnicodeDecodeError, OSError):
+            continue
+    return found
+
+
+def cmd_check(args, cfg):
+    results = []
+    left = markers()
+    results.append({"command": "conflict markers", "ok": not left, "detail": ", ".join(left)})
+    for command in cfg["checks"]:
+        proc = subprocess.run(command, cwd=ROOT, shell=True, capture_output=True, text=True)
+        tail = (proc.stdout + proc.stderr).strip().splitlines()[-3:]
+        results.append({"command": command, "ok": proc.returncode == 0, "detail": " / ".join(tail)})
+    for r in results:
+        print(f"{'ok  ' if r['ok'] else 'FAIL'}  {r['command']}" + ("" if r["ok"] else f"\n      {r['detail']}"))
+    state = load_state()
+    if state:
+        state["checks"] = results
+        save_state(state)
+    return 0 if all(r["ok"] for r in results) else 1
+
+
+def cmd_finish(args, cfg):
+    state = load_state()
+    if not state.get("branch") or git("rev-parse", "--abbrev-ref", "HEAD") != state["branch"]:
+        raise SystemExit("no sync in flight here — run `bin/upstream-sync merge` first")
+    if git("diff", "--name-only", "--diff-filter=U") or markers():
+        raise SystemExit("unresolved conflicts remain — resolve them first")
+    if subprocess.run(["git", "merge-base", "--is-ancestor", state["upstream_head"], "HEAD"], cwd=ROOT).returncode:
+        raise SystemExit("the upstream merge is not committed yet — `git commit --no-edit`")
+    shas = git("rev-list", "--first-parent", "--reverse", f"{state['base']}..{state['upstream_head']}").split()
+    declined = {d["sha"]: d for d in state["declined"]}
+    today = datetime.date.today().isoformat()
+    rows, taken = [], []
+    for sha in shas:
+        c = change(sha, cfg)
+        if sha in declined:
+            rows.append([today, sha, "declined", c["subject"], declined[sha]["reason"]])
+        else:
+            taken.append(c)
+            rows.append([today, sha, "taken", c["subject"], ""])
+    with LEDGER.open("a", encoding="utf-8") as ledger:
+        for row in rows:
+            ledger.write("\t".join(v.replace("\t", " ").replace("\n", " ") for v in row) + "\n")
+    git("add", str(LEDGER.relative_to(ROOT)))
+    git("commit", "-m", f"Record upstream sync to {cfg['upstream']['branch']}@{state['upstream_head'][:9]}")
+    report = render_report(cfg, state, taken, list(declined.values()), len(shas))
+    (STATE / "report.md").write_text(report)
+    print(STATE / "report.md")
+    return 0
+
+
+def render_report(cfg, state, taken, declined, total):
+    url = cfg["upstream"]["url"].removesuffix(".git")
+    head = state["upstream_head"]
+    lines = [
+        f"Upstream sync: **{len(taken)} taken, {len(declined)} declined** of {total} upstream change(s), "
+        f"up to [{cfg['upstream']['branch']}@{head[:9]}]({url}/commit/{head}) "
+        f"([compare]({url}/compare/{state['base'][:12]}...{head[:12]})).",
+        "",
+        "Prepared by bin/upstream-sync and an agent following agents/skills/upstream-sync.md. "
+        "A human merges this; nothing merges itself.",
+        "",
+        "## Declined",
+        "",
+    ]
+    lines += [f"- `{d['sha'][:9]}` {d['subject']}: {d['reason']}" for d in declined] or ["None."]
+    lines += ["", "## Conflicts resolved", ""]
+    lines += [f"- `{p}`" + (" (fork-owned: the fork's version kept)" if owned(p, cfg) else "")
+              for p in state.get("conflicts", [])] or ["None."]
+    lines += ["", "## Checks", ""]
+    checks = state.get("checks")
+    lines += ([f"- {'✅' if r['ok'] else '❌'} `{r['command']}`" for r in checks] if checks
+              else ["- not run (`bin/upstream-sync check`)"])
+    lines += ["", f"## Taken ({len(taken)})", ""]
+    for c in taken[:80]:
+        ref = f"[#{c['pr']}]({url}/pull/{c['pr']})" if c["pr"] else f"[`{c['sha'][:9]}`]({url}/commit/{c['sha']})"
+        subject = re.sub(rf"\s*\(#{c['pr']}\)\s*$", "", c["subject"]) if c["pr"] else c["subject"]
+        lines.append(f"- {ref} {subject}")
+    if len(taken) > 80:
+        lines.append(f"- … and {len(taken) - 80} more (see the compare link and .upstream/ledger.tsv)")
+    return "\n".join(lines) + "\n"
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="bin/upstream-sync", description=__doc__.split("\n\n")[0])
+    parser.add_argument("--no-fetch", dest="fetch", action="store_false", help="do not fetch upstream first")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("status")
+    plan = sub.add_parser("plan")
+    plan.add_argument("--json", action="store_true")
+    sub.add_parser("merge")
+    decline = sub.add_parser("decline")
+    decline.add_argument("sha")
+    decline.add_argument("-r", "--reason", required=True)
+    sub.add_parser("check")
+    sub.add_parser("finish")
+    args = parser.parse_args()
+    cfg = config()
+    return {"status": cmd_status, "plan": cmd_plan, "merge": cmd_merge, "decline": cmd_decline,
+            "check": cmd_check, "finish": cmd_finish}[args.cmd](args, cfg)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

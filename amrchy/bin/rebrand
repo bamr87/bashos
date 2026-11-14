@@ -1,0 +1,288 @@
+#!/usr/bin/python3
+"""Rewrite this tree to the identity in default/brand.toml.
+
+Dry-run is the default. --apply writes. --check fails if the previous id
+remains outside the preserve rules.
+"""
+
+import argparse
+import os
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+SKIP_DIRS = {".git", ".kilo"}
+TEXT_SKIP_SUFFIXES = {
+    ".png", ".webp", ".jpg", ".jpeg", ".gif", ".ico", ".pdf",
+    ".ttf", ".otf", ".woff", ".woff2", ".gz", ".zip", ".xz", ".zst",
+}
+
+
+def repo_root(start):
+    current = Path(start).resolve()
+    for candidate in [current, *current.parents]:
+        if (candidate / "default" / "brand.toml").is_file():
+            return candidate
+    return current
+
+
+def load_config(path):
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    identity = data.get("identity") or {}
+    previous = data.get("previous") or {}
+    for section, fields in ((identity, "identity"), (previous, "previous")):
+        for key in ("id", "name", "env"):
+            if not section.get(key):
+                raise SystemExit(f"brand config {fields}.{key} is required")
+    preserve = data.get("preserve") or {}
+    patterns = preserve.get("patterns") or []
+    compiled = []
+    for pattern in patterns:
+        compiled.append(re.compile(pattern, re.IGNORECASE))
+    substitute = data.get("substitute") or {}
+    pairs = sorted(substitute.items(), key=lambda item: len(item[0]), reverse=True)
+    return identity, previous, compiled, pairs
+
+
+def variants(previous, identity):
+    return [
+        (previous["env"], identity["env"]),
+        (previous["name"], identity["name"]),
+        (previous["id"], identity["id"]),
+    ]
+
+
+def mask_preserves(text, patterns):
+    if not patterns:
+        return text, []
+    spans = []
+    for pattern in patterns:
+        spans.extend(match.span() for match in pattern.finditer(text))
+    if not spans:
+        return text, []
+    spans.sort(key=lambda span: (span[0], -(span[1] - span[0])))
+    chosen = []
+    cursor = -1
+    for start, end in spans:
+        if start < cursor:
+            continue
+        chosen.append((start, end))
+        cursor = end
+    pieces = []
+    kept = []
+    last = 0
+    for index, (start, end) in enumerate(chosen):
+        pieces.append(text[last:start])
+        token = f"\x00KEEP{index}\x00"
+        pieces.append(token)
+        kept.append(text[start:end])
+        last = end
+    pieces.append(text[last:])
+    return "".join(pieces), kept
+
+
+def unmask(text, kept):
+    for index, value in enumerate(kept):
+        text = text.replace(f"\x00KEEP{index}\x00", value, 1)
+    return text
+
+
+def apply_pairs(text, pairs):
+    for old, new in pairs:
+        if old and old != new:
+            text = text.replace(old, new)
+    return text
+
+
+def rewrite(text, substitutions, patterns, pairs):
+    text = apply_pairs(text, substitutions)
+    masked, kept = mask_preserves(text, patterns)
+    masked = apply_pairs(masked, pairs)
+    return unmask(masked, kept), len(kept)
+
+
+def is_binary(path, data):
+    if path.suffix.lower() in TEXT_SKIP_SUFFIXES:
+        return True
+    return b"\x00" in data[:8192]
+
+
+def should_skip(rel, config_rel):
+    parts = rel.parts
+    if parts and parts[0] in SKIP_DIRS:
+        return True
+    return rel == config_rel
+
+
+def walk_files(root, config_rel):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in SKIP_DIRS]
+        for name in filenames:
+            path = Path(dirpath) / name
+            if path.is_symlink():
+                continue
+            rel = path.relative_to(root)
+            if should_skip(rel, config_rel):
+                continue
+            yield path, rel
+
+
+def rename_map(root, config_rel, pairs):
+    mapping = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel_dir = Path(dirpath).relative_to(root)
+        if rel_dir.parts and rel_dir.parts[0] in SKIP_DIRS:
+            dirnames[:] = []
+            continue
+        dirnames[:] = [name for name in dirnames if name not in SKIP_DIRS]
+        for name in dirnames + filenames:
+            source = rel_dir / name
+            if should_skip(source, config_rel):
+                continue
+            target_name = apply_pairs(name, pairs)
+            if target_name != name:
+                mapping[source] = source.with_name(target_name)
+    return mapping
+
+
+def plan_destinations(mapping):
+    occupied = set(mapping)
+    destinations = {}
+    for source, target in mapping.items():
+        current = target
+        seen = {source}
+        while current in mapping and current not in seen:
+            seen.add(current)
+            current = mapping[current]
+        destinations[source] = current
+        if current in occupied and current not in mapping:
+            raise SystemExit(f"rename collides with existing path: {current}")
+    seen_dest = {}
+    for source, dest in destinations.items():
+        if dest in seen_dest:
+            raise SystemExit(f"rename collision: {source} and {seen_dest[dest]} -> {dest}")
+        seen_dest[dest] = source
+    return destinations
+
+
+def remaining_hits(text, previous):
+    hits = []
+    for token in (previous["env"], previous["name"], previous["id"]):
+        start = 0
+        while True:
+            index = text.find(token, start)
+            if index < 0:
+                break
+            hits.append((index, index + len(token)))
+            start = index + len(token)
+    return hits
+
+
+def uncovered(text, previous, patterns):
+    hits = remaining_hits(text, previous)
+    if not hits or not patterns:
+        return hits
+    covered = []
+    for pattern in patterns:
+        covered.extend(match.span() for match in pattern.finditer(text))
+    stray = []
+    for start, end in hits:
+        if not any(span_start <= start and end <= span_end for span_start, span_end in covered):
+            stray.append((start, end))
+    return stray
+
+
+def snippet(text, start):
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", start)
+    if line_end < 0:
+        line_end = len(text)
+    return text[line_start:line_end].strip()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Rewrite the tree to default/brand.toml")
+    parser.add_argument("--root", type=Path)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+
+    root = (args.root or repo_root(Path.cwd())).resolve()
+    config = (args.config or root / "default" / "brand.toml").resolve()
+    if not config.is_file():
+        raise SystemExit(f"missing brand config: {config}")
+    identity, previous, patterns, substitutions = load_config(config)
+    pairs = variants(previous, identity)
+    config_rel = config.relative_to(root) if config.is_relative_to(root) else None
+
+    content_changes = 0
+    preserved = 0
+    binary_named = []
+    stray = []
+    renames = rename_map(root, config_rel, pairs)
+    destinations = plan_destinations(renames)
+
+    for path, rel in walk_files(root, config_rel):
+        data = path.read_bytes()
+        if is_binary(path, data):
+            if any(token in path.name for token, _new in pairs):
+                binary_named.append(rel)
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            binary_named.append(rel)
+            continue
+        rewritten, kept = rewrite(text, substitutions, patterns, pairs)
+        preserved += kept
+        if rewritten != text:
+            content_changes += 1
+            if args.apply:
+                path.write_bytes(rewritten.encode("utf-8"))
+        if args.check and not args.apply:
+            scan = text
+        else:
+            scan = rewritten
+        for start, _end in uncovered(scan, previous, patterns):
+            if args.check or not args.apply:
+                stray.append(f"{rel}: {snippet(scan, start)}")
+
+    if args.check and not args.apply:
+        for source in destinations:
+            stray.append(f"path still named with {previous['id']}: {source}")
+
+    if args.apply:
+        for source in sorted(destinations, key=lambda item: len(item.parts), reverse=True):
+            dest = destinations[source]
+            src_path = root / source
+            dst_path = root / dest
+            if not src_path.exists():
+                continue
+            if dst_path.exists():
+                raise SystemExit(f"rename collides with existing path: {dest}")
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(src_path, dst_path)
+
+    print(f"identity: {previous['id']} -> {identity['id']}")
+    print(f"content files: {content_changes}")
+    print(f"path renames: {len(destinations)}")
+    print(f"preserved spans: {preserved}")
+    print(f"binary names: {len(binary_named)}")
+    if args.verbose:
+        for source in sorted(destinations):
+            print(f"rename {source} -> {destinations[source]}")
+    if stray:
+        print(f"unpreserved {previous['id']}: {len(stray)}", file=sys.stderr)
+        for line in stray[:40]:
+            print(line, file=sys.stderr)
+        if args.check or not args.apply:
+            raise SystemExit(1)
+    if args.check:
+        print("check: ok")
+
+
+if __name__ == "__main__":
+    main()
