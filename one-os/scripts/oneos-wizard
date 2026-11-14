@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# oneos-wizard — local web UI to build, flash and boot-test a stick. See ui/server.py.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+exec python3 "$ROOT/ui/server.py" "$@"

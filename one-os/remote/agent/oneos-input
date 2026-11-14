@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""oneos-input: keyboard and mouse input for a desktop session, injected through /dev/uinput.
+
+Runs on the remote machine. Unlike typing through a VNC client, events go straight to the
+kernel input layer, so nothing is dropped or reordered, and it works over plain SSH.
+
+  oneos-input serve                      hold the virtual devices, listen on a unix socket
+  oneos-input key ctrl+shift+p [...]     press key combinations, one after another
+  oneos-input type 'some text'           type text (US layout), --delay seconds between keys
+  oneos-input move X Y --screen WxH      move the pointer to a pixel
+  oneos-input click X Y --screen WxH [--button left|right|middle] [--count N]
+  oneos-input scroll DY                  wheel steps, positive = down
+  oneos-input ping                       is the server up?
+
+The client talks to the server ($XDG_RUNTIME_DIR/oneos-input.sock, mode 600). Without a
+server it creates the devices itself for the one command (slower: the compositor needs a
+moment to pick a new device up).
+"""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import socket
+import struct
+import sys
+import time
+
+EV_SYN, EV_KEY, EV_REL, EV_ABS = 0, 1, 2, 3
+SYN_REPORT = 0
+REL_WHEEL = 8
+ABS_X, ABS_Y = 0, 1
+BTN = {"left": 0x110, "right": 0x111, "middle": 0x112}
+ABS_MAX = 65535
+
+UI_SET_EVBIT, UI_SET_KEYBIT, UI_SET_RELBIT, UI_SET_ABSBIT = 0x40045564, 0x40045565, 0x40045566, 0x40045567
+UI_DEV_SETUP, UI_ABS_SETUP, UI_DEV_CREATE, UI_DEV_DESTROY = 0x405C5503, 0x401C5504, 0x5501, 0x5502
+
+# Linux key codes, US layout.
+KEYS = {
+    "esc": 1, "escape": 1, "1": 2, "2": 3, "3": 4, "4": 5, "5": 6, "6": 7, "7": 8, "8": 9, "9": 10, "0": 11,
+    "-": 12, "minus": 12, "=": 13, "equal": 13, "backspace": 14, "tab": 15,
+    "q": 16, "w": 17, "e": 18, "r": 19, "t": 20, "y": 21, "u": 22, "i": 23, "o": 24, "p": 25,
+    "[": 26, "]": 27, "enter": 28, "return": 28, "ctrl": 29, "control": 29,
+    "a": 30, "s": 31, "d": 32, "f": 33, "g": 34, "h": 35, "j": 36, "k": 37, "l": 38, ";": 39, "'": 40,
+    "`": 41, "shift": 42, "\\": 43, "z": 44, "x": 45, "c": 46, "v": 47, "b": 48, "n": 49, "m": 50,
+    ",": 51, ".": 52, "period": 52, "/": 53, "slash": 53, "alt": 56, "space": 57, " ": 57, "capslock": 58,
+    "f1": 59, "f2": 60, "f3": 61, "f4": 62, "f5": 63, "f6": 64, "f7": 65, "f8": 66, "f9": 67, "f10": 68,
+    "f11": 87, "f12": 88, "home": 102, "up": 103, "pageup": 104, "left": 105, "right": 106, "end": 107,
+    "down": 108, "pagedown": 109, "insert": 110, "delete": 111, "del": 111,
+    "super": 125, "meta": 125, "win": 125, "cmd": 125, "menu": 127,
+}
+SHIFTED = {
+    "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6", "&": "7", "*": "8", "(": "9", ")": "0",
+    "_": "-", "+": "=", "{": "[", "}": "]", ":": ";", '"': "'", "~": "`", "|": "\\", "<": ",", ">": ".", "?": "/",
+}
+
+
+def sock_path() -> str:
+    return os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"), "oneos-input.sock")
+
+
+class Devices:
+    """A virtual keyboard and a virtual absolute pointer (like a VM's USB tablet)."""
+
+    def __init__(self) -> None:
+        self.kbd = self._open("one-os keyboard", keys=sorted(set(KEYS.values())))
+        self.ptr = self._open("one-os pointer", keys=list(BTN.values()), absolute=True)
+        time.sleep(0.8)  # let the compositor notice the new devices
+
+    @staticmethod
+    def _open(name: str, keys: list[int], absolute: bool = False) -> int:
+        fd = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
+        fcntl.ioctl(fd, UI_SET_EVBIT, EV_KEY)
+        for k in keys:
+            fcntl.ioctl(fd, UI_SET_KEYBIT, k)
+        if absolute:
+            fcntl.ioctl(fd, UI_SET_EVBIT, EV_REL)
+            fcntl.ioctl(fd, UI_SET_RELBIT, REL_WHEEL)
+            fcntl.ioctl(fd, UI_SET_EVBIT, EV_ABS)
+            for axis in (ABS_X, ABS_Y):
+                fcntl.ioctl(fd, UI_SET_ABSBIT, axis)
+                # struct uinput_abs_setup { u16 code; struct input_absinfo { s32 value, min, max, fuzz, flat, res } }
+                fcntl.ioctl(fd, UI_ABS_SETUP, struct.pack("H2xiiiiii", axis, 0, 0, ABS_MAX, 0, 0, 0))
+        # struct uinput_setup { struct input_id { u16 bustype, vendor, product, version }; char name[80]; u32 ff_effects_max }
+        fcntl.ioctl(fd, UI_DEV_SETUP, struct.pack("HHHH80sI", 0x03, 0x1D6B, 0x0105 if absolute else 0x0104, 1, name.encode(), 0))
+        fcntl.ioctl(fd, UI_DEV_CREATE)
+        return fd
+
+    def close(self) -> None:
+        for fd in (self.kbd, self.ptr):
+            try:
+                fcntl.ioctl(fd, UI_DEV_DESTROY)
+                os.close(fd)
+            except OSError:
+                pass
+
+    @staticmethod
+    def _emit(fd: int, etype: int, code: int, value: int) -> None:
+        os.write(fd, struct.pack("llHHi", 0, 0, etype, code, value))
+
+    def _syn(self, fd: int) -> None:
+        self._emit(fd, EV_SYN, SYN_REPORT, 0)
+
+    def _tap(self, codes: list[int], hold: float) -> None:
+        for c in codes:
+            self._emit(self.kbd, EV_KEY, c, 1)
+            self._syn(self.kbd)
+        time.sleep(hold)
+        for c in reversed(codes):
+            self._emit(self.kbd, EV_KEY, c, 0)
+            self._syn(self.kbd)
+
+    def key(self, combo: str, hold: float = 0.02) -> None:
+        names = [n for n in combo.lower().replace(" ", "").split("+") if n] if combo not in ("+", " ") else [combo]
+        try:
+            codes = [KEYS[n] for n in names]
+        except KeyError as e:
+            raise ValueError(f"unknown key {e.args[0]!r} in {combo!r}") from None
+        self._tap(codes, hold)
+
+    def type(self, text: str, delay: float = 0.012) -> None:
+        for ch in text:
+            if ch == "\n":
+                codes = [KEYS["enter"]]
+            elif ch == "\t":
+                codes = [KEYS["tab"]]
+            elif ch in SHIFTED:
+                codes = [KEYS["shift"], KEYS[SHIFTED[ch]]]
+            elif ch.isalpha() and ch.isascii() and ch.isupper():
+                codes = [KEYS["shift"], KEYS[ch.lower()]]
+            elif ch in KEYS and len(ch) == 1:
+                codes = [KEYS[ch]]
+            else:
+                raise ValueError(f"cannot type {ch!r}: only US-layout ASCII is supported")
+            self._tap(codes, 0.008)
+            time.sleep(delay)
+
+    def move(self, x: float, y: float, w: int, h: int) -> None:
+        if not (0 <= x < w and 0 <= y < h):
+            raise ValueError(f"point ({x}, {y}) is outside the {w}x{h} screen")
+        self._emit(self.ptr, EV_ABS, ABS_X, round(x * ABS_MAX / (w - 1)))
+        self._emit(self.ptr, EV_ABS, ABS_Y, round(y * ABS_MAX / (h - 1)))
+        self._syn(self.ptr)
+
+    def click(self, button: str = "left", count: int = 1) -> None:
+        for _ in range(count):
+            self._emit(self.ptr, EV_KEY, BTN[button], 1)
+            self._syn(self.ptr)
+            time.sleep(0.03)
+            self._emit(self.ptr, EV_KEY, BTN[button], 0)
+            self._syn(self.ptr)
+            time.sleep(0.06)
+
+    def scroll(self, dy: int) -> None:
+        for _ in range(abs(dy)):
+            self._emit(self.ptr, EV_REL, REL_WHEEL, -1 if dy > 0 else 1)
+            self._syn(self.ptr)
+            time.sleep(0.02)
+
+
+def run(dev: Devices, req: dict) -> None:
+    op = req["op"]
+    if op == "key":
+        for combo in req["combos"]:
+            dev.key(combo)
+            time.sleep(req.get("delay", 0.05))
+    elif op == "type":
+        dev.type(req["text"], req.get("delay", 0.012))
+    elif op in ("move", "click"):
+        if req.get("x") is not None:
+            w, h = req["screen"]
+            dev.move(req["x"], req["y"], w, h)
+            time.sleep(0.05)
+        if op == "click":
+            dev.click(req.get("button", "left"), req.get("count", 1))
+    elif op == "scroll":
+        dev.scroll(req["dy"])
+    elif op != "ping":
+        raise ValueError(f"unknown op {op!r}")
+
+
+def serve() -> int:
+    path = sock_path()
+    if os.path.exists(path):
+        os.unlink(path)
+    dev = Devices()
+    old = os.umask(0o177)
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(path)
+    os.umask(old)
+    srv.listen(8)
+    print(f"oneos-input: listening on {path}", flush=True)
+    try:
+        while True:
+            conn, _ = srv.accept()
+            with conn:
+                try:
+                    data = conn.makefile("r").readline()
+                    run(dev, json.loads(data))
+                    reply = {"ok": True}
+                except Exception as e:  # report to the client, keep serving
+                    reply = {"ok": False, "error": str(e)}
+                try:
+                    conn.sendall((json.dumps(reply) + "\n").encode())
+                except OSError:
+                    pass
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        dev.close()
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+def send(req: dict) -> int:
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(sock_path())
+    except OSError:
+        if req["op"] == "ping":
+            print("oneos-input: no server", file=sys.stderr)
+            return 1
+        dev = Devices()  # no server: one-shot devices
+        try:
+            run(dev, req)
+            time.sleep(0.1)
+        finally:
+            dev.close()
+        return 0
+    with s:
+        s.sendall((json.dumps(req) + "\n").encode())
+        reply = json.loads(s.makefile("r").readline() or '{"ok": false, "error": "no reply"}')
+    if not reply.get("ok"):
+        print(f"oneos-input: {reply.get('error')}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def screen(value: str) -> list[int]:
+    w, _, h = value.lower().partition("x")
+    return [int(w), int(h)]
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="oneos-input", description=__doc__.split("\n\n")[0])
+    sub = ap.add_subparsers(dest="op", required=True)
+    sub.add_parser("serve")
+    sub.add_parser("ping")
+    p = sub.add_parser("key")
+    p.add_argument("combos", nargs="+")
+    p.add_argument("--delay", type=float, default=0.05)
+    p = sub.add_parser("type")
+    p.add_argument("text")
+    p.add_argument("--delay", type=float, default=0.012)
+    for name in ("move", "click"):
+        p = sub.add_parser(name)
+        p.add_argument("x", type=float, nargs=None if name == "move" else "?")
+        p.add_argument("y", type=float, nargs=None if name == "move" else "?")
+        p.add_argument("--screen", type=screen, help="screen size in pixels, WxH")
+        if name == "click":
+            p.add_argument("--button", choices=sorted(BTN), default="left")
+            p.add_argument("--count", type=int, default=1)
+    p = sub.add_parser("scroll")
+    p.add_argument("dy", type=int)
+    a = ap.parse_args()
+    if a.op == "serve":
+        return serve()
+    req = {k: v for k, v in vars(a).items() if v is not None}
+    if a.op in ("move", "click") and a.x is not None and not a.screen:
+        ap.error("--screen WxH is required with coordinates")
+    return send(req)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

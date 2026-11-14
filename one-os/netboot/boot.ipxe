@@ -1,0 +1,65 @@
+#!ipxe
+# one-os network boot menu, rendered per client by netboot/server.py (it fills in the
+# server address as the client reached it, the SteamOS version, the default entry and a note).
+
+set srv {srv}
+# console=tty0 last: the initramfs (live-boot, a rescue shell) talks to the monitor, not serial.
+# oneos-net.cpio (netboot/initrd/) waits for the wired link that live-boot gives up on too soon
+set live boot=live components fetch=${{srv}}/live/filesystem.squashfs username=user hostname=oneos console=ttyS0,115200 console=tty0 oneos.server=${{srv}} oneos.mac=${{net0/mac:hexhyp}} consoleblank=0 ethdevice-timeout=30 live-config.hooks=${{srv}}/hooks/oneos-netboot.sh
+
+:menu
+menu one-os network boot  ({srv})
+{note}item --gap --        ---- Install ----
+item steamos         Install SteamOS{steamos} onto this PC's M.2 drive
+item --gap --        ---- Run ----
+item homebase        one-os home base (runs in RAM, nothing is installed)
+item homebase-safe   one-os home base, safe graphics (nomodeset, for black screens/hangs)
+item netbootxyz      netboot.xyz (internet installers)
+item --gap --        ---- Other ----
+item local           Boot from local disk
+item shell           iPXE shell
+choose --default {default} --timeout 20000 target || goto menu
+goto ${{target}}
+
+:homebase
+# imgfree first: newer iPXE (e.g. netboot.xyz's) hands EVERY loaded image to the kernel as
+# its initrd on UEFI, so leftover menu scripts would end up in front of the real initrd
+# ("Initramfs unpacking failed: invalid magic").
+imgfree
+kernel ${{srv}}/live/vmlinuz ${{live}} initrd=initrd.img initrd=oneos-net.cpio || goto failed
+initrd ${{srv}}/live/initrd.img || goto failed
+initrd ${{srv}}/live/oneos-net.cpio || goto failed
+boot || goto failed
+
+:homebase-safe
+# Safe graphics: nomodeset keeps the kernel's GPU drivers (amdgpu, nouveau, i915...) from
+# taking over the display, so the firmware framebuffer stays up. For PCs that hang or go
+# black right after the kernel starts; the desktop still runs, just without acceleration.
+imgfree
+kernel ${{srv}}/live/vmlinuz ${{live}} nomodeset initrd=initrd.img initrd=oneos-net.cpio || goto failed
+initrd ${{srv}}/live/initrd.img || goto failed
+initrd ${{srv}}/live/oneos-net.cpio || goto failed
+boot || goto failed
+
+:steamos
+imgfree
+kernel ${{srv}}/live/vmlinuz ${{live}} oneos.task=steamos-install initrd=initrd.img initrd=oneos-net.cpio || goto failed
+initrd ${{srv}}/live/initrd.img || goto failed
+initrd ${{srv}}/live/oneos-net.cpio || goto failed
+boot || goto failed
+
+:netbootxyz
+iseq ${{platform}} efi && chain --autofree ${{srv}}/netboot/netboot.xyz.efi || sanboot --no-describe ${{srv}}/netboot/netboot.xyz.iso || goto failed
+
+:local
+iseq ${{platform}} efi && exit ||
+sanboot --no-describe --drive 0x80 || goto failed
+
+:shell
+shell
+goto menu
+
+:failed
+echo Boot failed - returning to the menu in 10 s
+sleep 10
+goto menu

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>one-os flasher</title>
+<style>
+:root {
+  --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e2dd;
+  --accent: #2f5bd3; --accent-ink: #fff; --ok: #1f7a4a; --ok-bg: #e5f3ea; --warn: #8a5a00; --warn-bg: #fbf0d9;
+  --bad: #b42318; --bad-bg: #fdeceb; --run: #2f5bd3; --run-bg: #e8eefc; --code: #f1f0ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #a09f98; --line: #33332f;
+    --accent: #7b9cf5; --accent-ink: #0d1430; --ok: #6fd49b; --ok-bg: #173023; --warn: #f0c46b; --warn-bg: #33290f;
+    --bad: #ff8a80; --bad-bg: #3a1a17; --run: #8fb0ff; --run-bg: #1b2440; --code: #262624;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+header { max-width: 860px; margin: 0 auto; padding: 28px 16px 8px; }
+header h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+header p { margin: 4px 0 0; color: var(--muted); }
+main { max-width: 860px; margin: 0 auto; padding: 8px 16px 64px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin: 12px 0; overflow: hidden; }
+.step > .head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.num { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 600; font-size: 13px; background: var(--code); color: var(--muted); }
+.step.done .num { background: var(--ok-bg); color: var(--ok); }
+.step.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.step.current .num { background: var(--accent); color: var(--accent-ink); }
+.title { font-weight: 600; flex: 1; }
+.summary { color: var(--muted); font-size: 13px; text-align: right; }
+.body { padding: 0 16px 16px 56px; }
+.step:not(.current):not(.open) .body { display: none; }
+.step .head { cursor: pointer; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.run { background: var(--run-bg); color: var(--run); }
+ul.facts { list-style: none; padding: 0; margin: 4px 0 12px; }
+ul.facts li { padding: 3px 0; display: flex; gap: 8px; align-items: baseline; }
+button { font: inherit; font-weight: 600; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.devices { display: grid; gap: 8px; margin: 8px 0; }
+.device { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 12px; cursor: pointer; }
+.device.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.device input { margin-top: 4px; }
+.device .name { font-weight: 600; }
+.device .meta, .hint { color: var(--muted); font-size: 13px; }
+.parts { font-size: 13px; color: var(--muted); margin-top: 4px; }
+input[type=text] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); min-width: 260px; }
+.warnbox { background: var(--bad-bg); color: var(--bad); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: 14px; }
+.bar { height: 8px; background: var(--code); border-radius: 99px; overflow: hidden; margin: 8px 0 4px; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+#activity { position: sticky; bottom: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-top: 16px; }
+#activity .top { display: flex; gap: 10px; align-items: center; }
+#activity .top .t { flex: 1; font-weight: 600; }
+pre#log { max-height: 220px; overflow: auto; background: var(--code); border-radius: 8px; padding: 10px; margin: 8px 0 0;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; display: none; }
+#activity.showlog pre#log { display: block; }
+.checks li::before { content: none; }
+pre.nbpre { max-height: 240px; overflow: auto; background: var(--code); border-radius: 8px; padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; margin: 6px 0; }
+#netboot details summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
+img.shot { max-width: 100%; border-radius: 8px; border: 1px solid var(--line); margin-top: 8px; }
+table.hist { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.hist td, table.hist th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+#toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: var(--bad); color: #fff;
+  padding: 8px 14px; border-radius: 8px; display: none; max-width: 90vw; }
+@media (max-width: 600px) { .body { padding-left: 16px; } .summary { display: none; } input[type=text] { min-width: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>one-os flasher</h1>
+  <p>Build the stick image, pick a USB stick or SD card, flash it, and boot-test the result.</p>
+</header>
+<main id="steps"></main>
+<main><section class="step open" id="netboot"><div class="head"><span class="num">⇄</span><span class="title">Network boot (PXE)</span>
+  <span class="summary" id="nb-summary"></span></div><div class="body" id="nb-body"></div></section></main>
+<main>
+  <section id="activity" hidden>
+    <div class="top"><span class="pill run" id="act-state">running</span><span class="t" id="act-title"></span>
+      <span class="hint" id="act-time"></span><button id="act-log-btn">Show log</button></div>
+    <div class="bar" id="act-bar" hidden><div></div></div>
+    <div class="hint" id="act-progress"></div>
+    <pre id="log"></pre>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const S = { state: null, devices: [], selKey: null, confirm: "", open: new Set(), lastJobId: null };
+try { S.selKey = localStorage.getItem("oneos.sel"); } catch (e) {}
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const gb = b => (b / 1e9).toFixed(1) + " GB";
+const ago = t => { const s = Date.now()/1000 - t; return s < 90 ? "just now" : s < 5400 ? Math.round(s/60) + " min ago" : s < 129600 ? Math.round(s/3600) + " h ago" : Math.round(s/86400) + " days ago"; };
+const dur = s => s < 90 ? Math.round(s) + "s" : Math.floor(s/60) + "m " + Math.round(s%60) + "s";
+const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Token": TOKEN, "Content-Type": "application/json" },
+                                body: body ? JSON.stringify(body) : undefined, cache: "no-store" });
+  const j = await r.json().catch(() => ({ error: r.statusText }));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.style.display = "block"; setTimeout(() => t.style.display = "none", 6000); }
+async function run(step, extra = {}) {
+  try { await api("/api/run", { step, ...extra }); await refresh(); } catch (e) { toast(e.message); }
+}
+
+const devKey = d => d.media + "|" + d.size;
+const selected = () => S.devices.find(d => devKey(d) === S.selKey) || null;
+const busy = () => S.state?.job?.state === "running";
+
+function steps() {
+  const st = S.state; if (!st) return [];
+  const p = st.prereqs, a = st.artifacts, dev = selected(), job = st.job;
+  const prereqOk = p.macos && p.docker && p.builder && p.qemu && p.free_gb > 20;
+  const isoOk = a.iso.exists && a.iso.fresh, payOk = a.payload.exists && a.payload.fresh;
+  const imgOk = !!dev && dev.card_image_fits && a.card_image.fresh;
+  const lastFlash = st.history[0];
+  const flashedNow = job && job.step === "flash" && job.state === "ok";
+  const list = [];
+
+  list.push({ id: "pre", title: "Check this Mac", done: prereqOk,
+    summary: prereqOk ? "Docker, builder, QEMU ready" : "needs attention",
+    body: `<ul class="facts">
+      <li>${p.macos ? pill("ok","ok") : pill("bad","no")} macOS (the flasher writes through macOS disk tools)</li>
+      <li>${p.docker ? pill("ok","ok") : pill("bad","off")} Docker Desktop running ${p.docker ? "" : "— start it, then wait for the whale icon to settle"}</li>
+      <li>${p.builder ? pill("ok","ok") : pill("warn","missing")} builder container image</li>
+      <li>${p.qemu ? pill("ok","ok") : pill("bad","missing")} QEMU ${p.qemu ? "" : "— brew install qemu"}</li>
+      <li>${p.free_gb > 20 ? pill("ok", p.free_gb + " GB") : pill("warn", p.free_gb + " GB")} free disk space (needs ~20 GB)</li>
+      </ul>
+      <div class="row">${p.docker && !p.builder ? `<button class="primary" data-run="builder">Build builder image</button>` : ""}</div>` });
+
+  list.push({ id: "iso", title: "Home-base system (ISO)", done: isoOk,
+    summary: a.iso.exists ? `${gb(a.iso.size)}, built ${ago(a.iso.mtime)}${a.iso.fresh ? "" : " — out of date"}` : "not built",
+    body: `<p class="hint">The persistent Debian desktop the stick boots into. Rebuild when files under <code>lightos/</code> or <code>manifest.yaml</code> change.</p>
+      <ul class="facts"><li>${isoOk ? pill("ok","up to date") : a.iso.exists ? pill("warn","out of date") : pill("warn","missing")}
+      ${a.iso.exists ? `built ${ago(a.iso.mtime)}` : ""}</li></ul>
+      <div class="row"><button class="${isoOk ? "" : "primary"}" data-run="lightos">${a.iso.exists ? "Rebuild" : "Build"} ISO (~25 min)</button>
+      <button data-run="fetch">Re-download pinned files</button></div>` });
+
+  list.push({ id: "payload", title: "Stick contents", done: payOk,
+    summary: a.payload.exists ? `staged ${ago(a.payload.mtime)}${a.payload.fresh ? "" : " — out of date"}` : "not staged",
+    body: `<p class="hint">ISOs, netboot.xyz, the persistence file and Ventoy's menu config, assembled from the pinned manifest.</p>
+      <div class="row"><button class="${payOk ? "" : "primary"}" data-run="payload" ${isoOk ? "" : "disabled"}>Stage files (~1 min)</button></div>` });
+
+  const devHtml = S.devices.length ? S.devices.map(d => `
+      <label class="device ${dev && devKey(d) === devKey(dev) ? "sel" : ""}" data-dev="${esc(devKey(d))}">
+        <input type="radio" name="dev" ${dev && devKey(d) === devKey(dev) ? "checked" : ""}>
+        <div><div class="name">${esc(d.media)} ${d.is_oneos ? pill("ok","one-os stick") : ""}</div>
+          <div class="meta">${esc(d.disk)} · ${esc(d.bus)} · ${gb(d.size)}</div>
+          <div class="parts">${d.partitions.length ? "Now on it: " + d.partitions.map(x => esc((x.name || x.type) + " (" + x.size + ")")).join(", ") : "No partitions"}</div></div>
+      </label>`).join("") : `<p class="hint">No removable USB or SD disk found. Insert one — this list refreshes by itself.</p>`;
+  list.push({ id: "device", title: "Choose the stick or SD card", done: !!dev,
+    summary: dev ? `${dev.media} (${dev.disk}, ${gb(dev.size)})` : "none selected",
+    body: `<div class="devices">${devHtml}</div>
+      <p class="hint">Only removable USB/SD disks are listed. Disk numbers change when you re-insert a card; the selection follows the card.</p>` });
+
+  list.push({ id: "image", title: "Prepare the image for this device", done: imgOk,
+    summary: imgOk ? "ready" : dev ? "needs building" : "choose a device first",
+    body: `<p class="hint">An image exactly the size of the device, so the whole capacity is usable. Only the ~6 GB of real data gets written.</p>
+      <div class="row"><button class="${imgOk ? "" : "primary"}" data-run="card-image" ${dev && payOk ? "" : "disabled"}>
+        ${imgOk ? "Rebuild" : "Build"} image${dev ? " for " + esc(dev.media) : ""} (~3 min)</button></div>` });
+
+  const canFlash = prereqOk && isoOk && payOk && imgOk && !busy();
+  list.push({ id: "flash", title: "Flash", done: flashedNow,
+    summary: flashedNow ? "verified ✓ — ejected" : lastFlash ? `last: ${lastFlash.media}, ${lastFlash.result}, ${lastFlash.time}` : "",
+    body: dev ? `<div class="warnbox">Everything on <b>${esc(dev.media)}</b> (${esc(dev.disk)}, ${gb(dev.size)}) will be erased${dev.partitions.length ? ": " + dev.partitions.map(x => esc(x.name || x.type)).join(", ") : ""}.</div>
+      <p class="hint">To confirm it's this device, type its name: <b>${esc(dev.media)}</b>. macOS then shows its own
+      authorization dialog (from <b>authopen</b>) asking for an administrator password — it grants access to this one
+      device only; nothing else runs as administrator. Writing and verifying take a few minutes; the card is ejected at the end.</p>
+      <div class="row"><input type="text" id="confirm" placeholder="${esc(dev.media)}" autocomplete="off" spellcheck="false">
+      <button class="danger" id="flash-btn" ${canFlash && S.confirm === dev.media ? "" : "disabled"}>Erase and flash</button></div>`
+      : `<p class="hint">Choose a device first.</p>` });
+
+  const fj = job && job.step === "flash" && job.state !== "running" ? job : null;
+  if (fj?.result?.hint === "full-disk-access") {
+    list[list.length - 1].body += `<div class="warnbox"><b>macOS blocked the write</b> — nothing was written.
+      This shouldn't happen with the authorization dialog; if it does, macOS is checking the app the wizard runs in
+      ${p.host_app ? `(<b>${esc(p.host_app)}</b>)` : ""}. Giving that app <b>Full Disk Access</b> is the fallback.
+      <div class="row"><button data-run="open-privacy">Open Full Disk Access settings</button></div></div>`;
+  }
+
+  const tj = job && job.step === "test" ? job : null;
+  const checks = tj?.result?.checks || [];
+  list.push({ id: "test", title: "Boot-test in a window", done: tj?.state === "ok",
+    summary: tj ? (tj.state === "running" ? "booting…" : tj.state === "ok" ? "all checks passed" : "failed") : "",
+    body: `<p class="hint">Boots exactly the bytes that were written (the flash verified the card against them) in a QEMU window,
+      then checks the account, password, desktop login, persistence and control channel. On Apple Silicon this takes 5–8 minutes (x86 is emulated).</p>
+      ${checks.length ? `<ul class="facts">${checks.map(c => `<li>${c.startsWith("PASS") ? pill("ok","pass") : pill("bad","fail")} ${esc(c.slice(6))}</li>`).join("")}</ul>` : ""}
+      ${tj?.result?.screenshot ? `<img class="shot" alt="Screen of the test VM" src="/test-screen.png?t=${encodeURIComponent(TOKEN)}&v=${tj.ended}">` : ""}
+      <div class="row"><button class="primary" data-run="test" ${a.card_image.exists && !busy() ? "" : "disabled"}>Boot it</button>
+      ${st.test_vm_running ? `<button data-run="stop-test" ${busy() ? "disabled" : ""}>Close test VM</button>` : ""}</div>` });
+
+  if (st.history.length) list.push({ id: "hist", title: "Flash history", done: false, summary: `${st.history.length} recent`, history: true,
+    body: `<table class="hist"><tr><th>When</th><th>Device</th><th>Size</th><th>Result</th></tr>${st.history.map(h =>
+      `<tr><td>${esc(h.time)}</td><td>${esc(h.media)} (${esc(h.disk)})</td><td>${gb(h.size)}</td><td>${h.result === "verified" ? pill("ok","verified") : pill("bad", h.result)}</td></tr>`).join("")}</table>` });
+  return list;
+}
+
+function render() {
+  const list = steps(); if (!list.length) return;
+  const cur = list.find(s => !s.done && !s.history);
+  const hadFocus = document.activeElement?.id === "confirm";
+  document.getElementById("steps").innerHTML = list.map((s, i) => `
+    <section class="step ${s.done ? "done" : ""} ${s === cur ? "current" : ""} ${S.open.has(s.id) ? "open" : ""}" data-step="${s.id}">
+      <div class="head"><span class="num">${s.done ? "✓" : s.history ? "≡" : i + 1}</span><span class="title">${esc(s.title)}</span><span class="summary">${esc(s.summary)}</span></div>
+      <div class="body">${s.body}</div></section>`).join("");
+  const c = document.getElementById("confirm");
+  if (c) { c.value = S.confirm; if (hadFocus) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); } }
+  renderJob();
+}
+
+function renderJob() {
+  const j = S.state?.job, box = document.getElementById("activity");
+  if (!j) { box.hidden = true; return; }
+  box.hidden = false;
+  const cls = { running: "run", ok: "ok", failed: "bad", cancelled: "warn" }[j.state] || "run";
+  const label = { running: "running", ok: "done", failed: "failed", cancelled: "cancelled" }[j.state] || j.state;
+  document.getElementById("act-state").className = "pill " + cls;
+  document.getElementById("act-state").textContent = label;
+  document.getElementById("act-title").textContent = j.title;
+  document.getElementById("act-time").textContent = dur(j.elapsed);
+  const bar = document.getElementById("act-bar"), prog = document.getElementById("act-progress");
+  if (j.progress) {
+    bar.hidden = false;
+    bar.firstElementChild.style.width = Math.min(100, 100 * j.progress.done / j.progress.total) + "%";
+    prog.textContent = j.progress.phase === "write"
+      ? `Writing ${j.progress.done.toFixed(2)} of ${j.progress.total.toFixed(2)} GB${j.progress.rate ? " · " + j.progress.rate + " MB/s" : ""}`
+      : `Verifying ${j.progress.done} of ${j.progress.total} regions`;
+  } else { bar.hidden = true; prog.textContent = j.state === "failed" ? "See the log for details." : ""; }
+  if (j.state === "failed" && j.id !== S.lastJobId) document.getElementById("activity").classList.add("showlog");
+  const log = document.getElementById("log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+  log.textContent = j.log; if (atEnd) log.scrollTop = log.scrollHeight;
+  document.getElementById("act-log-btn").textContent = box.classList.contains("showlog") ? "Hide log" : "Show log";
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-run]");
+  if (b && !b.disabled) {
+    const dev = selected();
+    run(b.dataset.run, dev ? { disk: dev.disk } : {});
+    return;
+  }
+  if (e.target.id === "flash-btn") {
+    const dev = selected(); if (!dev) return;
+    run("flash", { disk: dev.disk, confirm: S.confirm });
+    return;
+  }
+  const d = e.target.closest("[data-dev]");
+  if (d) { S.selKey = d.dataset.dev; try { localStorage.setItem("oneos.sel", S.selKey); } catch (x) {} S.confirm = ""; render(); return; }
+  if (e.target.id === "act-log-btn") { document.getElementById("activity").classList.toggle("showlog"); renderJob(); return; }
+  const h = e.target.closest(".step .head");
+  if (h) { const id = h.parentElement.dataset.step; S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "confirm") {
+    S.confirm = e.target.value;
+    const dev = selected(), btn = document.getElementById("flash-btn");
+    const st = S.state, a = st?.artifacts;
+    if (btn && dev) btn.disabled = !(S.confirm === dev.media && dev.card_image_fits && a.card_image.fresh && !busy());
+  }
+});
+
+async function refresh() {
+  try { S.state = await api("/api/state"); } catch (e) { toast(e.message); return; }
+  render();
+}
+async function refreshDevices() {
+  try { S.devices = (await api("/api/devices")).devices; } catch (e) { return; }
+  if (!selected() && S.devices.length === 1) S.selKey = devKey(S.devices[0]);
+  render();
+}
+async function refreshNetboot() {
+  let n; try { n = await api("/api/netboot"); } catch (e) { return; }
+  const st = n.state || {}, b = document.getElementById("nb-body");
+  document.getElementById("nb-summary").textContent = n.running ? `serving on ${st.iface || "?"} · ${st.server_ip}` : "stopped";
+  if (!n.running) {
+    b.innerHTML = `<p>PCs on this LAN can boot the home base and install SteamOS over Ethernet — no stick.
+      ${n.files ? "" : "First extract the home base for network boot."}</p>
+      <p>${n.files ? "" : '<button data-run="netboot">Extract home base</button> '}<button data-run="pxe-start" ${n.files ? "" : "disabled"}>Start server</button></p>
+      <p class="hint">On the PC: UEFI network boot on, Secure Boot off. See docs/operator-guide/05-network-boot-server.md.</p>`;
+    return;
+  }
+  const so = n.steamos ? `SteamOS ${esc(n.steamos.version)} cached` : `no SteamOS cached (PCs download from Valve) <button data-run="steamos-fetch">Cache it</button>`;
+  const pcs = (n.pcs || []).map(p => `<details><summary><code>${esc(p.mac)}</code> · ${ago(p.updated)} · ${esc(p.summary)}</summary><pre class="nbpre">${esc(p.detail)}</pre></details>`).join("") || '<p class="hint">No network-booted PC has reported yet.</p>';
+  const rep = (n.reports || []).map(e => `${new Date(e.t*1000).toLocaleTimeString()} ${esc(e.msg)}`).join("\n");
+  const ev = (n.events || []).filter(e => e.kind !== "status").slice(-12).map(e => `${new Date(e.t*1000).toLocaleTimeString()} ${esc(e.kind)} ${esc(e.client)} ${esc(e.msg)}`).join("\n");
+  b.innerHTML = `<p>Menu: <code>http://${esc(st.server_ip)}:${esc(st.http_port)}/boot.ipxe</code> · ${so} · <button data-run="pxe-stop">Stop server</button></p>
+    <h3>PCs</h3>${pcs}
+    ${rep ? `<h3>Installer</h3><pre class="nbpre">${rep}</pre>` : ""}
+    <h3>Recent events</h3><pre class="nbpre">${ev}</pre>`;
+}
+async function tick() {
+  if (busy()) { try { const j = (await api("/api/job")).job; S.state.job = j; renderJob(); if (j.state !== "running") await refresh(); } catch (e) {} }
+}
+refresh(); refreshDevices();
+setInterval(tick, 1000);
+setInterval(() => { if (!busy()) refresh(); }, 4000);
+setInterval(refreshDevices, 5000);
+refreshNetboot(); setInterval(refreshNetboot, 5000);
+</script>
+</body>
+</html>

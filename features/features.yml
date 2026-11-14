@@ -297,3 +297,66 @@ features:
     surface: cli
     link: "os/install/engine.sh"
     docs: "docs/OPENCODE.md"
+  - id: BASHOS-032
+    title: "one-os: a multiboot stick built from a manifest"
+    description: "One USB stick or SD card built from pinned, verified downloads: a Ventoy menu (UEFI and BIOS) with a persistent Debian home base, netboot.xyz and offline installer ISOs. bashos one-os fetch, lightos, payload and image build it; a guarded wizard flashes it."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/manifest.yaml"
+    docs: "one-os/README.md"
+  - id: BASHOS-033
+    title: "one-os: install an OS onto another drive"
+    description: "From the home base, oneos-install puts Debian or Ubuntu on a target disk (UEFI and BIOS) and oneos-restock refreshes the stick's ISOs; oneos-clone copies a disk."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/lightos/config/includes.chroot/usr/local/bin/oneos-install"
+    docs: "one-os/docs/user-guide/05-install-an-os.md"
+  - id: BASHOS-034
+    title: "one-os: network boot server"
+    description: "Serves the home base to machines with no stick: HTTP for iPXE, ProxyDHCP and TFTP for real PCs, a boot menu, and an event log of every machine's progress."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/netboot/server.py"
+    docs: "one-os/docs/operator-guide/05-network-boot-server.md"
+  - id: BASHOS-035
+    title: "one-os: deploy SteamOS onto a desktop"
+    description: "Fetches Valve's recovery image and deploys SteamOS onto an NVMe drive from the home base or the network, with a troubleshooting guide for first-boot network failures."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/lightos/config/includes.chroot/usr/local/bin/oneos-steamos"
+    docs: "one-os/docs/user-guide/07-steamos.md"
+  - id: BASHOS-036
+    title: "one-os: VMs you can drive (oneos-vm)"
+    description: "Named QEMU instances of the stick, an ISO or an installed disk, controlled through QMP, the serial console and a guest agent: run commands as root, copy files, send keys, take screenshots. The harness tests are built on it."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/scripts/oneos-vm"
+    docs: "one-os/docs/reference/oneos-vm.md"
+  - id: BASHOS-037
+    title: "one-os: bashOS and Amrchy as bootable systems"
+    description: "bashOS and Amrchy as catalog entries one-os builds, puts on the stick and the PXE menu, deploys unattended and proves in QEMU, with machine profiles that check drivers against a system's kernel before deploying."
+    implemented: false
+    status: planned
+    prd: [TBD]
+    surface: cli
+    link: "one-os/docs/epics/0001-bashos-and-amrchy.md"
+    docs: "one-os/docs/epics/0001-bashos-and-amrchy.md"
+  - id: BASHOS-038
+    title: "one-os: remote sessions (oneos-remote)"
+    description: "Drive an installed machine from another one over SSH: screenshots of its desktop, keyboard and pointer input through uinput (no dropped keys, no VNC password), Claude Code sessions in tmux that are started, sent text, read back and recorded, one-shot headless prompts, a log of VNC and SSH connections, and screen recording while a VNC client is connected."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/scripts/oneos-remote"
+    docs: "one-os/docs/operator-guide/06-remote-sessions.md"
