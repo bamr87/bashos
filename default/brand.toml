@@ -1,0 +1,37 @@
+# Product identity. Edit this, then run bin/rebrand.
+# [identity] is what the tree should say. [previous] is what bin/rebrand
+# rewrites away. [preserve] are conflicts: external names that must stay.
+
+[identity]
+id = "amrchy"
+name = "Amrchy"
+env = "AMRCHY"
+
+[previous]
+id = "omarchy"
+name = "Omarchy"
+env = "OMARCHY"
+
+[substitute]
+"https://github.com/omacom/omarchy.git" = "https://github.com/bamr87/amrchy.git"
+
+[preserve]
+patterns = [
+  'https?://\S*omarchy\.org\S*',
+  'mailto:\S*omarchy\.org\S*',
+  'github\.com/omacom/\S*',
+  'github\.com/omacom-io/\S*',
+  'omarchy\.org',
+  'omarchy/omarchy-',
+  'omarchy-keyring',
+  'omarchy-nvim',
+  'omarchy-pkgs',
+  'omarchy-iso',
+  'omarchy-mirror',
+  'omarchy-site',
+  'omarchy-audio-tuner',
+  'omarchy-installer',
+  'hackerman-omarchy',
+  '#omarchy-[A-Za-z0-9-]+',
+  '\.\./omarchy/',
+]

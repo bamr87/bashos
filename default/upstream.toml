@@ -1,0 +1,44 @@
+# Upstream sync: what this fork follows and where it diverges. bin/upstream-sync does the
+# mechanical part; an agent following agents/skills/upstream-sync.md makes the calls.
+#
+# Source stays in upstream's naming. bin/rebrand applies default/brand.toml when a build is made,
+# so merging upstream conflicts only where this fork really changed something.
+
+[upstream]
+remote = "upstream"
+url = "https://github.com/omacom/omarchy"
+branch = "quattro"
+
+[fork]
+branch = "main"
+sync_branch_prefix = "upstream-sync/"
+
+[policy]
+# Taken by default: upstream's features, improvements, fixes and security work.
+#
+# Paths this fork owns. On a conflict here the fork's version wins and the agent ports
+# upstream's intent onto it; an upstream change that touches them is flagged for review.
+fork_owned = [
+  "default/brand.toml",
+  "default/bash/brand.sh",
+  "default/upstream.toml",
+  "bin/rebrand",
+  "bin/upstream-sync",
+  "agents/skills/upstream-sync.md",
+  ".github/workflows/upstream-sync.yml",
+  ".upstream/",
+  "test/shell.d/rebrand-test.sh",
+  "test/shell.d/upstream-sync-test.sh",
+]
+
+# Upstream changes this fork leaves out, as regular expressions prefixed "subject:" or "path:".
+# A match is a decline candidate in the plan; the agent confirms it and records why.
+decline = []
+
+[checks]
+# The gates `bin/upstream-sync check` runs on the merged tree, from the repository root.
+commands = [
+  "python3 bin/rebrand",
+  "bash test/shell.d/rebrand-test.sh",
+  "bash test/shell.d/upstream-sync-test.sh",
+]
