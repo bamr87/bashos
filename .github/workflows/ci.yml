@@ -27,9 +27,9 @@ jobs:
           ruff check .
       - name: shellcheck
         run: |
-          shellcheck bin/bashos
+          shellcheck bin/bashos one-os/one-os.sh
           shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
-          shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
+          shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/iso/*.sh os/amrchy/sync.sh os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
       - name: compose config
         run: docker compose config --quiet
 
@@ -52,6 +52,21 @@ jobs:
         run: python -c "from bashos.desktop.app import BashOSApp"
       - name: test (offline suite — fake model, no auth)
         run: pytest -q
+
+  amrchy:
+    name: amrchy (the fork's own tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The layers contract bashOS installs through, the build-time rebrand and the upstream
+      # sync: the parts of amrchy/ this fork owns (amrchy/default/upstream.toml). The rest of
+      # amrchy's suite needs its desktop and runs in bamr87/amrchy.
+      - name: layers, rebrand, upstream sync
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
+          cd amrchy
+          for t in layers rebrand upstream-sync; do bash "test/shell.d/$t-test.sh"; done
 
   docker:
     name: docker image builds
