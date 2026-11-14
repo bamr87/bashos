@@ -26,6 +26,17 @@ os_packages() {
   done
 }
 
+# Every repository pacman.conf names has its sync database (a fresh Amrchy has only the
+# installer's offline.db).
+os_pacman_synced() {
+  local repo dir
+  dir=$(os_path /var/lib/pacman/sync)
+  os_has pacman-conf || return 0
+  while IFS= read -r repo; do
+    [[ -f $dir/$repo.db ]] || return 1
+  done < <(pacman-conf --repo-list)
+}
+
 # Where this base's lists live: Arch names for Amrchy and Arch, Debian names otherwise.
 os_package_dir() {
   if os_arch_base; then printf '%s' "$OS_DIR/packages/arch"; else printf '%s' "$OS_DIR/packages"; fi
@@ -70,9 +81,12 @@ phase_packages() {
   fi
   os_log "missing: ${missing[*]}"
   if os_arch_base; then
-    # --needed and no -y: an install, never a partial upgrade (Amrchy's own updates go through
-    # `omarchy update`, which its pacman hook guards).
-    os_root pacman -S --needed --noconfirm -- "${missing[@]}"
+    # An install, never an upgrade: Amrchy's own updates go through `omarchy update`, which its
+    # pacman hook guards. A freshly installed machine has no sync databases yet (its installer
+    # worked from an offline mirror), so they are fetched first, as Omarchy's keyring update does.
+    local sync=-S
+    os_pacman_synced || sync=-Sy
+    os_root pacman "$sync" --needed --noconfirm -- "${missing[@]}"
   else
     os_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
     os_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"

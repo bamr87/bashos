@@ -1,0 +1,56 @@
+# one-os machine profile: what this PC is built from, which kernel first drives each of its
+# chips, and how its firmware boots. `scripts/oneos-machine check x870e-dark-hero --system NAME`
+# says whether an operating system can drive it before anything is deployed
+# (docs/reference/machines.md). TBD: not yet read off the machine.
+schema: 1
+name: x870e-dark-hero
+title: ASUS ROG Crosshair X870E Dark Hero desktop
+notes: >-
+  The first machine one-os deployed to (SteamOS, 2026-11-12) and bashOS's first target. Every
+  chip below was read on the machine during that deployment.
+build:
+  board: ASUS ROG Crosshair X870E Dark Hero (AMD X870E)
+  cpu: TBD
+  gpu: AMD Radeon RX 9070 XT
+  memory: 64 GB
+  storage:
+    - device: nvme0n1
+      model: WD_BLACK SN8100 2 TB
+      # The exact size the unattended installer needs (bashos os iso seed --disk-bytes): run
+      # `lsblk -bdno SIZE /dev/nvme0n1` on the home base before seeding an install.
+      bytes: TBD
+firmware:
+  boot: uefi
+  secure_boot: "off"
+  pxe: >-
+    Boot from the 5 GbE port. The 10 GbE port network-boots too, but a kernel before 6.16
+    cannot drive it once Linux takes over, and the boot waits for a link forever.
+devices:
+  - name: 5 GbE Ethernet
+    chip: Realtek RTL8126
+    pci: "10ec:8126"
+    driver: r8169
+    kernel: "6.9"
+    role: network
+  - name: 10 GbE Ethernet
+    chip: Realtek RTL8127
+    pci: "10ec:8127"
+    driver: r8169
+    kernel: "6.16"
+    role: network
+    notes: 6.16 warns that rtl8127a-1.fw is missing and works anyway.
+  - name: Wi-Fi 7
+    chip: MediaTek MT7927
+    pci: "14c3:7927"
+    driver: mt7925e
+    kernel: "7.2"
+    role: network
+  - name: Graphics
+    chip: AMD Radeon RX 9070 XT (RDNA 4)
+    pci: TBD
+    driver: amdgpu
+    kernel: TBD
+    role: display
+sources:
+  - docs/field-reports/2026-11-12-steamos-silent-network.md
+  - docs/hardware-results.md

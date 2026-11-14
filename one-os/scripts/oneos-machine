@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""oneos-machine: the machines one-os deploys to, and whether an operating system can drive them.
+
+  oneos-machine list                                 every profile in machines/
+  oneos-machine show NAME                            its build sheet: parts, firmware, chips
+  oneos-machine check NAME --system SYS|--kernel V   each chip against that kernel
+  oneos-machine check --lspci FILE|- --system SYS    the chips `lspci -nn` lists, against every
+                                                     chip the profiles know (on the home base)
+  oneos-machine lint                                 every profile and machines/systems.yaml
+
+`check` exits 0 when every chip with a known first kernel is driven, 1 when one is not, and 2
+when no network chip is: an unattended deploy could not finish. It reads only files: run it
+before anything is written to a disk (docs/reference/machines.md).
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+MACHINES = Path(os.environ.get("ONEOS_MACHINES", ROOT / "machines"))
+PCI_RE = re.compile(r"^[0-9a-f]{4}:[0-9a-f]{4}$")
+KERNEL_RE = re.compile(r"^\d+\.\d+$")
+ROLES = {"network", "display", "storage", "audio", "input", "other"}
+
+
+def load(path: Path) -> dict:
+    with open(path, encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def profiles() -> dict[str, dict]:
+    out = {}
+    for path in sorted(MACHINES.glob("*.yaml")):
+        if path.name != "systems.yaml":
+            data = load(path)
+            out[data.get("name", path.stem)] = data
+    return out
+
+
+def systems() -> dict[str, dict]:
+    return load(MACHINES / "systems.yaml").get("systems", {})
+
+
+def version(text: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in text.split("."))
+
+
+def known(value) -> bool:
+    return value not in (None, "", "TBD")
+
+
+def verdict(device: dict, kernel: str) -> str:
+    """ok | missing | unknown: does `kernel` drive this chip?"""
+    if not known(device.get("kernel")):
+        return "unknown"
+    return "ok" if version(kernel) >= version(str(device["kernel"])) else "missing"
+
+
+def report(devices: list[dict], kernel: str, label: str) -> int:
+    print(f"{label} · kernel {kernel}\n")
+    marks = {"ok": "[ OK ]", "missing": "[MISS]", "unknown": "[ ?? ]"}
+    results = []
+    for d in devices:
+        v = verdict(d, kernel)
+        results.append((d, v))
+        need = f"needs {d['kernel']}" if known(d.get("kernel")) else "first kernel TBD"
+        pci = d.get("pci") if known(d.get("pci")) else "pci TBD"
+        print(f"{marks[v]} {d['name']:<16} {d['chip']} ({pci}, {d.get('driver', '?')}, {need})")
+    network = [v for d, v in results if d.get("role") == "network"]
+    print()
+    if network and "ok" not in network:
+        print("no network chip is driven: an unattended deploy cannot finish (field report 2026-11-12)")
+        return 2
+    if any(v == "missing" for _, v in results):
+        print("some chips have no driver in this kernel")
+        return 1
+    print("every chip with a known first kernel is driven")
+    return 0
+
+
+def kernel_of(args) -> tuple[str, str]:
+    if args.kernel:
+        return args.kernel, f"kernel {args.kernel}"
+    table = systems()
+    if args.system not in table:
+        sys.exit(f"oneos-machine: unknown system {args.system!r} (machines/systems.yaml: {', '.join(table)})")
+    return str(table[args.system]["kernel"]), f"{args.system}: {table[args.system]['title']}"
+
+
+def cmd_list(_args) -> int:
+    for name, data in profiles().items():
+        print(f"{name:<24} {data.get('title', '')}")
+    return 0
+
+
+def cmd_show(args) -> int:
+    data = profiles().get(args.name)
+    if not data:
+        sys.exit(f"oneos-machine: no profile {args.name!r} in {MACHINES}")
+    print(f"{data['title']} ({data['name']})\n")
+    for part, value in (data.get("build") or {}).items():
+        if part == "storage":
+            for disk in value:
+                print(f"  {'storage':<9} {disk['model']} ({disk['device']}, {disk.get('bytes', 'TBD')} bytes)")
+        else:
+            print(f"  {part:<9} {value}")
+    print()
+    for key, value in (data.get("firmware") or {}).items():
+        print(f"  {key:<11} {value}")
+    print()
+    for d in data.get("devices", []):
+        print(f"  {d['name']:<16} {d['chip']} · {d.get('pci', 'TBD')} · {d.get('driver')} since {d.get('kernel')}")
+    return 0
+
+
+def cmd_check(args) -> int:
+    kernel, label = kernel_of(args)
+    if args.lspci:
+        text = sys.stdin.read() if args.lspci == "-" else Path(args.lspci).read_text()
+        present = set(re.findall(r"\[([0-9a-f]{4}:[0-9a-f]{4})\]", text))
+        chips = {d["pci"]: d for p in profiles().values() for d in p.get("devices", []) if known(d.get("pci"))}
+        devices = [chips[pci] for pci in sorted(present) if pci in chips]
+        print(f"lspci: {len(present)} devices, {len(devices)} chips a profile knows\n")
+        return report(devices, kernel, label)
+    data = profiles().get(args.name)
+    if not data:
+        sys.exit(f"oneos-machine: no profile {args.name!r} in {MACHINES}")
+    return report(data.get("devices", []), kernel, f"{data['title']} · {label}")
+
+
+def problems() -> list[str]:
+    out = []
+    for name, sysdata in systems().items():
+        if not KERNEL_RE.match(str(sysdata.get("kernel", ""))):
+            out.append(f"systems.yaml: {name}: kernel must be MAJOR.MINOR")
+        if not sysdata.get("source"):
+            out.append(f"systems.yaml: {name}: say where the kernel version was read (source)")
+    for path in sorted(MACHINES.glob("*.yaml")):
+        if path.name == "systems.yaml":
+            continue
+        data = load(path)
+        where = path.name
+        if data.get("schema") != 1:
+            out.append(f"{where}: schema must be 1")
+        if data.get("name") != path.stem:
+            out.append(f"{where}: name must be the file's name ({path.stem})")
+        for key in ("title", "build", "firmware", "devices", "sources"):
+            if not data.get(key):
+                out.append(f"{where}: {key} is required")
+        for d in data.get("devices") or []:
+            label = f"{where}: {d.get('name', '?')}"
+            for key in ("name", "chip", "driver", "role"):
+                if not d.get(key):
+                    out.append(f"{label}: {key} is required")
+            if d.get("role") not in ROLES:
+                out.append(f"{label}: role must be one of {', '.join(sorted(ROLES))}")
+            if known(d.get("pci")) and not PCI_RE.match(str(d["pci"])):
+                out.append(f"{label}: pci must be vendor:device in hex, or TBD")
+            if known(d.get("kernel")) and not KERNEL_RE.match(str(d["kernel"])):
+                out.append(f"{label}: kernel must be MAJOR.MINOR, or TBD")
+    return out
+
+
+def cmd_lint(_args) -> int:
+    found = problems()
+    for p in found:
+        print(p, file=sys.stderr)
+    if not found:
+        print(f"machines OK ({len(profiles())} profiles, {len(systems())} systems)")
+    return 1 if found else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="oneos-machine", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("list").set_defaults(fn=cmd_list)
+    show = sub.add_parser("show")
+    show.add_argument("name")
+    show.set_defaults(fn=cmd_show)
+    check = sub.add_parser("check")
+    check.add_argument("name", nargs="?")
+    target = check.add_mutually_exclusive_group(required=True)
+    target.add_argument("--system")
+    target.add_argument("--kernel", type=lambda v: v if KERNEL_RE.match(v) else ap.error("--kernel: MAJOR.MINOR"))
+    check.add_argument("--lspci", metavar="FILE", help="`lspci -nn` output (- for stdin) instead of a profile")
+    check.set_defaults(fn=cmd_check)
+    sub.add_parser("lint").set_defaults(fn=cmd_lint)
+    args = ap.parse_args(argv)
+    if args.cmd == "check" and not (args.name or args.lspci):
+        ap.error("check: a machine NAME, or --lspci")
+    return args.fn(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

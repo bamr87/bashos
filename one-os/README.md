@@ -139,6 +139,7 @@ scripts/oneos-vm stop run
 | ID | What | Suite |
 |----|------|-------|
 | T00 | partition layout, payload checksums, `ventoy.json` schema, persistence image | fast |
+| T05 | machine profiles lint; the kernel check names the X870E's missing Wi-Fi driver on SteamOS 3.8 (no VM) | fast |
 | T10 | Ventoy menu shows our aliases (OCR) — UEFI + BIOS | fast |
 | T20 | home base reaches `ONEOS-READY` — UEFI + BIOS, via Ventoy and straight from the ISO | fast |
 | T21 | live user exists, password is `live`, Xfce session starts via autologin | fast |
