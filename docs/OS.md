@@ -1,10 +1,21 @@
 # bashOS, the operating system
 
-> How bashOS becomes the machine itself — an Omarchy-style layer on Debian 13 that boots the physical monitor into the bashOS console and serves the bamr87 Harness Console, delivered either in place (`bashos os install`) or as a bootable disk image built with mkosi — and how forge moves onto it.
+> How bashOS becomes the machine itself: one OS layer (`os/`) that turns an Amrchy (Arch) or Debian 13 machine into a bashOS machine, with the shared console and the bamr87 Harness Console. It arrives in place (`bashos os install`), as the Amrchy ISO with bashOS as its layer (`bashos os iso`, the primary path), or as the Debian disk image built with mkosi, and this page also covers how forge moves onto it.
 
 bashOS started as a program you run in a terminal. `os/` makes it the terminal a machine boots into: the monitor auto-logs in to one shared tmux session whose first window is the bashOS desktop, every ssh login joins the same session, the hub's Harness Console runs as a supervised service, and the whole thing updates itself the way Omarchy does. Nothing in the kernel, the loops or the policy changes — this is userland and plumbing around them, so every hard rule in [AGENTS.md](../AGENTS.md) holds as before.
 
 The machine it was built for is **forge** ([FORGE.md](FORGE.md)): an i7-3820 with 32 GB, a 1 TB SATA SSD, a GTX 660 on nouveau, UEFI, Debian 13. Its hand-written `~/setup/01…06` scripts are the prior art this layer generalises.
+
+## Two bases
+
+The layer installs on either of two operating systems, and reads which one it is on from `/etc/os-release` (`os_base` in [`os/lib.sh`](../os/lib.sh)):
+
+| Base | What it is | Packages | The console | How it arrives |
+| --- | --- | --- | --- | --- |
+| **Amrchy** (primary, [ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md)) | The Omarchy fork in [`amrchy/`](../amrchy/README.md): Arch, Hyprland, Omarchy's installer and updates | `os/packages/arch/*.list` through pacman (`--needed`, refreshing the sync databases a fresh install lacks) | `desktop`: a terminal window opened at login (a managed block in `~/.config/hypr/autostart.lua`) and two launcher entries; the login screen keeps tty1 | The bashOS ISO, whose layer arms `bashos-firstboot` ([AMRCHY.md](AMRCHY.md)), or `bashos os install` on an existing Amrchy |
+| **Debian 13** ([ADR 0002](adr/0002-bashos-os-debian-mkosi.md)) | Debian 13 or a derivative (Raspberry Pi OS); forge today | `os/packages/*.list` through apt | tty1 autologin into a kiosk (cage + foot) or the Linux console | `bashos os install` in place, or the mkosi image below (no new work, per ADR 0005) |
+
+Everything else is the same on both: `/opt/bashos`, the runtime, the managed engine, the units, the shared tmux session that ssh logins join, the harness, migrations, `bashos os status`. The rest of this page was written for forge, on Debian; where Amrchy differs, the table above says how.
 
 ## The shape, borrowed from Omarchy
 
@@ -53,7 +64,10 @@ The base choice is recorded in [ADR 0002](adr/0002-bashos-os-debian-mkosi.md), i
 | `~/.config/bashos/harness.env` | The Harness Console's secrets (`DASH_CONSOLE_TOKEN`, `GH_TOKEN`), mode 0600, created once | the user |
 | `~/dev/bamr87` | The hub checkout the harness serves (`BASHOS_HUB_DIR`); cloned if absent, never touched if present | the user |
 
-## Two ways onto a machine
+## Onto a machine
+
+**The bashOS ISO** — Amrchy with bashOS as its layer, installed by the framework's own installer, interactively or unattended from a `cidata` drive. This is the path for a new machine, the X870E desktop first. [AMRCHY.md](AMRCHY.md) covers building it, seeding it and what happens at first boot. On Debian there are two more ways:
+
 
 **In place** — the Omarchy one-liner, for a Debian 13 box that already has a life (forge today). Additive and reversible: `bashos os uninstall` removes every file, link, unit and managed block it added (`--purge` also removes `/opt/bashos` and `/etc/bashos`); the hub checkout, linger and sleep masks are left as they are.
 

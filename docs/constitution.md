@@ -8,9 +8,9 @@
 
 ## 1. Mission
 
-PR #20 proposes/lands `bashos gui`: a GUI access layer beside the terminal, not above it. One page, seven hash-routed scenes (Overview, Console, Commands, Runs, Health, Engine, Settings), same kernel as the CLI, no-build front end.
+bashOS is one platform from the terminal to the machine it runs on: a terminal-first AI runtime whose Markdown slash commands run on one kernel behind every surface (the CLI, the Textual desktop and the loopback GUI), on any machine that has a terminal. On a machine of its own it boots as Amrchy, the maintainer's fork of Omarchy, with bashOS as its layer. one-os builds, checks and deploys those machines, custom-built PCs among them, and proves each step in a VM before hardware is touched. Every part stays customizable and versatile, and nothing in the operating system or the hardware tooling widens what the AI loops can touch.
 
-_Source: [docs/frontend/PRD-os-shell.md](frontend/PRD-os-shell.md)._
+_Sources: [AGENTS.md](../AGENTS.md), [ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md), [docs/frontend/PRD-os-shell.md](frontend/PRD-os-shell.md); amended by [0002](amendments/0002-mission-a-platform-from-terminal-to-machine.md) (proposed)._
 
 ## 2. Invariants (non-negotiable)
 

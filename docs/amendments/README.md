@@ -10,3 +10,4 @@ The append-only log of changes to [the constitution](../constitution.md). Proces
 | # | Title | Status | Affects |
 | --- | --- | --- | --- |
 | [0001](0001-ratify-constitution.md) | Ratify the constitution | ratified on merge | whole constitution |
+| [0002](0002-mission-a-platform-from-terminal-to-machine.md) | The mission: one platform, from the terminal to the machine it boots on | proposed | § 1 |

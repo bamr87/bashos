@@ -1,19 +1,22 @@
 # os — bashOS as the operating system
 
-> The Linux OS layer of bashOS: install it onto a Debian 13 machine, or build it into a bootable image, so the monitor boots into the bashOS console and the machine serves the bamr87 Harness Console.
+> The Linux OS layer of bashOS: install it onto an Amrchy (Arch) or Debian 13 machine, or build it into a bootable image (the Amrchy ISO, or the Debian disk image), so the machine opens the bashOS console and serves the bamr87 Harness Console.
 
-The design, the Omarchy mapping, the security model and the forge runbook are in [docs/OS.md](../docs/OS.md); the base decision is [ADR 0002](../docs/adr/0002-bashos-os-debian-mkosi.md). This file is the reference for the directory.
+The design, the two bases, the security model and the forge runbook are in [docs/OS.md](../docs/OS.md); bashOS on Amrchy, the ISO and first boot are in [docs/AMRCHY.md](../docs/AMRCHY.md); the decisions are [ADR 0005](../docs/adr/0005-bashos-is-amrchy-plus-a-layer.md) and, for Debian, [ADR 0002](../docs/adr/0002-bashos-os-debian-mkosi.md). This file is the reference for the directory.
 
 ## Use
 
 ```bash
 bin/bashos os install --dry-run      # the plan for this machine; changes nothing (works on macOS)
-bin/bashos os install                # Debian 13: the layer, the console, the harness (sudo asks once)
+bin/bashos os install                # Amrchy or Debian 13: the layer, the console, the harness (sudo asks once)
 bashos os status                     # verdicts; exit 0 OK · 1 WARN · 2 CRIT
 bashos os harness url                # where the Harness Console answers (and the ssh -L line)
-bashos os update [--system]          # pull, re-apply, migrate (and apt full-upgrade)
+bashos os update [--system]          # pull, re-apply, migrate (and `omarchy update` / apt full-upgrade)
 bashos os uninstall [--purge]        # remove what install added
-bashos os image build --docker       # the bootable disk image (image/README.md)
+bin/bashos os iso build              # the bashOS ISO: Amrchy with this layer (docs/AMRCHY.md)
+bin/bashos os iso seed --user U --disk DEV --disk-bytes N   # its unattended-install drive
+bin/bashos os amrchy status          # amrchy/ against bamr87/amrchy
+bashos os image build --docker       # the Debian disk image (image/README.md)
 ```
 
 On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/opt/bashos` and runs the same installer: `curl -fsSL https://raw.githubusercontent.com/bamr87/bashos/main/os/boot.sh | bash` (read it first).
@@ -22,20 +25,24 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 
 | Path | What it is |
 | --- | --- |
-| `os.sh` | The dispatch table: `install`, `update`, `migrate`, `status`, `harness`, `console`, `heal`, `uninstall`, `image`, `version` |
+| `os.sh` | The dispatch table: `install`, `update`, `migrate`, `status`, `harness`, `console`, `heal`, `uninstall`, `amrchy`, `iso`, `image`, `version` |
 | `install.sh` | The phase runner; `--dry-run`, `--image`, `--user-only`, `--system-only`, `--only`/`--skip PHASE`, `--root DIR` |
 | `install/*.sh` | One phase each: `preflight`, `packages`, `runtime`, `system` (root) · `console`, `harness`, `finish` (the user) |
 | `install/engine.sh` | OpenCode as a managed dependency: npm's latest release, fetched from the registry and sha512-checked, verified with `bashos opencode verify`, promoted atomically, updated daily (`bashos os engine …`, `bashos-engine-update.timer`) |
 | `lib.sh` | Every helper that changes the machine — and the three switches they all obey: `BASHOS_OS_DRY_RUN`, `BASHOS_OS_ROOT` (a fake root), `BASHOS_OS_IMAGE` |
-| `packages/*.list` | Debian package names per concern; a trailing `cmd:NAME` skips the line when `NAME` is already installed — on PATH or in the person's own tool directories (fnm's Node, `~/.local/bin`; `os_user_bins`) |
+| `packages/*.list`, `packages/arch/*.list` | Debian and Arch (Amrchy) package names per concern, chosen by the machine's base (`os_base`); a trailing `cmd:NAME` skips the line when `NAME` is already installed — on PATH or in the person's own tool directories (fnm's Node, `~/.local/bin`; `os_user_bins`) |
 | `config/os.conf` | The shipped defaults, copied once to `/etc/bashos/os.conf` |
 | `config/tmux.conf` | tmux defaults, sourced first from `~/.tmux.conf` |
 | `bin/bashos-console` | tty1 → kiosk or Linux console → the shared tmux session; `--attach` (ssh), `--heal` (the timer), `--kiosk` (inside cage: turn the outputs per `BASHOS_CONSOLE_ROTATE`, start `wayvnc` on loopback per `BASHOS_CONSOLE_VNC`, then `foot`) |
 | `bin/bashos-harness` | Runs the hub's Harness Console (`native` / `compose` / `off`); `--print` shows the command |
-| `bin/bashos-provision` | An image's first boot: the user, hostname, keys and user phases, from a `BASHOS-SEED` drive or tty1 |
-| `systemd/` | `bashos-provision.service`, `bashos-engine-update.{service,timer}` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
+| `bin/bashos-provision` | The Debian image's first boot: the user, hostname, keys and user phases, from a `BASHOS-SEED` drive or tty1 |
+| `bin/bashos-firstboot` | The Amrchy ISO's first boot: once a user exists and the network answers, `install.sh --system-only`, then the user phases as that user; waits exit 75 and retry |
+| `amrchy/layer/` | bashOS as an Amrchy layer: `system.sh` runs in the installer, offline, and arms `bashos-firstboot` ([amrchy/docs/layers.md](../amrchy/docs/layers.md)) |
+| `amrchy/sync.sh` | `bashos os amrchy status / pull / push`: `amrchy/` kept in step with bamr87/amrchy (a squashed git subtree) |
+| `iso/` | `build.sh` (the bashOS ISO with Omarchy's builder at the commits `iso.conf` pins), `seed.sh` (the `cidata` drive for an unattended install) |
+| `systemd/` | `bashos-provision.service`, `bashos-firstboot.service`, `bashos-engine-update.{service,timer}` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
 | `migrations/` | One-shot `<timestamp>.sh` scripts for existing installs ([README](migrations/README.md)) |
-| `image/` | The mkosi image definition, its build wrapper and boot test ([README](image/README.md)) |
+| `image/` | The Debian mkosi image definition, its build wrapper and boot test ([README](image/README.md)); no new work (ADR 0005) |
 | `tests/` | The offline suite: fake root, throwaway `$HOME`, no sudo/apt/systemctl/network |
 | `boot.sh` | The curl one-liner |
 

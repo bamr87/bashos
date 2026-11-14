@@ -20,3 +20,4 @@ Add an ADR in the same PR as the change it justifies.
 | 0002 | [bashOS the OS is an Omarchy-style layer on Debian 13, imaged with mkosi](0002-bashos-os-debian-mkosi.md) | superseded by 0003 |
 | 0003 | [bashOS by BASH Consulting is a fork of Omarchy, kept current by an AI-assisted upstream sync](0003-bashos-on-omarchy.md) | proposed |
 | 0004 | [one-os lives in bashos: one tool to build, boot, manage and deploy machines](0004-one-os.md) | proposed |
+| 0005 | [The bootable bashOS is Amrchy plus the bashOS layer, and amrchy lives in this repo](0005-bashos-is-amrchy-plus-a-layer.md) | proposed |
