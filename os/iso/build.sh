@@ -37,10 +37,13 @@ iso_conf() {
   sed -n "s/^$1=//p" "$ISO_DIR/iso.conf" | sed 's/[[:space:]]*#.*$//' | head -1
 }
 
-# The upstream commit amrchy/ was last synced to, and the bashOS commit the build is made from.
+# The bamr87/amrchy commit amrchy/ holds ("unknown" in a shallow clone, which lacks the squash
+# commit that records it), and the bashOS commit the build is made from.
 amrchy_split() {
-  git -C "$OS_SRC" log -1 --grep='^git-subtree-dir: amrchy$' --format=%B 2>/dev/null |
-    sed -n 's/^git-subtree-split: //p'
+  local split
+  split=$(git -C "$OS_SRC" log -1 --grep='^git-subtree-dir: amrchy$' --format=%B 2>/dev/null |
+    sed -n 's/^git-subtree-split: //p')
+  printf '%s' "${split:-unknown}"
 }
 bashos_commit() { git -C "$OS_SRC" rev-parse HEAD 2>/dev/null || printf 'unknown'; }
 bashos_dirty() { [[ -n $(git -C "$OS_SRC" status --porcelain 2>/dev/null) ]] && printf yes || printf no; }

@@ -29,6 +29,9 @@ def _bash_ok() -> bool:
 
 
 needs_bash = pytest.mark.skipif(not _bash_ok(), reason="the OS layer needs bash >= 4.4")
+# CI checks out one commit: the squash commit that records what amrchy/ holds is not there.
+SHALLOW = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+                         capture_output=True, text=True, check=False).stdout.strip() == "true"
 
 
 def _env(**extra: str) -> dict[str, str]:
@@ -78,7 +81,8 @@ def test_stage_is_amrchy_with_the_bashos_layer(staged):
     for path in ("amrchy", "one-os", "chui", "os/image"):
         assert not (payload / path).exists(), path
     stamp = dict(line.split("=", 1) for line in (layer / "build-info").read_text().splitlines())
-    assert len(stamp["commit"]) == 40 and len(stamp["amrchy"]) == 40
+    assert len(stamp["commit"]) == 40
+    assert len(stamp["amrchy"]) == 40 or (SHALLOW and stamp["amrchy"] == "unknown")
     assert stamp["layer"] == "/opt/bashos" and stamp["source"] == "bashos-iso"
 
 
@@ -225,3 +229,21 @@ def test_seed_refuses_what_would_install_the_wrong_machine(tmp_path, args, messa
     p = _seed(tmp_path, *args, check=False)
     assert p.returncode == 2 and message in p.stderr
     assert not (tmp_path / "cidata").exists()
+
+
+# ---------------------------------------------------------------- amrchy/, the subtree
+
+
+@needs_bash
+@pytest.mark.skipif(SHALLOW, reason="a shallow clone lacks the subtree's squash commit")
+def test_amrchy_status_names_the_commit_amrchy_holds():
+    env = _env(BASHOS_AMRCHY_REPO="/nonexistent/amrchy.git")  # no network: the remote is unreachable
+    p = sh(str(OS / "amrchy/sync.sh"), "status", env=env)
+    assert p.stdout.startswith("amrchy/  holds bamr87/amrchy ")
+    assert "could not reach" in p.stderr
+
+
+@needs_bash
+def test_amrchy_changes_never_go_to_its_main(tmp_path):
+    p = sh(str(OS / "amrchy/sync.sh"), "push", "main", env=_env(), check=False)
+    assert p.returncode == 1 and "never main" in p.stderr

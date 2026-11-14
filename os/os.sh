@@ -32,6 +32,8 @@ usage: bashos os <command>
   console                 attach the shared tmux console (what tty1 shows)
   heal                    add a missing bashos window to the console (the timer's job)
   uninstall [-n] [--purge]  remove what install added (--purge: /opt/bashos and /etc/bashos too)
+  amrchy <verb>           status | pull [REF] | push BRANCH — amrchy/, the framework, kept in step
+                          with bamr87/amrchy (a squashed git subtree)
   iso <verb>              build | seed — bashOS on Amrchy: the ISO, and the cidata drive that
                           installs it unattended (os/iso/README.md)
   image <verb>            build | test — the Debian 13 disk image (os/image/README.md)
@@ -359,6 +361,7 @@ case $cmd in
       *) os_die "usage: bashos os image build|test [options] (os/image/README.md)" ;;
     esac
     ;;
+  amrchy) exec "$OS_DIR/amrchy/sync.sh" "$@" ;;
   iso)
     case ${1:-} in
       build) shift; exec "$OS_DIR/iso/build.sh" "$@" ;;
