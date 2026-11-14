@@ -164,6 +164,7 @@ class VM:
                 a += ["-device", f"nvme,serial=ONEOS-M2-0001,drive=target,bootindex={boot}"]
             else:
                 a += ["-device", f"virtio-blk-pci,drive=target,bootindex={boot}"]
+            boot += 1
         if self.net or self.pxe:
             user = "user,id=n0"
             nic = "virtio-net-pci,netdev=n0"
@@ -175,6 +176,11 @@ class VM:
                 boot_file = "boot.ipxe" if self.profile == "bios" else "http://10.0.2.2:8780/uefi/boot.efi"
                 user += f",tftp={self.cfg.build / 'netboot' / 'tftp'},bootfile={boot_file}"
                 nic += ",bootindex=0"
+            elif self.profile != "bios":
+                # OVMF connects only the devices in QEMU's boot order: a NIC outside it gets no
+                # driver, and netboot.xyz's SNP build (the stick's UEFI netboot) finds no
+                # interface. Last in the order, it is never booted before the disks.
+                nic += f",bootindex={boot}"
             a += ["-netdev", user, "-device", nic,
                   "-object", f"filter-dump,id=cap0,netdev=n0,file={self.pcap}"]
         else:

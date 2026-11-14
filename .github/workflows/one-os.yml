@@ -75,8 +75,10 @@ jobs:
         run: sudo chown -R "$(id -u):$(id -g)" build
       - run: make payload image
       - name: Fast suite (T00–T51)
+        # 10.0.2.2 is the runner as a QEMU guest sees it (user networking), where the apt
+        # cache listens; the guest's own localhost is the guest.
         env:
-          ONEOS_MIRROR: http://localhost:3142/deb.debian.org/debian
+          ONEOS_MIRROR: http://10.0.2.2:3142/deb.debian.org/debian
         run: make test ARGS="-v --junitxml=build/junit.xml"
       - name: Upload failure artifacts
         if: failure()
@@ -123,7 +125,7 @@ jobs:
       - run: make lightos payload image
       - name: Full matrix
         env:
-          ONEOS_MIRROR: http://localhost:3142/deb.debian.org/debian
+          ONEOS_MIRROR: http://10.0.2.2:3142/deb.debian.org/debian
         run: make test-full ARGS="-v --junitxml=build/junit.xml"
       - uses: actions/upload-artifact@v7
         if: always()
