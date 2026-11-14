@@ -68,7 +68,11 @@ jobs:
             parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil tesseract-ocr
           sudo modprobe nbd max_part=16
       - run: make fetch
-      - run: make lightos
+      # In the builder container: Ubuntu's live-build is an older fork whose options differ from
+      # Debian's (`lb config: unrecognized option '--bootloaders'`); the home base is Debian's.
+      - run: make lightos USE_DOCKER=1
+      - name: Give build/ back to the runner (the container wrote it as root)
+        run: sudo chown -R "$(id -u):$(id -g)" build
       - run: make payload image
       - name: Fast suite (T00–T51)
         env:
