@@ -18,3 +18,5 @@ run_logged "$OMARCHY_INSTALL/user/default-keyring.sh"
 run_logged "$OMARCHY_INSTALL/user/mise.sh"
 
 run_logged "$OMARCHY_INSTALL/user/platform-setup.sh"
+
+run_logged "$OMARCHY_INSTALL/user/layers.sh"

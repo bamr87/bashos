@@ -37,6 +37,10 @@ This fork diverges from upstream Omarchy and keeps up with it. `bin/upstream-syn
 
 Source stays in upstream's naming so syncs stay mergeable; `bin/rebrand` applies the brand to builds. Don't run `bin/rebrand --apply` on the tree.
 
+# Layers
+
+A product built on this framework (bashOS is the first) adds its own setup as a layer: `install/layers/<name>/system.sh` and `user.sh`, copied in by the product's build and run last by the installer. Nothing lives under `install/layers/` in this repo. [`docs/layers.md`](docs/layers.md) is the contract; change the framework there rather than inside a layer.
+
 # Style
 
 - In markdown documents (`plans/`, `docs/`, `manual/`), write full lines — no hard wrapping at 80 columns; break only at structural boundaries like headings and list items

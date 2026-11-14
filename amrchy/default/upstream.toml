@@ -29,6 +29,10 @@ fork_owned = [
   ".upstream/",
   "test/shell.d/rebrand-test.sh",
   "test/shell.d/upstream-sync-test.sh",
+  "install/post-install/layers.sh",
+  "install/user/layers.sh",
+  "docs/layers.md",
+  "test/shell.d/layers-test.sh",
 ]
 
 # Upstream changes this fork leaves out, as regular expressions prefixed "subject:" or "path:".
