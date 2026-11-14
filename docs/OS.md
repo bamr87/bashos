@@ -1,10 +1,21 @@
 # bashOS, the operating system
 
-> How bashOS becomes the machine itself — an Omarchy-style layer on Debian 13 that boots the physical monitor into the bashOS console and serves the bamr87 Harness Console, delivered either in place (`bashos os install`) or as a bootable disk image built with mkosi — and how forge moves onto it.
+> How bashOS becomes the machine itself: one OS layer (`os/`) that turns an Amrchy (Arch) or Debian 13 machine into a bashOS machine, with the shared console and the bamr87 Harness Console. It arrives in place (`bashos os install`), as the Amrchy ISO with bashOS as its layer (`bashos os iso`, the primary path), or as the Debian disk image built with mkosi, and this page also covers how forge moves onto it.
 
 bashOS started as a program you run in a terminal. `os/` makes it the terminal a machine boots into: the monitor auto-logs in to one shared tmux session whose first window is the bashOS desktop, every ssh login joins the same session, the hub's Harness Console runs as a supervised service, and the whole thing updates itself the way Omarchy does. Nothing in the kernel, the loops or the policy changes — this is userland and plumbing around them, so every hard rule in [AGENTS.md](../AGENTS.md) holds as before.
 
-The machine it was built for is **forge** ([FORGE.md](FORGE.md)): an i7-3820 with 32 GB, a 1 TB SATA SSD, a GTX 660 on nouveau, UEFI, Debian 13. Its hand-written `~/setup/01…06` scripts are the prior art this layer generalises.
+It was first built for **forge** ([FORGE.md](FORGE.md)): an i7-3820 with 32 GB, a 1 TB SATA SSD, a GTX 660 on nouveau, UEFI, Debian 13. Its hand-written `~/setup/01…06` scripts are the prior art this layer generalises. bashOS's machine is now the **X870E desktop**, on Amrchy, in forge's place ([the X870E, step by step](#the-x870e-step-by-step)).
+
+## Two bases
+
+The layer installs on either of two operating systems, and reads which one it is on from `/etc/os-release` (`os_base` in [`os/lib.sh`](../os/lib.sh)):
+
+| Base | What it is | Packages | The console | How it arrives |
+| --- | --- | --- | --- | --- |
+| **Amrchy** (primary, [ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md)) | The Omarchy fork in [`amrchy/`](../amrchy/README.md): Arch, Hyprland, Omarchy's installer and updates | `os/packages/arch/*.list` through pacman (`--needed`, refreshing the sync databases a fresh install lacks) | `desktop`: a terminal window opened at login (a managed block in `~/.config/hypr/autostart.lua`) and two launcher entries; the login screen keeps tty1 | The bashOS ISO, whose layer arms `bashos-firstboot` ([AMRCHY.md](AMRCHY.md)), or `bashos os install` on an existing Amrchy |
+| **Debian 13** ([ADR 0002](adr/0002-bashos-os-debian-mkosi.md)) | Debian 13 or a derivative (Raspberry Pi OS); forge, bashOS's first machine | `os/packages/*.list` through apt | tty1 autologin into a kiosk (cage + foot) or the Linux console | `bashos os install` in place, or the mkosi image below (no new work, per ADR 0005) |
+
+Everything else is the same on both: `/opt/bashos`, the runtime, the managed engine, the units, the shared tmux session that ssh logins join, the harness, migrations, `bashos os status`. The rest of this page was written for forge, on Debian; where Amrchy differs, the table above says how.
 
 ## The shape, borrowed from Omarchy
 
@@ -53,9 +64,12 @@ The base choice is recorded in [ADR 0002](adr/0002-bashos-os-debian-mkosi.md), i
 | `~/.config/bashos/harness.env` | The Harness Console's secrets (`DASH_CONSOLE_TOKEN`, `GH_TOKEN`), mode 0600, created once | the user |
 | `~/dev/bamr87` | The hub checkout the harness serves (`BASHOS_HUB_DIR`); cloned if absent, never touched if present | the user |
 
-## Two ways onto a machine
+## Onto a machine
 
-**In place** — the Omarchy one-liner, for a Debian 13 box that already has a life (forge today). Additive and reversible: `bashos os uninstall` removes every file, link, unit and managed block it added (`--purge` also removes `/opt/bashos` and `/etc/bashos`); the hub checkout, linger and sleep masks are left as they are.
+**The bashOS ISO** — Amrchy with bashOS as its layer, installed by the framework's own installer, interactively or unattended from a `cidata` drive. This is the path for a new machine, the X870E desktop first. [AMRCHY.md](AMRCHY.md) covers building it, seeding it and what happens at first boot. On Debian there are two more ways:
+
+
+**In place** — the Omarchy one-liner, for a Debian 13 box that already has a life (forge, bashOS's first machine). Additive and reversible: `bashos os uninstall` removes every file, link, unit and managed block it added (`--purge` also removes `/opt/bashos` and `/etc/bashos`); the hub checkout, linger and sleep masks are left as they are.
 
 ```bash
 bin/bashos os install --dry-run      # every change it would make, on any machine (macOS too)
@@ -95,7 +109,7 @@ An existing hand-made hook is adopted, never duplicated: if `~/.zprofile` alread
 | `compose` | the hub's `console` compose service in the foreground, so systemd supervises it; a LAN bind adds the hub's `compose/forge.yml` overlay |
 | `off` | nothing |
 
-It binds `127.0.0.1:4001` by default; reach it from another machine with `ssh -L 4001:127.0.0.1:4001 forge`. A LAN address (`BASHOS_HARNESS_HOST=0.0.0.0`) is refused unless `DASH_CONSOLE_TOKEN` is set in `harness.env`; it then answers to `HOST`, `HOST.local` and loopback (`DASH_CONSOLE_ALLOWED_HOSTS`), and with `BASHOS_LAN_CIDR` set the installer opens the port in ufw for that subnet only. The console keeps its own rules — allowlisted operations, confirm-gated GitHub writes, never commits or merges — bashOS only supervises the process.
+It binds `127.0.0.1:4001` by default; reach it from another machine with `ssh -L 4001:127.0.0.1:4001 HOST`. A LAN address (`BASHOS_HARNESS_HOST=0.0.0.0`) is refused unless `DASH_CONSOLE_TOKEN` is set in `harness.env`; it then answers to `HOST`, `HOST.local` and loopback (`DASH_CONSOLE_ALLOWED_HOSTS`), and with `BASHOS_LAN_CIDR` set the installer opens the port in ufw for that subnet only. The console keeps its own rules — allowlisted operations, confirm-gated GitHub writes, never commits or merges — bashOS only supervises the process.
 
 ## The engine
 
@@ -120,13 +134,19 @@ OpenCode is the dependency every bashOS command runs on, so a bashOS machine own
 - **The harness is loopback unless tokened.** No LAN listener without `DASH_CONSOLE_TOKEN`; no firewall rule without an explicit `BASHOS_LAN_CIDR`.
 - **Physical access is the trust boundary on the console.** Autologin on tty1 is forge's existing trade; with `BASHOS_SUDO_NOPASSWD=yes` whoever holds the keyboard is root. The seed's default is `no`.
 
-## forge, step by step
+## The X870E, step by step
 
-Each step is a deploy that changes forge, so each is run only after an explicit go-ahead (hub constitution § 10). The order goes from most reversible to least:
+bashOS's machine is the ASUS ROG Crosshair X870E Dark Hero desktop, in forge's place ([ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md), [its profile](../one-os/machines/x870e-dark-hero.yaml)): a Ryzen 9 9950X3D2, 64 GB and an RX 9070 XT. It runs SteamOS 3.9 from its 2 TB NVMe drive, and that stays. bashOS installs onto its empty 2 TB SATA SSD beside it, and the firmware's boot menu (F8) picks the system. Each step that touches the machine is the maintainer's: an agent never writes a real disk.
 
-1. **In place, harness only.** `bin/bashos os install --dry-run` on forge, review, then install. forge's console mirror and getty drop-in are adopted, so the monitor keeps working exactly as now; what changes is `/opt/bashos`, the units, a `bashos` window in the console session and the Harness Console as a supervised service on `127.0.0.1:4001` (nothing listens there today). Undo: `bashos os uninstall`.
-2. **The image, from USB, once.** Write the x86-64 image to a USB stick, plug it into one of forge's **black USB 2.0 ports**, add an entry with `sudo efibootmgr --create-only` (the boot order stays Debian's), `sudo efibootmgr --bootnext <entry>` and reboot: forge boots bashOS once and returns to Debian on the next reboot. forge's DX79SI firmware (2014) can't boot from its blue USB 3.0 ports, which are on NEC uPD720200 add-on controllers. It silently falls back to Debian, and after the warm reboot that controller didn't come back in Linux either. Secure Boot needs to be off; forge's firmware has none.
-3. **The image, for good.** Only after an off-box backup (forge's restic repository lives on the same disk): either a second disk, or the image written over `sda`. forge's volume group has ~464 GB unallocated, so a side-by-side install is possible, but systemd-boot finds a root by GPT partition type, not inside LVM, so it needs a partition of its own.
+1. **Check the machine.** `bin/bashos one-os machine check x870e-dark-hero --system bashos`: Amrchy's 7.2 kernel drives both Ethernet ports and the Wi-Fi, which Debian 13's 6.12 cannot.
+2. **Get the ISO.** Run the `os iso` workflow by hand with `upload_iso`, download the ISO and its `.sha256`, and check it: `shasum -a 256 -c bashos-*.iso.sha256`. The same run has already installed that ISO unattended in a VM ([AMRCHY.md](AMRCHY.md#in-ci)).
+3. **Write the seed.** `bin/bashos os iso seed --user amr --hostname x870e --timezone ZONE $(bin/bashos one-os machine seed-args x870e-dark-hero)`. The seed erases `/dev/sda` (the SATA SSD, 2,000,398,934,016 bytes), asks for your password and hashes it, and takes your ssh public key.
+4. **Make two sticks.** Write the ISO to a stick of its own (Omarchy's documented path), or put it in the one-os stick's `ISO/` folder; whether it boots under Ventoy is not tested yet. Format a second stick FAT, name it `CIDATA`, and copy the files from `build/iso/cidata/` onto it.
+5. **Confirm the target.** `/dev/sda` and the NVMe are the same size, so check the model before the install: `lsblk -dno NAME,MODEL /dev/sda` must say `WD Blue SA510`, from SteamOS's terminal or the one-os home base. The NVMe is always `nvme0n1`, and USB sticks enumerate after the SATA ports.
+6. **Install.** Plug in both sticks and pick the ISO in the boot menu (F8). The installer finds the `CIDATA` drive, erases `/dev/sda`, installs and reboots. It adds a boot entry for bashOS, which may become the default; SteamOS stays one F8 away.
+7. **First boot.** With a cable in the 5 GbE port, `bashos-firstboot` finishes the runtime, the engine and the hub (about five minutes on Omarchy's own image). Then `ssh amr@x870e.local` and `bashos os status`. Record the result in [one-os/docs/hardware-results.md](../one-os/docs/hardware-results.md): which disk booted (`findmnt -no SOURCE /`, `efibootmgr`), wired and Wi-Fi, and how long each step took.
+
+**forge** was bashOS's first machine: an i7-3820 on Debian 13, with the in-place install and the USB image of [ADR 0002](adr/0002-bashos-os-debian-mkosi.md). Its step-by-step plan is in this file's history. Its lessons stay in the layer (adopting a console mirror, absolute paths in panes, never sleeping).
 
 ## Roadmap
 

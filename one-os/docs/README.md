@@ -47,7 +47,8 @@ tested from code before it touches hardware.
 **Reference**
 - [Make targets](reference/make-targets.md) · [oneos-vm CLI](reference/oneos-vm.md) ·
   [On-stick tools](reference/stick-tools.md) · [manifest.yaml](reference/manifest.md) ·
-  [Stick layout and ventoy.json](reference/stick-layout.md) · [Environment variables](reference/environment.md)
+  [Stick layout and ventoy.json](reference/stick-layout.md) · [Environment variables](reference/environment.md) ·
+  [Machine profiles](reference/machines.md)
 
 **Records and decisions**
 - [Design plan](../PLAN.md) · [ADRs](adr/) · [Phase 0 spike report](spike.md)

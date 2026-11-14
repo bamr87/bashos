@@ -1,0 +1,95 @@
+name: os iso
+
+# Builds the bashOS ISO (Amrchy with the bashOS layer: os/iso/build.sh runs Omarchy's own builder
+# at the commits os/iso/iso.conf pins), then installs it unattended into a KVM VM from a cidata
+# seed and checks it the way its person would: ssh with the seed's key, bashos-firstboot
+# finishing online, `bashos os status` (os/iso/test.sh). Omarchy builds and tests its own ISO on
+# the same runners. About an hour, so it runs when the framework, the layer or the ISO pipeline
+# moves, or by hand.
+on:
+  pull_request:
+    paths:
+      - "amrchy/**"
+      - "os/iso/**"
+      - "os/amrchy/**"
+      - "os/install/**"
+      - "os/lib.sh"
+      - "os/bin/bashos-firstboot"
+      - "os/systemd/system/bashos-firstboot.service"
+      - ".github/workflows/os-iso.yml"
+  push:
+    branches: [main]
+    paths:
+      - "amrchy/**"
+      - "os/iso/**"
+      - "os/amrchy/**"
+      - "os/install/**"
+      - "os/lib.sh"
+      - "os/bin/bashos-firstboot"
+      - "os/systemd/system/bashos-firstboot.service"
+      - ".github/workflows/os-iso.yml"
+  workflow_dispatch:
+    inputs:
+      upload_iso:
+        description: "Upload the ISO as an artifact (~6.5 GB, kept 7 days)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: os-iso-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iso:
+    name: build + unattended install (x86_64)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The build stamp names the amrchy commit, which the subtree's squash commit records.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: free disk space (the build and the install test need ~40 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+          avail=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+          [ "$avail" -ge 40 ] || { echo "::error::only ${avail} GB free; the build and the install test need ~40 GB"; exit 1; }
+      - name: tools for the install test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf xorriso jq
+          sudo chmod 0666 /dev/kvm
+      - name: build the ISO (omarchy-iso-make --local-source, privileged Docker)
+        run: bin/bashos os iso build
+      - name: install it unattended and check the first boot (QEMU + KVM, cidata seed)
+        run: bin/bashos os iso test --timeout 90
+      - name: evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: os-iso-test
+          # Never the seed's credentials or the run's private key: only these files.
+          path: |
+            build/iso/*.sha256
+            build/iso/*.build-info
+            build/iso/test/serial.log
+            build/iso/test/screens/
+            build/iso/test/firstboot.log
+            build/iso/test/firstboot.journal
+            build/iso/test/build-info
+            build/iso/test/status.txt
+            build/iso/test/cidata/user_configuration.json
+          if-no-files-found: ignore
+      - name: upload the ISO
+        if: inputs.upload_iso
+        uses: actions/upload-artifact@v7
+        with:
+          name: bashos-iso-x86_64
+          path: build/iso/bashos-*.iso
+          retention-days: 7
+          compression-level: 0

@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# bashos-firstboot — finish a bashOS machine installed from the Amrchy ISO, once it is online.
+#
+# The installer cannot reach the network, so the ISO's layer (os/amrchy/layer/system.sh) only
+# put the bashOS tree at /opt/bashos and armed this. What is left needs the network: the
+# Python runtime, the engine, the hub. This runs the system phases of `bashos os install` for
+# the machine's person, then the user phases as them, and disarms itself.
+#
+# The person is the user the installer created (/etc/bashos/firstboot.env), else the first
+# regular user. Without one yet (a deferred install creates them at first login) or without a
+# network, it exits 75 and bashos-firstboot.service starts it again a minute later. Any other
+# failure is recorded in /var/lib/bashos/firstboot-failed and ends the retries: `bashos os
+# status` reports it, and `sudo bashos-firstboot` tries again.
+set -Eeuo pipefail
+
+_src="${BASH_SOURCE[0]}"
+while [[ -L $_src ]]; do
+  _dir="$(cd "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  [[ $_src == /* ]] || _src="$_dir/$_src"
+done
+OS_SRC="$(cd "$(dirname "$_src")/../.." && pwd)"
+unset _src _dir
+# shellcheck source=../lib.sh
+source "$OS_SRC/os/lib.sh"
+
+STATE=$(os_path /var/lib/bashos)
+DONE=$STATE/provisioned
+PENDING=$STATE/firstboot-pending
+FAILED=$STATE/firstboot-failed
+ENV_FILE=$(os_path /etc/bashos/firstboot.env)
+TEMPFAIL=75
+# What must answer before the runtime can be installed: PyPI (the venv) and npm (the engine).
+BASHOS_FIRSTBOOT_PROBES=${BASHOS_FIRSTBOOT_PROBES:-"https://pypi.org/simple/ https://registry.npmjs.org/"}
+
+os_is_root || os_fake_root || os_die "bashos-firstboot runs as root (bashos-firstboot.service)"
+export HOME=${HOME:-/root}
+if [[ -e $DONE ]]; then
+  echo "bashos-firstboot: already done ($DONE)"
+  rm -f "$PENDING"
+  exit 0
+fi
+mkdir -p "$STATE"
+os_fake_root || exec > >(tee -a /var/log/bashos-firstboot.log) 2>&1
+
+# person — the machine's user: the one the installer named, else the first regular user.
+person() {
+  local user=""
+  [[ -r $ENV_FILE ]] && user=$(sed -n 's/^BASHOS_USER=//p' "$ENV_FILE" | head -1)
+  if [[ -z $user ]]; then
+    user=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// { print $1; exit }')
+  fi
+  [[ -n $user ]] && id -u "$user" >/dev/null 2>&1 || return 1
+  printf '%s' "$user"
+}
+
+online() {
+  local url
+  for url in $BASHOS_FIRSTBOOT_PROBES; do
+    curl -fsS -o /dev/null --max-time 15 "$url" || return 1
+  done
+}
+
+fail() {
+  date -Is >"$FAILED"
+  os_warn "bashos-firstboot: $* — see /var/log/bashos-firstboot.log, then: sudo bashos-firstboot"
+  exit 0
+}
+
+main() {
+  local user uid home
+  printf '%sbashOS%s first boot on %s\n' "$_os_b" "$_os_0" "$(os_base)"
+  if ! user=$(person); then
+    os_log "no user yet (the first login creates one) — trying again in a minute"
+    exit "$TEMPFAIL"
+  fi
+  if ! online; then
+    os_log "offline (${BASHOS_FIRSTBOOT_PROBES// / and } must answer) — trying again in a minute"
+    exit "$TEMPFAIL"
+  fi
+  rm -f "$FAILED"
+  os_ok "user $user, online"
+
+  "$OS_DIR/install.sh" --system-only --user "$user" || fail "the system phases failed"
+
+  # The user phases, as the user, against their own manager (the system phase enabled linger).
+  uid=$(id -u "$user")
+  home=$(os_user_home "$user")
+  systemctl start "user@$uid.service" 2>/dev/null || true
+  runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" \
+    PATH=/usr/local/bin:/usr/bin:/bin XDG_RUNTIME_DIR="/run/user/$uid" \
+    BASHOS_USER="$user" NO_COLOR=1 "$OS_DIR/install.sh" --user-only ||
+    fail "the user phases failed (as $user: bashos os install --user-only)"
+
+  date -Is >"$DONE"
+  rm -f "$PENDING"
+  # On the console (a VM's serial port, the monitor otherwise): the install test waits for it.
+  printf 'bashos-firstboot: ready user=%s host=%s\n' "$user" "$(hostname)" | tee /dev/console 2>/dev/null || true
+}
+
+main "$@"
