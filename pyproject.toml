@@ -76,6 +76,8 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
+# amrchy/ is a subtree of bamr87/amrchy and keeps upstream Omarchy's style (AGENTS.md).
+extend-exclude = ["amrchy"]
 src = ["src", "tests"]
 
 [tool.ruff.lint]
