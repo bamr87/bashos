@@ -53,3 +53,19 @@ def test_lspci_mode_checks_only_the_chips_present():
 def test_an_unknown_system_is_refused():
     p = machine("check", "x870e-dark-hero", "--system", "windows-95")
     assert p.returncode != 0 and "unknown system" in p.stderr
+
+
+def test_seed_args_name_the_install_target_exactly():
+    """bashOS installs on the X870E's empty SATA SSD, beside SteamOS on the NVMe of the same size."""
+    p = machine("seed-args", "x870e-dark-hero")
+    assert p.returncode == 0
+    assert p.stdout.split() == ["--disk", "/dev/sda", "--disk-bytes", "2000398934016"]
+
+
+def test_lint_rejects_an_install_target_that_is_not_a_recorded_drive(tmp_path, monkeypatch):
+    text = (ROOT / "machines/x870e-dark-hero.yaml").read_text().replace("disk: /dev/sda", "disk: /dev/sdz")
+    (tmp_path / "x870e-dark-hero.yaml").write_text(text)
+    (tmp_path / "systems.yaml").write_text((ROOT / "machines/systems.yaml").read_text())
+    p = subprocess.run([sys.executable, str(TOOL), "lint"], capture_output=True, text=True, check=False,
+                       env={"ONEOS_MACHINES": str(tmp_path), "PATH": "/usr/bin:/bin"})
+    assert p.returncode == 1 and "install.disk '/dev/sdz'" in p.stderr

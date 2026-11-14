@@ -1,24 +1,41 @@
 # one-os machine profile: what this PC is built from, which kernel first drives each of its
 # chips, and how its firmware boots. `scripts/oneos-machine check x870e-dark-hero --system NAME`
 # says whether an operating system can drive it before anything is deployed
-# (docs/reference/machines.md). TBD: not yet read off the machine.
+# (docs/reference/machines.md). TBD: not yet known.
 schema: 1
 name: x870e-dark-hero
 title: ASUS ROG Crosshair X870E Dark Hero desktop
 notes: >-
-  The first machine one-os deployed to (SteamOS, 2026-11-12) and bashOS's first target. Every
-  chip below was read on the machine during that deployment.
+  bashOS's machine, in place of forge (ADR 0005). It runs SteamOS 3.9 from the NVMe drive, and
+  bashOS installs onto the SATA SSD beside it; the firmware's boot menu picks the system. The
+  chips were read during the SteamOS deployment of 2026-11-12, and the parts and drives on
+  SteamOS 3.9.5 on 2026-11-13.
 build:
   board: ASUS ROG Crosshair X870E Dark Hero (AMD X870E)
-  cpu: TBD
-  gpu: AMD Radeon RX 9070 XT
+  cpu: AMD Ryzen 9 9950X3D2 (16 cores, 32 threads)
+  gpu: AMD Radeon RX 9070 XT, and the CPU's Radeon Graphics
   memory: 64 GB
   storage:
     - device: nvme0n1
-      model: WD_BLACK SN8100 2 TB
-      # The exact size the unattended installer needs (bashos os iso seed --disk-bytes): run
-      # `lsblk -bdno SIZE /dev/nvme0n1` on the home base before seeding an install.
-      bytes: TBD
+      model: WD_BLACK SN8100 2 TB (NVMe)
+      bytes: 2000398934016
+      holds: SteamOS 3.9, kept
+    - device: sda
+      model: WD Blue SA510 2.5" 2 TB (SATA)
+      bytes: 2000398934016
+      holds: nothing (no partition table, 2026-11-13); bashOS installs here
+    - device: sdb
+      model: WD 8 TB WD8002FZBX (SATA hard disk)
+      bytes: 8001563222016
+      holds: nothing (no partition table, 2026-11-13)
+install:
+  system: bashos
+  # sda and nvme0n1 are the same size, so the model is what tells them apart: confirm it on the
+  # machine (`lsblk -dno NAME,MODEL /dev/sda` from the home base or the ISO's live system)
+  # before the seeded boot. The NVMe is always nvme0n1 and the USB stick enumerates after the
+  # SATA ports, so /dev/sda can only be the SA510 or, were the ports reordered, the empty HDD.
+  disk: /dev/sda
+  disk_bytes: 2000398934016
 firmware:
   boot: uefi
   secure_boot: "off"
@@ -46,11 +63,19 @@ devices:
     kernel: "7.2"
     role: network
   - name: Graphics
-    chip: AMD Radeon RX 9070 XT (RDNA 4)
-    pci: TBD
+    chip: AMD Radeon RX 9070 XT (Navi 48, RDNA 4)
+    pci: "1002:7550"
+    driver: amdgpu
+    kernel: TBD
+    role: display
+    notes: SteamOS 3.9.5's 7.2.7 kernel drives it; the first kernel that does is not yet recorded.
+  - name: CPU graphics
+    chip: AMD Radeon Graphics (Granite Ridge)
+    pci: "1002:13c0"
     driver: amdgpu
     kernel: TBD
     role: display
 sources:
   - docs/field-reports/2026-11-12-steamos-silent-network.md
   - docs/hardware-results.md
+  - lscpu, lspci -nn and lsblk on the machine's SteamOS 3.9.5, 2026-11-13

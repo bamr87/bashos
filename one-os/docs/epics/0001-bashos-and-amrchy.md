@@ -4,7 +4,7 @@
 
 - **Status:** in progress (2026-11-13): story 2 is done and story 5 half done. [ADR 0005](../../../docs/adr/0005-bashos-is-amrchy-plus-a-layer.md) answers "Which bashOS?"
 - **Depends on:** [ADR 0004](../../../docs/adr/0004-one-os.md) (one-os in bashos), [ADR 0002](../../../docs/adr/0002-bashos-os-debian-mkosi.md) (the bashOS Debian image), [ADR 0003](../../../docs/adr/0003-bashos-on-omarchy.md) and epic [bamr87/bashos#73](https://github.com/bamr87/bashos/issues/73) (bashOS as a fork of Omarchy, `bamr87/amrchy`)
-- **First machine:** the ASUS ROG Crosshair X870E Dark Hero from the [SteamOS field report](../field-reports/2026-11-12-steamos-silent-network.md); second: forge ([docs/FORGE.md](../../../docs/FORGE.md))
+- **The machine:** the ASUS ROG Crosshair X870E Dark Hero from the [SteamOS field report](../field-reports/2026-11-12-steamos-silent-network.md), which replaces forge as bashOS's machine. bashOS goes on its empty 2 TB SATA SSD, and SteamOS stays on the NVMe ([its profile](../../machines/x870e-dark-hero.yaml))
 
 ## Goal
 

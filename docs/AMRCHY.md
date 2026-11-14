@@ -70,7 +70,7 @@ one-os puts the ISO on a machine and checks the machine first ([ONE-OS.md](ONE-O
 bin/bashos one-os machine check x870e-dark-hero --system bashos   # every known chip driven by Amrchy's 7.2 kernel?
 ```
 
-The first target is the ASUS ROG Crosshair X870E Dark Hero desktop ([its profile](../one-os/machines/x870e-dark-hero.yaml)). Its Wi-Fi needs kernel 7.2 and its 10 GbE port needs 6.16. Debian 13's 6.12 drives neither; Amrchy's `linux-omarchy` drives both. Booting the ISO there, from the stick or over PXE, is the maintainer's step: an agent never writes a real disk.
+bashOS's machine is the ASUS ROG Crosshair X870E Dark Hero desktop, in forge's place ([its profile](../one-os/machines/x870e-dark-hero.yaml)). Its Wi-Fi needs kernel 7.2 and its 10 GbE port needs 6.16. Debian 13's 6.12 drives neither; Amrchy's `linux-omarchy` drives both. bashOS installs onto its empty 2 TB SATA SSD, and SteamOS stays on the NVMe drive beside it. The profile names the target, so the seed is `bashos os iso seed --user U --hostname x870e $(bin/bashos one-os machine seed-args x870e-dark-hero)`. Installing there is the maintainer's step, because an agent never writes a real disk. The runbook is [OS.md](OS.md#the-x870e-step-by-step).
 
 ## What is proven, and what is not
 

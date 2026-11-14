@@ -6,6 +6,8 @@
   oneos-machine check NAME --system SYS|--kernel V   each chip against that kernel
   oneos-machine check --lspci FILE|- --system SYS    the chips `lspci -nn` lists, against every
                                                      chip the profiles know (on the home base)
+  oneos-machine seed-args NAME                       the seed's --disk and --disk-bytes for its install
+                                                     target: bashos os iso seed ... $(oneos-machine seed-args NAME)
   oneos-machine lint                                 every profile and machines/systems.yaml
 
 `check` exits 0 when every chip with a known first kernel is driven, 1 when one is not, and 2
@@ -110,6 +112,10 @@ def cmd_show(args) -> int:
                 print(f"  {'storage':<9} {disk['model']} ({disk['device']}, {disk.get('bytes', 'TBD')} bytes)")
         else:
             print(f"  {part:<9} {value}")
+    install = data.get("install")
+    if install:
+        print(f"\n  install    {install['system']} onto {install['disk']} ({install['disk_bytes']} bytes):"
+              f" bashos os iso seed ... $(oneos-machine seed-args {data['name']})")
     print()
     for key, value in (data.get("firmware") or {}).items():
         print(f"  {key:<11} {value}")
@@ -132,6 +138,17 @@ def cmd_check(args) -> int:
     if not data:
         sys.exit(f"oneos-machine: no profile {args.name!r} in {MACHINES}")
     return report(data.get("devices", []), kernel, f"{data['title']} · {label}")
+
+
+def cmd_seed_args(args) -> int:
+    data = profiles().get(args.name)
+    if not data:
+        sys.exit(f"oneos-machine: no profile {args.name!r} in {MACHINES}")
+    install = data.get("install")
+    if not install:
+        sys.exit(f"oneos-machine: {args.name} has no install target (install: in its profile)")
+    print(f"--disk {install['disk']} --disk-bytes {install['disk_bytes']}")
+    return 0
 
 
 def problems() -> list[str]:
@@ -164,6 +181,16 @@ def problems() -> list[str]:
                 out.append(f"{label}: pci must be vendor:device in hex, or TBD")
             if known(d.get("kernel")) and not KERNEL_RE.match(str(d["kernel"])):
                 out.append(f"{label}: kernel must be MAJOR.MINOR, or TBD")
+        install = data.get("install")
+        if install:
+            disk = str(install.get("disk", ""))
+            disks = {f"/dev/{s.get('device')}": s for s in (data.get("build") or {}).get("storage", [])}
+            if install.get("system") not in systems():
+                out.append(f"{where}: install.system must be one of machines/systems.yaml")
+            if disk not in disks:
+                out.append(f"{where}: install.disk {disk!r} is not one of the drives under build.storage")
+            elif disks[disk].get("bytes") != install.get("disk_bytes"):
+                out.append(f"{where}: install.disk_bytes must be that drive's bytes ({disks[disk].get('bytes')})")
     return out
 
 
@@ -191,6 +218,9 @@ def main(argv: list[str] | None = None) -> int:
     target.add_argument("--kernel", type=lambda v: v if KERNEL_RE.match(v) else ap.error("--kernel: MAJOR.MINOR"))
     check.add_argument("--lspci", metavar="FILE", help="`lspci -nn` output (- for stdin) instead of a profile")
     check.set_defaults(fn=cmd_check)
+    seed = sub.add_parser("seed-args")
+    seed.add_argument("name")
+    seed.set_defaults(fn=cmd_seed_args)
     sub.add_parser("lint").set_defaults(fn=cmd_lint)
     args = ap.parse_args(argv)
     if args.cmd == "check" and not (args.name or args.lspci):

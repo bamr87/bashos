@@ -389,7 +389,7 @@ features:
     docs: "docs/AMRCHY.md"
   - id: BASHOS-042
     title: "one-os: machine profiles"
-    description: "A custom PC's parts, firmware and chips, each with the first kernel that drives it (one-os/machines/), checked against an operating system's kernel or a live lspci before anything is deployed (bashos one-os machine check). The ASUS ROG Crosshair X870E Dark Hero desktop is the first profile."
+    description: "A custom PC's parts, firmware, drives and chips, each chip with the first kernel that drives it, and where a system installs (one-os/machines/), checked against an operating system's kernel or a live lspci before anything is deployed (bashos one-os machine check, seed-args). The ASUS ROG Crosshair X870E Dark Hero desktop, bashOS's machine in forge's place, is the first profile."
     implemented: true
     status: shipped
     prd: [TBD]

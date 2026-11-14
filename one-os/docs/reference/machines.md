@@ -21,6 +21,7 @@ scripts/oneos-machine show x870e-dark-hero                   # its build sheet
 scripts/oneos-machine check x870e-dark-hero --system bashos  # every chip against bashOS's kernel
 scripts/oneos-machine check x870e-dark-hero --kernel 6.12    # or against any kernel
 lspci -nn | scripts/oneos-machine check --lspci - --system steamos-3.8   # the hardware in front of you
+scripts/oneos-machine seed-args x870e-dark-hero              # --disk and --disk-bytes of its install target
 scripts/oneos-machine lint                                   # part of make lint
 ```
 
@@ -45,7 +46,18 @@ The `--lspci` form is for the home base: boot the machine into it, pipe `lspci -
 | SteamOS 3.8 | 6.16 | No Wi-Fi (MT7927 needs 7.2); both Ethernet ports work |
 | Debian 13 | 6.12 | No 10 GbE (needs 6.16), no Wi-Fi |
 
-Still `TBD` on it: the CPU, the graphics card's PCI id and first kernel, and the NVMe drive's exact size in bytes, which the unattended bashOS installer needs (`bashos os iso seed --disk-bytes`). Read them from the home base: `lscpu`, `lspci -nn`, `lsblk -bdno SIZE /dev/nvme0n1`.
+It is bashOS's machine, in forge's place. Its parts and drives were read on its SteamOS 3.9.5 on 2026-11-13: a Ryzen 9 9950X3D2, and three drives. The 2 TB NVMe holds SteamOS, which stays. The 2 TB SATA SSD is empty and is where bashOS installs. The 8 TB hard disk is empty. Still `TBD`: the first kernel that drives each of its two Radeon GPUs (7.2 does).
+
+## Where a system installs
+
+A profile's `install` names the system and the drive it erases: `disk`, and `disk_bytes` that must equal that drive's `bytes` under `build.storage` (lint checks both). The unattended seed takes them from there:
+
+```bash
+bin/bashos os iso seed --user amr --hostname x870e $(bin/bashos one-os machine seed-args x870e-dark-hero)
+#   = --disk /dev/sda --disk-bytes 2000398934016
+```
+
+Drive names are what the installer's kernel calls them. When two drives are the same size, as the X870E's NVMe and SATA SSD are, write in the profile what tells them apart (the model), and check it on the machine before the seeded boot.
 
 ## Adding a machine
 
