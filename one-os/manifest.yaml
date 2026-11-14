@@ -48,7 +48,7 @@ netboot:
   - name: netboot.xyz-efi
     file: ISO/netboot.xyz-snp.efi
     url: "https://boot.netboot.xyz/ipxe/netboot.xyz-snp.efi"
-    sha256: "58be5a48642827a1b5ffa579c3e82e23866d8b50c90b355c770c2b34a16d048a"
+    sha256: "f30777ff2dbaeb5643bc077a807ae9c77ccdf60fa54355cc4b54235791242c97"
     sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
     alias: "Network install (netboot.xyz)"
     mode: uefi
@@ -56,7 +56,7 @@ netboot:
   - name: netboot.xyz-bios
     file: ISO/netboot.xyz.iso
     url: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso"
-    sha256: "0d365dcb553932a3723525758cb1bd884219757cb1a7034658a9187d7d8dee9b"
+    sha256: "5dbffcb3aa89bd322378ab7ee0bd278afe80d37777f9489fce4327413cf19f79"
     sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
     alias: "Network install (netboot.xyz)"
     mode: legacy

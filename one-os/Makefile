@@ -36,8 +36,10 @@ help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 builder: ## Build the builder container image(s)
+ifeq ($(UNAME_S)-$(shell uname -m),Linux-x86_64)
+	docker build -f docker/builder.Dockerfile -t $(BUILDER_IMAGE) -t oneos-builder:amd64 docker
+else
 	docker build -f docker/builder.Dockerfile -t $(BUILDER_IMAGE) docker
-ifneq ($(UNAME_S)-$(shell uname -m),Linux-x86_64)
 	docker build --platform linux/amd64 -f docker/builder.Dockerfile -t oneos-builder:amd64 docker
 endif
 

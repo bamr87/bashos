@@ -54,6 +54,10 @@ QEMU TCG (no KVM). Ventoy 1.1.18. All runs inside `docker/builder.Dockerfile`.
   physical disk must walk down with `lsblk -lsp` (as `oneos-install` does).
 - In UEFI, screendumps of iPXE's EFI text console come out blank; OVMF mirrors it to
   serial, which is the better oracle.
+- OVMF connects only the devices in QEMU's boot order. A NIC without a `bootindex` gets no
+  driver, so `netboot.xyz-snp.efi` prints "Available interfaces..." with none listed and
+  exits to Ventoy ("cannot load image"); from the UEFI shell it works, because the firmware
+  connects everything before starting the shell. The harness puts the NIC last in the order.
 
 - `live-build` templates on trixie have `timeout 0` (wait forever) for isolinux and no
   timeout for GRUB; `build-lightos.sh` sets 5 s so Ventoy-booted ISOs don't stall.

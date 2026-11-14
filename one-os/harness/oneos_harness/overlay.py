@@ -44,6 +44,27 @@ def _wait_block(dev: str, timeout: float = 10) -> None:
         time.sleep(0.1)
 
 
+def _settle() -> None:
+    """Wait for udev to finish with the block devices (no udev in a container: nothing to wait for)."""
+    if shutil.which("udevadm"):
+        run("udevadm", "settle", "--timeout=10", check=False)
+
+
+def _mount(dev: str, mnt: Path, fstype: str, opts: str, tries: int = 10) -> None:
+    """mount, waiting out udev: it re-reads a disk's partition table when a writer closes the
+    disk (partprobe), and an nbd device's last partitions go only after its disconnect returns.
+    Either way the partition node is missing for a moment, and mount says it does not exist."""
+    for attempt in range(tries):
+        _wait_block(dev)
+        r = run("mount", "-t", fstype, "-o", opts, dev, str(mnt), check=False)
+        if r.returncode == 0:
+            return
+        if attempt == tries - 1 or "does not exist" not in r.stderr:
+            raise subprocess.CalledProcessError(r.returncode, r.args, r.stdout, r.stderr)
+        _settle()
+        time.sleep(0.5)
+
+
 def _nbd_available() -> bool:
     if shutil.which("qemu-nbd") is None:
         return False
@@ -86,9 +107,11 @@ class Overlay:
             run("qemu-nbd", "--connect", dev, "--format", "qcow2", "--cache=unsafe", str(self.path))
             try:
                 run("partprobe", dev, check=False)
+                _settle()
                 yield dev
             finally:
                 run("qemu-nbd", "--disconnect", dev, check=False)
+                _settle()
         elif self.backend == "fuse":
             export = self.dir / "usb.fuse"
             export.touch()
@@ -115,6 +138,7 @@ class Overlay:
         dev = run("losetup", "-fP", "--show", str(file)).stdout.strip()
         try:
             run("partprobe", dev, check=False)
+            _settle()
             yield dev
         finally:
             run("losetup", "-d", dev, check=False)
@@ -130,11 +154,8 @@ class Overlay:
     def p1(self, readonly: bool = False) -> Iterator[Path]:
         """Mount the Ventoy data partition of the overlay."""
         with self.block_device() as dev:
-            part = f"{dev}p1"
-            _wait_block(part)
             mnt = Path(tempfile.mkdtemp(prefix="oneos-p1-"))
-            run("mount", "-t", "exfat", "-o", f"{'ro' if readonly else 'rw'},uid={os.getuid()},gid={os.getgid()}",
-                part, str(mnt))
+            _mount(f"{dev}p1", mnt, "exfat", f"{'ro' if readonly else 'rw'},uid={os.getuid()},gid={os.getgid()}")
             try:
                 yield mnt
             finally:

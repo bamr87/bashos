@@ -23,8 +23,16 @@ fi
 # Valve's recovery image: build/steamos/recovery.img, else the newest cached .img.bz2 unpacked.
 img="${STEAMOS_RECOVERY_IMG:-$BUILD_DIR/steamos/recovery.img}"
 if [[ ! -f $img ]]; then
+  # `|| true`: with no cached image, ls fails, and under pipefail that would end the script with
+  # status 2 and no message.
   # shellcheck disable=SC2012  # newest by mtime; Valve names have no odd characters
-  bz="$(ls -t "$ONEOS_ROOT"/cache/steamos/*.img.bz2 2>/dev/null | head -1)"
+  bz="$(ls -t "$ONEOS_ROOT"/cache/steamos/*.img.bz2 2>/dev/null | head -1 || true)"
+  if [[ -z $bz && ${CI:-} == true ]]; then
+    # CI has no 8 GB Valve image: its test stick goes without, and T120 skips. A stick for a
+    # machine still needs it (below).
+    warn "no SteamOS recovery image in CI: the reserved space stays empty"
+    exit 0
+  fi
   [[ -n $bz ]] || die "no SteamOS recovery image: run 'make steamos-fetch'"
   log "unpacking $(basename "$bz") → $img (~8 GB)"
   mkdir -p "$(dirname "$img")"
