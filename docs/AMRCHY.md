@@ -80,6 +80,6 @@ bashOS's machine is the ASUS ROG Crosshair X870E Dark Hero desktop, in forge's p
 | The console window on the Hyprland desktop | The autostart block and launchers are written (seen in that run); no desktop session was started under emulation |
 | Staging the ISO tree, the seed files | Offline tests (`os/tests/test_iso.py`) |
 | amrchy's layers runner | `amrchy/test/shell.d/layers-test.sh` |
-| Building the ISO, installing it unattended in a VM | The `os iso` workflow; its first run comes with the pull request that adds it |
+| Building the ISO, installing it unattended in a VM | The `os iso` workflow, first passed 2026-11-14 ([run](https://github.com/bamr87/bashos/actions/runs/43557590289)). The build took 21 minutes, and the unattended install with first boot 4 minutes under KVM, on kernel 7.2.15-2-omarchy. First boot retried once while the network came up. `bashos os status` showed base, layer, runtime, engine, heal and provisioning OK |
 | Installing it on the X870E | The maintainer's step, from the stick or PXE; the [one-os epic](../one-os/docs/epics/0001-bashos-and-amrchy.md), story 7 |
-| bashOS's branding of the image | Not started (`bin/rebrand`, the boot and login screens) |
+| bashOS's branding of the image | Not started: the installed system's login screen still says Omarchy (`bin/rebrand`, the boot and login screens) |

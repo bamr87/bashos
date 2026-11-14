@@ -380,7 +380,7 @@ features:
     docs: "docs/OS.md"
   - id: BASHOS-041
     title: "The bashOS ISO, its unattended seed and first boot"
-    description: "bashos os iso build stages amrchy/ with the bashOS layer and builds the ISO with Omarchy's own builder at pinned commits; bashos os iso seed writes the cidata drive that installs it unattended on one machine's disk; bashos-firstboot finishes the runtime, the engine and the hub once the machine is online. The layer and first boot are proven on Omarchy's 4.5.0 VM image; the ISO build and an unattended install are not yet run."
+    description: "bashos os iso build stages amrchy/ with the bashOS layer and builds the ISO with Omarchy's own builder at pinned commits; bashos os iso seed writes the cidata drive that installs it unattended on one machine's disk; bashos-firstboot finishes the runtime, the engine and the hub once the machine is online. The os iso workflow builds the ISO and installs it unattended in a KVM VM through first boot (first passed 2026-11-14); not yet branded, not yet on hardware."
     implemented: true
     status: partial
     prd: [TBD]

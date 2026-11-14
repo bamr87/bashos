@@ -40,7 +40,7 @@ What was found when the two were put together:
 - **Two places to change the framework:** a change made here must go back to `bamr87/amrchy` (`bashos os amrchy push`), or the next pull conflicts with it.
 - **Builder drift:** the ISO builder is pinned to the framework's upstream base. Each amrchy upstream sync must move `os/iso/iso.conf` with it, or the builder rejects the tree.
 - **Build cost:** an x86_64 ISO needs Docker with privileges and about 30 GB free, and runs emulated on Apple Silicon. CI builds it (the `os iso` workflow, on GitHub's standard runners as Omarchy's own CI does) and installs it unattended in a KVM VM: about an hour on every change to the framework, the layer or the ISO pipeline.
-- **Not yet proven when this was written:** the ISO build and its unattended install (the `os iso` workflow's first run comes with this pull request), and anything on the X870E (the epic's story 7).
+- **Not yet proven:** anything on the X870E itself (the epic's story 7). The ISO build and its unattended install in a KVM VM passed in CI on 2026-11-14 ([run](https://github.com/bamr87/bashos/actions/runs/43557590289)).
 
 ## Alternatives considered
 

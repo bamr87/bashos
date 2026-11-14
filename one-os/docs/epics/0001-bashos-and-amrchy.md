@@ -2,7 +2,7 @@
 
 > The next major piece of one-os: make bashOS and Amrchy two operating systems that one-os can build, put on a stick or serve over the network, deploy onto a machine unattended, and prove in QEMU before the first real disk is written.
 
-- **Status:** in progress (2026-11-13): story 2 is done and story 5 half done. [ADR 0005](../../../docs/adr/0005-bashos-is-amrchy-plus-a-layer.md) answers "Which bashOS?"
+- **Status:** in progress (2026-11-14): stories 2 and 5 are done, and 4 is part of 5. [ADR 0005](../../../docs/adr/0005-bashos-is-amrchy-plus-a-layer.md) answers "Which bashOS?"
 - **Depends on:** [ADR 0004](../../../docs/adr/0004-one-os.md) (one-os in bashos), [ADR 0002](../../../docs/adr/0002-bashos-os-debian-mkosi.md) (the bashOS Debian image), [ADR 0003](../../../docs/adr/0003-bashos-on-omarchy.md) and epic [bamr87/bashos#73](https://github.com/bamr87/bashos/issues/73) (bashOS as a fork of Omarchy, `bamr87/amrchy`)
 - **The machine:** the ASUS ROG Crosshair X870E Dark Hero from the [SteamOS field report](../field-reports/2026-11-12-steamos-silent-network.md), which replaces forge as bashOS's machine. bashOS goes on its empty 2 TB SATA SSD, and SteamOS stays on the NVMe ([its profile](../../machines/x870e-dark-hero.yaml))
 
@@ -32,7 +32,7 @@ and then, on a real machine booted from the stick or from PXE, one menu entry ea
 
 ## Stories
 
-Progress, 2026-11-13: story 2 is done (machine profiles, T05). Story 4 merged into story 5: the bashOS that boots is Amrchy with the bashOS layer (ADR 0005), and the Debian image stays as it is. Story 5's build half is done (`bashos os iso build`, `bashos os iso seed`), and its *Done when* is a CI job: the `os iso` workflow builds the ISO and installs it unattended in a KVM VM through first boot (`bashos os iso test`). It still has to pass for the first time, and a one-os harness test for the stick and PXE paths is open. Stories 1, 3, 6 and 7 are open.
+Progress, 2026-11-13: story 2 is done (machine profiles, T05). Story 4 merged into story 5: the bashOS that boots is Amrchy with the bashOS layer (ADR 0005), and the Debian image stays as it is. Story 5 is done (`bashos os iso build`, `bashos os iso seed`), and its *Done when* is a CI job: the `os iso` workflow builds the ISO and installs it unattended in a KVM VM through first boot (`bashos os iso test`). It first passed on 2026-11-14 ([run](https://github.com/bamr87/bashos/actions/runs/43557590289)): the build took 21 minutes, and the install with first boot 4 minutes. A one-os harness test for the stick and PXE paths is still open. Stories 1, 3, 6 and 7 are open.
 
 
 1. **A catalog of systems, not just ISOs.** Generalise `isos` and the SteamOS special case into one `systems:` list in `manifest.yaml`. Each entry says what it is (`iso`, `disk-image`), where it comes from (a pinned URL, or a local build command and its output path) and how it is checked. `scripts/manifest.py lint` enforces it. *Done when:* SteamOS, bashOS and Amrchy are three entries of the same shape and the existing tests still pass.
