@@ -33,7 +33,7 @@ What was found when the two were put together:
 - One checkout holds everything a bashOS machine is: the framework, the layer, the runtime, the delivery tool and the machine it targets.
 - The framework stays close to upstream. The layer contract is the only lasting divergence an upstream sync has to keep, and it is two lines in upstream files.
 - The X870E gets a kernel that drives every chip whose first kernel is known. Debian 13 could not.
-- The layer and its first boot ran on Omarchy's own 4.5.0 image (kernel 7.2.15, QEMU, no desktop session) before any ISO was built. First boot finished in about five minutes, with the managed engine verified, and `bashos os status` reported the base, layer, runtime and engine OK. The run also found a real fault, now fixed: a fresh install has only the installer's `offline.db` for pacman.
+- The layer and its first boot ran on Omarchy's own 4.5.0 image (kernel 7.2.15, QEMU, no desktop session) before any ISO was built. First boot finished in about five minutes, with the managed engine verified, and `bashos os status` reported the base, layer, runtime, engine and harness OK. The run also found a real fault, now fixed: a fresh install has only the installer's `offline.db` for pacman.
 
 **Negative / risks**
 - **Size:** `amrchy/` is 212 MB, 86 MB of it theme intro videos. Every later pull that changes media adds to this repo's history, and to the hub's, which vendors bashos.

@@ -69,7 +69,7 @@ The first target is the ASUS ROG Crosshair X870E Dark Hero desktop ([its profile
 
 | Step | State |
 | --- | --- |
-| The layer's install step, first boot, `bashos os install` on Amrchy | Run on Omarchy's own 4.5.0 VM image under QEMU, booted to the multi-user target: first boot was ready in about five minutes, and `bashos os status` reported the base, layer, runtime, engine, heal timer and provisioning OK. Offline tests in `os/tests/` |
+| The layer's install step, first boot, `bashos os install` on Amrchy | Run on Omarchy's own 4.5.0 VM image under QEMU, booted to the multi-user target: first boot was ready in about five minutes, and `bashos os status` reported the base, layer, runtime, engine, harness (answering on :4001), heal timer and provisioning OK; the only warnings were no Claude sign-in and no desktop session. Offline tests in `os/tests/` |
 | The console window on the Hyprland desktop | The autostart block and launchers are written (seen in that run); no desktop session was started under emulation |
 | Staging the ISO tree, the seed files | Offline tests (`os/tests/test_iso.py`) |
 | amrchy's layers runner | `amrchy/test/shell.d/layers-test.sh` |
