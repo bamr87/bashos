@@ -15,6 +15,7 @@ bashos os update [--system]          # pull, re-apply, migrate (and `omarchy upd
 bashos os uninstall [--purge]        # remove what install added
 bin/bashos os iso build              # the bashOS ISO: Amrchy with this layer (docs/AMRCHY.md)
 bin/bashos os iso seed --user U --disk DEV --disk-bytes N   # its unattended-install drive
+bin/bashos os iso test               # install it unattended in a KVM VM and check it (CI: os-iso.yml)
 bin/bashos os amrchy status          # amrchy/ against bamr87/amrchy
 bashos os image build --docker       # the Debian disk image (image/README.md)
 ```
@@ -39,7 +40,7 @@ On a fresh Debian 13 box with nothing checked out, the one-liner clones into `/o
 | `bin/bashos-firstboot` | The Amrchy ISO's first boot: once a user exists and the network answers, `install.sh --system-only`, then the user phases as that user; waits exit 75 and retry |
 | `amrchy/layer/` | bashOS as an Amrchy layer: `system.sh` runs in the installer, offline, and arms `bashos-firstboot` ([amrchy/docs/layers.md](../amrchy/docs/layers.md)) |
 | `amrchy/sync.sh` | `bashos os amrchy status / pull / push`: `amrchy/` kept in step with bamr87/amrchy (a squashed git subtree) |
-| `iso/` | `build.sh` (the bashOS ISO with Omarchy's builder at the commits `iso.conf` pins), `seed.sh` (the `cidata` drive for an unattended install) |
+| `iso/` | `build.sh` (the bashOS ISO with Omarchy's builder at the commits `iso.conf` pins), `seed.sh` (the `cidata` drive for an unattended install), `test.sh` (that install in a KVM VM, checked through first boot; the `os-iso` workflow runs build and test) |
 | `systemd/` | `bashos-provision.service`, `bashos-firstboot.service`, `bashos-engine-update.{service,timer}` (system) · `bashos-harness.service`, `bashos-heal.{service,timer}` (user) |
 | `migrations/` | One-shot `<timestamp>.sh` scripts for existing installs ([README](migrations/README.md)) |
 | `image/` | The Debian mkosi image definition, its build wrapper and boot test ([README](image/README.md)); no new work (ADR 0005) |

@@ -49,11 +49,18 @@ bin/bashos os iso build --stage-only     # build/iso/stage/amrchy: the framework
 bin/bashos os iso build                  # build/iso/bashos-<date>-<commit>-x86_64.iso (+ .sha256, .build-info)
 bin/bashos os iso seed --user amr --disk /dev/nvme0n1 --disk-bytes N --hostname x870e
                                          # build/iso/cidata/ and cidata.iso: the unattended install for one machine
+bin/bashos os iso test                   # install the newest ISO unattended in a KVM VM, check first boot and status
 ```
 
-`build` fetches Omarchy's ISO builder ([omarchy-iso](https://github.com/omacom/omarchy-iso)) and package recipes ([omarchy-pkgs](https://github.com/omacom/omarchy-pkgs)) at the commits [`os/iso/iso.conf`](../os/iso/iso.conf) pins. It stages `amrchy/` with the layer and runs `omarchy-iso-make --local-source`, which builds the framework's packages from the staged tree and the ISO around them in a privileged Docker container. It needs Docker and about 30 GB free. On Apple Silicon the x86_64 builder runs emulated and slowly, so a Linux x86_64 machine is the practical builder. **The pins move with the framework:** the builder checks the tree it is given, so after `bashos os amrchy pull` brings in a newer upstream, take each builder repository's last commit from the day of the new upstream base.
+`build` fetches Omarchy's ISO builder ([omarchy-iso](https://github.com/omacom/omarchy-iso)) and package recipes ([omarchy-pkgs](https://github.com/omacom/omarchy-pkgs)) at the commits [`os/iso/iso.conf`](../os/iso/iso.conf) pins. It stages `amrchy/` with the layer and runs `omarchy-iso-make --local-source`, which builds the framework's packages from the staged tree and the ISO around them in a privileged Docker container. It needs Docker and about 30 GB free; on Apple Silicon the x86_64 builder runs emulated and slowly. CI is the builder: the `os iso` workflow runs the build and the install test on GitHub's standard runners, as Omarchy builds and tests its own ISO. **The pins move with the framework:** the builder checks the tree it is given, so after `bashos os amrchy pull` brings in a newer upstream, take each builder repository's last commit from the day of the new upstream base.
 
 `seed` writes the configurator's answer files for one machine. You give it the disk to erase and that disk's exact size: run `lsblk -bdno SIZE DEV` on the machine from the one-os home base first, because the layout must fill the disk to the byte. It also writes the user, with sudo, a password hash that is asked for and never stored in clear, and your ssh public keys, which turn sshd on. Attach the result beside the ISO and the install runs with nobody at the keyboard. An unattended install is never encrypted: the passphrase would have to sit on the drive in clear and would still be asked for at the first boot. For an encrypted disk, use the interactive installer.
+
+`test` does in a VM what the ISO will do on a machine. It writes a seed for a 40 GB virtual disk with a key made for the run, boots the ISO beside it in QEMU with KVM, and waits for ssh from the installed system: the live installer has no such user, so only the installed disk answers. It then waits for `bashos-firstboot` to finish and requires `bashos os status` to show base, layer, runtime, engine and provisioning OK, with no CRIT. It keeps a screenshot every three minutes, the serial log, the first-boot log and the status in `build/iso/test/`.
+
+## In CI
+
+[`.github/workflows/os-iso.yml`](../.github/workflows/os-iso.yml) runs `bashos os iso build` then `bashos os iso test` on `ubuntu-26.04`, under KVM. It runs when a pull request or a push to main changes `amrchy/`, `os/iso/`, `os/amrchy/`, the install phases or first boot, and it can be run by hand. It takes about an hour and needs about 40 GB, which the job frees and checks first. The evidence above is uploaded on every run, and the ISO itself (about 6.5 GB, kept 7 days) when a run by hand asks for it with `upload_iso`. The seed's credentials and the run's key are never uploaded.
 
 ## Onto a machine
 
@@ -73,6 +80,6 @@ The first target is the ASUS ROG Crosshair X870E Dark Hero desktop ([its profile
 | The console window on the Hyprland desktop | The autostart block and launchers are written (seen in that run); no desktop session was started under emulation |
 | Staging the ISO tree, the seed files | Offline tests (`os/tests/test_iso.py`) |
 | amrchy's layers runner | `amrchy/test/shell.d/layers-test.sh` |
-| Building the ISO | Not yet run (Docker, about 30 GB) |
-| Installing the ISO unattended in QEMU, then on the X870E | Not yet run; the [one-os epic](../one-os/docs/epics/0001-bashos-and-amrchy.md) holds both |
+| Building the ISO, installing it unattended in a VM | The `os iso` workflow; its first run comes with the pull request that adds it |
+| Installing it on the X870E | The maintainer's step, from the stick or PXE; the [one-os epic](../one-os/docs/epics/0001-bashos-and-amrchy.md), story 7 |
 | bashOS's branding of the image | Not started (`bin/rebrand`, the boot and login screens) |

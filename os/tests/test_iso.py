@@ -247,3 +247,23 @@ def test_amrchy_status_names_the_commit_amrchy_holds():
 def test_amrchy_changes_never_go_to_its_main(tmp_path):
     p = sh(str(OS / "amrchy/sync.sh"), "push", "main", env=_env(), check=False)
     assert p.returncode == 1 and "never main" in p.stderr
+
+
+# ---------------------------------------------------------------- the os-iso workflow
+
+
+def test_the_ci_build_uploads_no_credentials_and_runs_when_the_layer_moves():
+    import yaml
+
+    flow = yaml.safe_load((REPO / ".github/workflows/os-iso.yml").read_text())
+    on = flow[True] if True in flow else flow["on"]  # PyYAML reads the bare key `on` as True
+    paths = on["pull_request"]["paths"]
+    for path in ("amrchy/**", "os/iso/**", "os/amrchy/**", "os/bin/bashos-firstboot"):
+        assert path in paths, path
+    steps = flow["jobs"]["iso"]["steps"]
+    uploads = "\n".join(s["with"]["path"] for s in steps if s.get("uses", "").startswith("actions/upload-artifact"))
+    for secret in ("user_credentials", "id_ed25519", "cidata.iso", "cidata/\n"):
+        assert secret not in uploads, secret
+    runs = "\n".join(s.get("run", "") for s in steps)
+    assert "bin/bashos os iso build" in runs and "bin/bashos os iso test" in runs
+    assert os.access(OS / "iso/test.sh", os.X_OK)

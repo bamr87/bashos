@@ -32,7 +32,7 @@ and then, on a real machine booted from the stick or from PXE, one menu entry ea
 
 ## Stories
 
-Progress, 2026-11-13: story 2 is done (machine profiles, T05). Story 4 merged into story 5: the bashOS that boots is Amrchy with the bashOS layer (ADR 0005), and the Debian image stays as it is. Story 5's build half is done (`bashos os iso build`, `bashos os iso seed`); its *Done when*, an unattended install in a harness test, is open. Stories 1, 3, 6 and 7 are open.
+Progress, 2026-11-13: story 2 is done (machine profiles, T05). Story 4 merged into story 5: the bashOS that boots is Amrchy with the bashOS layer (ADR 0005), and the Debian image stays as it is. Story 5's build half is done (`bashos os iso build`, `bashos os iso seed`), and its *Done when* is a CI job: the `os iso` workflow builds the ISO and installs it unattended in a KVM VM through first boot (`bashos os iso test`). It still has to pass for the first time, and a one-os harness test for the stick and PXE paths is open. Stories 1, 3, 6 and 7 are open.
 
 
 1. **A catalog of systems, not just ISOs.** Generalise `isos` and the SteamOS special case into one `systems:` list in `manifest.yaml`. Each entry says what it is (`iso`, `disk-image`), where it comes from (a pinned URL, or a local build command and its output path) and how it is checked. `scripts/manifest.py lint` enforces it. *Done when:* SteamOS, bashOS and Amrchy are three entries of the same shape and the existing tests still pass.

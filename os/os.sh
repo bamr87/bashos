@@ -34,8 +34,8 @@ usage: bashos os <command>
   uninstall [-n] [--purge]  remove what install added (--purge: /opt/bashos and /etc/bashos too)
   amrchy <verb>           status | pull [REF] | push BRANCH — amrchy/, the framework, kept in step
                           with bamr87/amrchy (a squashed git subtree)
-  iso <verb>              build | seed — bashOS on Amrchy: the ISO, and the cidata drive that
-                          installs it unattended (os/iso/README.md)
+  iso <verb>              build | seed | test — bashOS on Amrchy: the ISO, the cidata drive that
+                          installs it unattended, and that install checked in a VM (docs/AMRCHY.md)
   image <verb>            build | test — the Debian 13 disk image (os/image/README.md)
   version                 the installed layer's version
 EOF
@@ -366,7 +366,8 @@ case $cmd in
     case ${1:-} in
       build) shift; exec "$OS_DIR/iso/build.sh" "$@" ;;
       seed) shift; exec "$OS_DIR/iso/seed.sh" "$@" ;;
-      *) os_die "usage: bashos os iso build|seed [options] (os/iso/README.md)" ;;
+      test) shift; exec "$OS_DIR/iso/test.sh" "$@" ;;
+      *) os_die "usage: bashos os iso build|seed|test [options] (docs/AMRCHY.md)" ;;
     esac
     ;;
   version) printf 'bashos os %s (%s)\n' "$(os_version)" "$BASHOS_OS_PATH" ;;

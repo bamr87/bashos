@@ -46,6 +46,7 @@ bin/bashos os install --dry-run                  # Linux OS layer: the plan for 
 bin/bashos os amrchy status                      # amrchy/ (the framework) against bamr87/amrchy; pull / push BRANCH
 bin/bashos os iso build --stage-only             # the bashOS ISO tree: amrchy/ + the bashOS layer (a full build needs Docker, ~30 GB)
 bin/bashos os iso seed --user U --disk DEV --disk-bytes N   # the cidata drive that installs it unattended
+bin/bashos os iso test                           # that install in a KVM VM, through first boot (the os-iso workflow runs build + test)
 bin/bashos os engine update                      # OpenCode → npm's latest, verified before it is promoted
 bin/bashos os image build --docker               # the bootable Debian 13 disk image (mkosi, privileged container)
 bin/bashos os image test --docker                # boot it in QEMU with a seed drive and check it like a user
@@ -111,7 +112,7 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - It never widens `opencode/policy.py`, gives a loop a tool, or touches the engine's credential path. Changing what runs on forge (an install, an image written to a disk) is a deploy: it needs the maintainer's explicit go-ahead.
 - Two bases, read from `/etc/os-release` (`os_base`): Amrchy (Arch package lists in `os/packages/arch/`, pacman, the console as a desktop window) and Debian 13 (apt, tty1). A change that differs by base says so where it branches, and is tested against both fake roots.
 - The Amrchy layer (`os/amrchy/layer/system.sh`) runs inside the installer, as root, with no network: it may only copy, write and enable. Anything that needs the network belongs to `bashos-firstboot`, which retries by exiting 75 and records every other failure instead of looping.
-- Building an ISO is local and safe. Booting it, or writing it to a stick or disk, is the maintainer's step, like every disk write in one-os.
+- Building an ISO and installing it into a VM (`bashos os iso test`, the `os-iso` workflow) is safe. Writing it to a stick or a real disk is the maintainer's step, like every disk write in one-os.
 - Tests: `os/tests/` (fake root + throwaway `$HOME`; in `make test`), `os/tests/test_iso.py` for the layer, first boot, staging and the seed; the Debian image is built and booted by `os/image/test/boot-smoke.sh` in the `os-image.yml` workflow. Docs: [os/README.md](os/README.md), [docs/OS.md](docs/OS.md), [docs/AMRCHY.md](docs/AMRCHY.md).
 
 ## amrchy
