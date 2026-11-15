@@ -12,7 +12,7 @@ mapfile -t sh_files < <(
 shellcheck -x -P scripts "${sh_files[@]}" || rc=1
 
 log "ruff"
-ruff check --config harness/pyproject.toml harness scripts/manifest.py scripts/write-image.py scripts/card-boot.py ui/server.py \
+ruff check --config harness/pyproject.toml harness scripts/manifest.py scripts/write-image.py scripts/card-boot.py scripts/capture-steamos.py scripts/stick-add-netboot.py scripts/render-docs.py ui/server.py netboot/server.py netboot/watch.py \
   lightos/config/includes.chroot/usr/local/bin/oneusb-restock || rc=1
 
 log "manifest"

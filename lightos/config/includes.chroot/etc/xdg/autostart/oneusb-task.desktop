@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=one-usb boot task
+Exec=/usr/local/bin/oneusb-task
+NoDisplay=true
+X-XFCE-Autostart-Override=true

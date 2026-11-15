@@ -30,7 +30,7 @@ endif
 PYTEST = python3 -m pytest -c harness/pyproject.toml --rootdir harness
 IMAGE  = build/one-usb-test.img
 
-.PHONY: help builder fetch lightos payload image card-image card-boot wizard run vm docs-screenshots test test-full test-image lint flash shell bump clean distclean
+.PHONY: help builder fetch lightos payload image card-image card-boot netboot netboot-server pxe-server pxe-start pxe-stop pxe-restart pxe-status pxe-logs steamos-fetch steamos-capture wizard run vm docs-screenshots test test-full test-image lint flash shell bump clean distclean
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -86,6 +86,37 @@ endif
 card-boot: ## Boot a flashed device in QEMU without writing to it: sudo make card-boot DISK=diskN
 	@test -n "$(DISK)" || { echo "usage: sudo make card-boot DISK=diskN" >&2; exit 1; }
 	python3 scripts/card-boot.py $(DISK)
+
+netboot: $(BUILDER_DEP) ## Extract the home base for network boot → build/netboot/
+	$(RUN) scripts/build-netboot.sh
+
+netboot-server: ## Network boot server, HTTP only (VMs / iPXE): make netboot-server
+	python3 netboot/server.py
+
+pxe-server: ## Network boot server + ProxyDHCP/TFTP for real PCs: make pxe-server IFACE=en0
+	python3 netboot/server.py --pxe $(if $(IFACE),--iface $(IFACE))
+
+pxe-start: ## PXE server in the background (follows address changes): make pxe-start [IFACE=en0]
+	scripts/pxe.sh start $(IFACE)
+
+pxe-stop: ## Stop the background PXE server
+	scripts/pxe.sh stop
+
+pxe-restart: ## Restart the background PXE server (picks up server.py changes)
+	scripts/pxe.sh restart $(IFACE)
+
+pxe-status: ## PXE server: address, menu URL, recent PCs
+	scripts/pxe.sh status
+
+pxe-logs: ## PXE server event log (make pxe-logs ARGS=-f to follow)
+	scripts/pxe.sh logs $(ARGS)
+
+steamos-fetch: ## Download Valve's latest SteamOS image into cache/steamos/ (~3.4 GB)
+	scripts/fetch-steamos.sh
+
+steamos-capture: ## Capture a bootable SteamOS stick as a deployable image: make steamos-capture DISK=diskN
+	@test -n "$(DISK)" || { echo "usage: make steamos-capture DISK=diskN (read-only)" >&2; exit 1; }
+	python3 scripts/capture-steamos.py $(DISK)
 
 wizard: ## Open the flash wizard (build → choose device → flash → boot-test) in your browser
 	scripts/oneusb-wizard

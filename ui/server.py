@@ -242,6 +242,14 @@ def start_step(body: dict) -> Job:
     if step == "open-privacy":  # opens the pane; the person decides what to enable
         return run_job(step, "Open Privacy & Security → Full Disk Access",
                        ["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"])
+    if step == "netboot":
+        return run_job(step, "Extract the home base for network boot", make + ["netboot"])
+    if step == "pxe-start":
+        return run_job(step, "Start the network boot server", make + ["pxe-start"])
+    if step == "pxe-stop":
+        return run_job(step, "Stop the network boot server", make + ["pxe-stop"])
+    if step == "steamos-fetch":
+        return run_job(step, "Download SteamOS for the network boot server (~3.4 GB)", make + ["steamos-fetch"])
     if step == "stop-test":
         return run_job(step, "Stop the test VM", [str(ROOT / "scripts/oneusb-vm"), "stop", TEST_VM])
     raise ValueError(f"unknown step {step!r}")
@@ -373,6 +381,8 @@ class Handler(BaseHTTPRequestHandler):
                         "job": JOB.view() if JOB else None, "test_vm_running": _vm_running(TEST_VM)})
         elif path == "/api/devices":
             self._json({"devices": devices()})
+        elif path == "/api/netboot":
+            self._json(netboot_view())
         elif path == "/api/job":
             self._json({"job": JOB.view() if JOB else None})
         elif path == "/test-screen.png":
@@ -401,6 +411,33 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"job": job.view()})
         except (ValueError, RuntimeError) as e:
             self._json({"error": str(e)}, HTTPStatus.BAD_REQUEST)
+
+
+PXE_PORT = 8780
+
+
+def netboot_view() -> dict:
+    """The local network boot server's state (netboot/server.py, read-only) plus each PC's
+    latest status snapshot, for the wizard's Network boot panel."""
+    import urllib.request
+    out = {"running": False, "files": (BUILD / "netboot" / "live" / "filesystem.squashfs").exists()}
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{PXE_PORT}/api/status", timeout=2) as r:
+            st = json.loads(r.read())
+    except (OSError, ValueError):
+        return out
+    clients = BUILD / "netboot" / "clients"
+    pcs = []
+    for d in sorted(clients.iterdir() if clients.is_dir() else [], key=lambda d: -d.stat().st_mtime)[:6]:
+        f = d / "status.txt"
+        if f.is_file():
+            text = f.read_text(errors="replace")
+            pcs.append({"mac": d.name, "updated": f.stat().st_mtime, "summary": text.splitlines()[0] if text else "",
+                        "detail": text[:6000]})
+    reports = [e for e in st.get("events", []) if e.get("kind") == "report"][-12:]
+    out.update(running=True, state=st.get("state"), steamos=st.get("steamos"), installs=st.get("installs"),
+               events=st.get("events", [])[-25:], reports=reports, pcs=pcs)
+    return out
 
 
 def _vm_running(name: str) -> bool:

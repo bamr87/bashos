@@ -7,7 +7,7 @@ from oneusb_harness import netcap, screen
 pytestmark = [pytest.mark.vm, pytest.mark.network]
 HOST = "boot.netboot.xyz"
 # UEFI boots the standalone .efi, BIOS the .iso (see manifest.yaml / docs/spike.md).
-NETBOOT = {"uefi": "/ISO/netboot.xyz.efi", "bios": "/ISO/netboot.xyz.iso"}
+NETBOOT = {"uefi": "/ISO/netboot.xyz-snp.efi", "bios": "/ISO/netboot.xyz.iso"}
 
 
 def _require(overlay, iso):

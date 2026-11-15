@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=one-usb Documentation
+Comment=User, operator and developer guides
+Exec=/usr/local/bin/oneusb-docs
+Icon=help-browser
+Categories=Documentation;

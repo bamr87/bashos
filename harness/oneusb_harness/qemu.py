@@ -75,7 +75,8 @@ class VM:
     def __init__(self, cfg: Config, workdir: Path, profile: str = "uefi", usb_image: Path | None = None,
                  target_disk: Path | None = None, net: bool = True, cdrom: Path | None = None,
                  memory_mb: int = 4096, smp: int = 2, name: str = "vm", usb_snapshot: bool = False,
-                 display: str = "none", agent: bool = True, reboot: bool = False, detach: bool = False):
+                 display: str = "none", agent: bool = True, reboot: bool = False, detach: bool = False,
+                 pxe: bool = False, target_bus: str = "virtio"):
         if profile not in PROFILES:
             raise ValueError(f"profile must be one of {PROFILES}")
         self.cfg, self.profile, self.name = cfg, profile, name
@@ -85,6 +86,9 @@ class VM:
         self.memory_mb, self.smp = memory_mb, smp
         self.usb_snapshot = usb_snapshot  # writes go to a temp file, never to usb_image
         self.display, self.agent, self.reboot, self.detach = display, agent, reboot, detach
+        # pxe: boot from the network first (QEMU's TFTP serves build/netboot/tftp/boot.ipxe, which
+        # chains to netboot/server.py on the host); target_bus "nvme" makes the target /dev/nvme0n1.
+        self.pxe, self.target_bus = pxe, target_bus
         self.serial_log = self.dir / f"{name}.serial.log"
         self.serial_sock = self.dir / f"{name}.serial"
         self.qga_path = self.dir / f"{name}.qga"
@@ -135,6 +139,8 @@ class VM:
         if self.display == "window":
             a += ["-device", "usb-tablet,bus=xhci.0", "-device", "usb-kbd,bus=xhci.0"]
         boot = 0
+        if self.pxe:
+            boot = 1  # the NIC takes bootindex 0 (see the network section below)
         if self.usb_image is not None:
             fmt = "qcow2" if self.usb_image.suffix == ".qcow2" else "raw"
             snap = ",snapshot=on" if self.usb_snapshot else ""
@@ -146,10 +152,23 @@ class VM:
                   "-device", f"ide-cd,drive=cd,bootindex={boot}"]
             boot += 1
         if self.target_disk is not None:
-            a += ["-drive", f"if=none,id=target,format=qcow2,file={self.target_disk},cache=unsafe",
-                  "-device", f"virtio-blk-pci,drive=target,bootindex={boot}"]
-        if self.net:
-            a += ["-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
+            a += ["-drive", f"if=none,id=target,format=qcow2,file={self.target_disk},cache=unsafe"]
+            if self.target_bus == "nvme":
+                a += ["-device", f"nvme,serial=ONEUSB-M2-0001,drive=target,bootindex={boot}"]
+            else:
+                a += ["-device", f"virtio-blk-pci,drive=target,bootindex={boot}"]
+        if self.net or self.pxe:
+            user = "user,id=n0"
+            nic = "virtio-net-pci,netdev=n0"
+            if self.pxe:
+                # BIOS: QEMU's iPXE NIC ROM fetches boot.ipxe over TFTP and runs it.
+                # UEFI: the firmware's own stack needs an EFI program; it HTTP-boots
+                # /uefi/boot.efi from netboot/server.py on the host (10.0.2.2), which hands
+                # iPXE and then, to iPXE, the menu.
+                boot_file = "boot.ipxe" if self.profile == "bios" else "http://10.0.2.2:8780/uefi/boot.efi"
+                user += f",tftp={self.cfg.build / 'netboot' / 'tftp'},bootfile={boot_file}"
+                nic += ",bootindex=0"
+            a += ["-netdev", user, "-device", nic,
                   "-object", f"filter-dump,id=cap0,netdev=n0,file={self.pcap}"]
         else:
             a += ["-nic", "none"]

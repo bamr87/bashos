@@ -5,7 +5,7 @@ import pytest
 from conftest import selftest
 
 pytestmark = [pytest.mark.vm, pytest.mark.network, pytest.mark.nightly]
-ISO = "ISO/netboot.xyz.efi"
+ISO = "ISO/netboot.xyz-snp.efi"
 
 
 def test_restock_replaces_missing_iso(overlay, make_vm, cfg):

@@ -24,4 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-pip \
 RUN apt-get update && apt-get install -y --no-install-recommends python3-pil \
     && rm -rf /var/lib/apt/lists/*
 
+# Network boot (iPXE loaders served over TFTP) and docs rendering for the stick.
+RUN apt-get update && apt-get install -y --no-install-recommends ipxe python3-markdown \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /work

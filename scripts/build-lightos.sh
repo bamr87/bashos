@@ -33,6 +33,20 @@ mkdir -p config/includes.chroot/etc
 chmod +x config/includes.chroot/usr/local/bin/* config/hooks/live/*.hook.chroot auto/*
 
 lb clean --purge >/dev/null 2>&1 || true
+
+# Backports: the archive, plus an apt pin so the listed packages (kernel, firmware) come from it.
+dist="$(manifest get lightos.distribution)"
+mapfile -t bp < <(manifest backports)
+if [[ ${#bp[@]} -gt 0 ]]; then
+  mkdir -p config/archives
+  for stage in chroot binary; do
+    echo "deb http://deb.debian.org/debian $dist-backports main contrib non-free non-free-firmware" \
+      >"config/archives/backports.list.$stage"
+    printf 'Package: %s\nPin: release n=%s-backports\nPin-Priority: 990\n' "${bp[*]}" "$dist" \
+      >"config/archives/backports.pref.$stage"
+  done
+  log "from $dist-backports: ${bp[*]}"
+fi
 DISTRIBUTION="$(manifest get lightos.distribution)" ARCH="$arch" lb config
 
 # The ISO's own boot menu must not wait for a keypress (Ventoy shows it after
@@ -46,6 +60,16 @@ grep -rqs 'timeout=' config/bootloaders/grub-pc/ || echo 'set timeout=5' >>confi
 for f in config/bootloaders/isolinux/isolinux.cfg config/bootloaders/syslinux_common/isolinux.cfg; do
   if [[ -f "$f" ]] && ! grep -qi '^timeout' "$f"; then sed -i '1a timeout 50' "$f"; fi
 done
+
+# Extra GRUB entry (UEFI; SteamOS is UEFI-only): boot the home base straight into the
+# SteamOS installer wizard. live-build fills in the @…@ placeholders.
+cat >>config/bootloaders/grub-pc/grub.cfg <<'EOF'
+
+menuentry "Install SteamOS onto this PC's M.2 drive (downloads the latest)" {
+	linux	@KERNEL_LIVE@ @APPEND_LIVE@ oneusb.task=steamos-install
+	initrd	@INITRD_LIVE@
+}
+EOF
 
 log "lb build (this takes a while)…"
 lb build 2>&1 | tee "$BUILD_DIR/lightos-build.log" | grep -E '^(P:|E:|W:)' || true

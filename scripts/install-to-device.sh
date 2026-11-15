@@ -52,8 +52,12 @@ sync
 umount_all
 rmdir "$mnt"
 
-# 5. (Phase 8) format + populate the reserved partition.
+# 5. Reserved space (Ventoy -r): Valve's SteamOS recovery stick, bootable from Ventoy's F6 menu.
 if [[ "$reserve" -gt 0 ]]; then
-  warn "reserve_mb=$reserve: native home base (Phase 8) is not implemented; space left unformatted"
+  if [[ "$(manifest get steamos.recovery_on_stick)" == true ]]; then
+    "$ONEUSB_ROOT/scripts/stick-add-steamos.sh" "$dev"
+  else
+    warn "reserve_mb=$reserve: nothing configured for the reserved space; left unformatted"
+  fi
 fi
 log "installed Ventoy $v_ver + payload on $dev"

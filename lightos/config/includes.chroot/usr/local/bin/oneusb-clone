@@ -1,0 +1,18 @@
+#!/bin/bash
+# oneusb-clone [DIR] — clone the one-usb repository (default ~/one-usb) from the git bundle
+# on the stick (oneusb/src/one-usb.bundle), else from the boot server.
+set -euo pipefail
+dest="${1:-$HOME/one-usb}"
+[[ -e $dest ]] && { echo "$dest already exists"; exit 1; }
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+server="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^oneusb\.server=//p' | tail -1)"
+if blkid -L Ventoy >/dev/null 2>&1; then
+  sudo mkdir -p /run/oneusb/src-p1
+  sudo oneusb-mount-p1 /run/oneusb/src-p1 ro >/dev/null 2>&1 || true
+  [[ -f /run/oneusb/src-p1/oneusb/src/one-usb.bundle ]] && cp /run/oneusb/src-p1/oneusb/src/one-usb.bundle "$tmp/"
+fi
+[[ -f $tmp/one-usb.bundle || -z $server ]] || curl -fsSL -o "$tmp/one-usb.bundle" "$server/src/one-usb.bundle"
+[[ -f $tmp/one-usb.bundle ]] || { echo "no bundle on the stick or the boot server" >&2; exit 1; }
+git bundle verify "$tmp/one-usb.bundle" >/dev/null
+git clone -q "$tmp/one-usb.bundle" "$dest"
+echo "cloned into $dest ($(git -C "$dest" log --oneline -1))"

@@ -82,6 +82,9 @@ def test_ventoy_json(overlay):
             assert (p1 / entry["image"].lstrip("/")).exists(), f"alias for missing image {entry}"
         ctrl = {k: v for c in data["control"] for k, v in c.items()}
         assert (p1 / ctrl["VTOY_DEFAULT_IMAGE"].lstrip("/")).exists()
+        # Windows 11 setup from the stick: TPM/Secure Boot/RAM checks and the online-account step
+        assert ctrl.get("VTOY_WIN11_BYPASS_CHECK") in ("0", "1")
+        assert ctrl.get("VTOY_WIN11_BYPASS_NRO") in ("0", "1")
 
 
 def test_persistence_image(overlay):

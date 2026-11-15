@@ -6,6 +6,7 @@
   manifest.py lint                       schema check + no <PIN> placeholders
   manifest.py render-ventoy <tmpl> <out> render config/ventoy.json.j2
   manifest.py packages                   lightos package list (desktop + extras)
+  manifest.py backports                  lightos packages taken from <distribution>-backports
 """
 from __future__ import annotations
 
@@ -83,6 +84,11 @@ def lint(m: dict) -> list[str]:
         errs.append(f"lightos.desktop must be one of {sorted(DESKTOP_PACKAGES)}")
     if not str(lo.get("file", "")).startswith("ISO/"):
         errs.append("lightos.file must live under ISO/")
+    if (m.get("steamos") or {}).get("recovery_on_stick") and int(opts.get("reserve_mb") or 0) < 8192:
+        errs.append("steamos.recovery_on_stick needs ventoy.options.reserve_mb >= 8192 (Valve's partitions are ~7.5 GiB)")
+    bp = lo.get("backports") or []
+    if not isinstance(bp, list) or not all(isinstance(x, str) and re.fullmatch(r"[a-z0-9.+*-]+", x) for x in bp):
+        errs.append("lightos.backports must be a list of package names or globs")
     seen = set()
     for a in artifacts(m):
         n = a.get("name")
@@ -108,13 +114,32 @@ def lint(m: dict) -> list[str]:
     return errs
 
 
+# Files staged onto the stick that don't come from the manifest (built locally).
+EXTRA_ENTRIES = [
+    {"file": "ISO/one-usb-netboot.efi", "mode": "uefi",
+     "alias": "Network boot from a one-usb server (iPXE, Ctrl-B for shell)"},
+]
+
+
+def menu(m: dict, present: set[str]) -> dict:
+    """Menu names and per-firmware hide lists for what is actually on the stick."""
+    entries = [a for a in artifacts(m) + EXTRA_ENTRIES if a["file"] in present]
+    aliases = [{"image": f"/{m['lightos']['file']}", "alias": "Home base (persistent)"}]
+    aliases += [{"image": f"/{a['file']}", "alias": a["alias"]} for a in entries if a.get("alias")]
+    hide = {"uefi": [], "legacy": []}
+    for a in entries:
+        if a.get("mode", "any") != "any":
+            hide["legacy" if a["mode"] == "uefi" else "uefi"].append(f"/{a['file']}")
+    return {"aliases": aliases, "blacklist": hide}
+
+
 def render_ventoy(m: dict, tmpl: Path, out: Path) -> None:
     import jinja2
 
     env = jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
     env.filters["tojson"] = lambda v: json.dumps(v, ensure_ascii=False)
-    text = env.from_string(tmpl.read_text(encoding="utf-8")).render(
-        m=m, artifacts=artifacts(m), present=set(os.environ.get("PRESENT", "").split()))
+    present = set(os.environ.get("PRESENT", "").split())
+    text = env.from_string(tmpl.read_text(encoding="utf-8")).render(m=m, **menu(m, present))
     data = json.loads(text)  # fail loudly on invalid JSON
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -144,6 +169,9 @@ def main(argv: list[str]) -> int:
         return 1 if errs else 0
     elif cmd == "render-ventoy":
         render_ventoy(m, Path(argv[1]), Path(argv[2]))
+    elif cmd == "backports":
+        for p in m["lightos"].get("backports") or []:
+            print(p)
     elif cmd == "packages":
         lo = m["lightos"]
         for p in DESKTOP_PACKAGES[lo["desktop"]] + list(lo.get("extra_packages") or []):

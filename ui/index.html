@@ -68,6 +68,9 @@ pre#log { max-height: 220px; overflow: auto; background: var(--code); border-rad
   font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; display: none; }
 #activity.showlog pre#log { display: block; }
 .checks li::before { content: none; }
+pre.nbpre { max-height: 240px; overflow: auto; background: var(--code); border-radius: 8px; padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; margin: 6px 0; }
+#netboot details summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
 img.shot { max-width: 100%; border-radius: 8px; border: 1px solid var(--line); margin-top: 8px; }
 table.hist { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.hist td, table.hist th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
@@ -82,6 +85,8 @@ table.hist td, table.hist th { text-align: left; padding: 4px 6px; border-bottom
   <p>Build the stick image, pick a USB stick or SD card, flash it, and boot-test the result.</p>
 </header>
 <main id="steps"></main>
+<main><section class="step open" id="netboot"><div class="head"><span class="num">⇄</span><span class="title">Network boot (PXE)</span>
+  <span class="summary" id="nb-summary"></span></div><div class="body" id="nb-body"></div></section></main>
 <main>
   <section id="activity" hidden>
     <div class="top"><span class="pill run" id="act-state">running</span><span class="t" id="act-title"></span>
@@ -280,6 +285,26 @@ async function refreshDevices() {
   if (!selected() && S.devices.length === 1) S.selKey = devKey(S.devices[0]);
   render();
 }
+async function refreshNetboot() {
+  let n; try { n = await api("/api/netboot"); } catch (e) { return; }
+  const st = n.state || {}, b = document.getElementById("nb-body");
+  document.getElementById("nb-summary").textContent = n.running ? `serving on ${st.iface || "?"} · ${st.server_ip}` : "stopped";
+  if (!n.running) {
+    b.innerHTML = `<p>PCs on this LAN can boot the home base and install SteamOS over Ethernet — no stick.
+      ${n.files ? "" : "First extract the home base for network boot."}</p>
+      <p>${n.files ? "" : '<button data-run="netboot">Extract home base</button> '}<button data-run="pxe-start" ${n.files ? "" : "disabled"}>Start server</button></p>
+      <p class="hint">On the PC: UEFI network boot on, Secure Boot off. See docs/operator-guide/05-network-boot-server.md.</p>`;
+    return;
+  }
+  const so = n.steamos ? `SteamOS ${esc(n.steamos.version)} cached` : `no SteamOS cached (PCs download from Valve) <button data-run="steamos-fetch">Cache it</button>`;
+  const pcs = (n.pcs || []).map(p => `<details><summary><code>${esc(p.mac)}</code> · ${ago(p.updated)} · ${esc(p.summary)}</summary><pre class="nbpre">${esc(p.detail)}</pre></details>`).join("") || '<p class="hint">No network-booted PC has reported yet.</p>';
+  const rep = (n.reports || []).map(e => `${new Date(e.t*1000).toLocaleTimeString()} ${esc(e.msg)}`).join("\n");
+  const ev = (n.events || []).filter(e => e.kind !== "status").slice(-12).map(e => `${new Date(e.t*1000).toLocaleTimeString()} ${esc(e.kind)} ${esc(e.client)} ${esc(e.msg)}`).join("\n");
+  b.innerHTML = `<p>Menu: <code>http://${esc(st.server_ip)}:${esc(st.http_port)}/boot.ipxe</code> · ${so} · <button data-run="pxe-stop">Stop server</button></p>
+    <h3>PCs</h3>${pcs}
+    ${rep ? `<h3>Installer</h3><pre class="nbpre">${rep}</pre>` : ""}
+    <h3>Recent events</h3><pre class="nbpre">${ev}</pre>`;
+}
 async function tick() {
   if (busy()) { try { const j = (await api("/api/job")).job; S.state.job = j; renderJob(); if (j.state !== "running") await refresh(); } catch (e) {} }
 }
@@ -287,6 +312,7 @@ refresh(); refreshDevices();
 setInterval(tick, 1000);
 setInterval(() => { if (!busy()) refresh(); }, 4000);
 setInterval(refreshDevices, 5000);
+refreshNetboot(); setInterval(refreshNetboot, 5000);
 </script>
 </body>
 </html>

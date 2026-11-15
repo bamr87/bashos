@@ -14,7 +14,7 @@ Design: [PLAN.md](PLAN.md) and [docs/adr/](docs/adr/).
 Firmware (UEFI or BIOS) → Ventoy menu
   ├─ 🏠 Home base (Debian live + persistence)   oneusb-install / oneusb-restock
   ├─ 🌐 netboot.xyz (iPXE → dozens of installers, wired Ethernet)
-  └─ 💿 offline installers (Ubuntu Server, your Windows ISO, …)
+  └─ 💿 offline installers (Ubuntu, Fedora, Mint, Debian, Arch, Proxmox, your Windows ISO, …)
 ```
 
 ## Quick start

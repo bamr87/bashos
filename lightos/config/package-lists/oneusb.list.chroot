@@ -10,6 +10,11 @@ locales
 # Control channel for scripts/oneusb-vm and the harness (ADR-0004). Only starts when
 # a virtio port named org.qemu.guest_agent.0 exists, i.e. inside our VMs.
 qemu-guest-agent
+# SteamOS installer (oneusb-steamos) and the repo clone on the stick
+lbzip2
+pv
+whiptail
+git
 systemd-sysv
 linux-image-amd64
 sudo

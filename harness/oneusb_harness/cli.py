@@ -5,8 +5,9 @@ command is non-interactive, prints plain text, and exits non-zero on failure; a
 human can add --window to watch, or `console` for an interactive serial login.
 
   oneusb-vm start NAME [--window] [--profile uefi|bios|uefi-sb] [--fresh]
-                       [--image IMG | --iso ISO | --disk diskN [--write]]
-                       [--target SIZE] [--no-usb] [--no-net] [--mem MB] [--smp N]
+                       [--image IMG | --iso ISO | --disk diskN [--write] | --pxe]
+                       [--target SIZE [--target-bus nvme|virtio]] [--no-usb] [--no-net]
+                       [--mem MB] [--smp N]
   oneusb-vm list
   oneusb-vm status NAME
   oneusb-vm wait NAME [--agent | --ready | --serial REGEX | --screen TEXT] [--timeout S]
@@ -124,6 +125,9 @@ def cmd_start(cfg: Config, a: argparse.Namespace) -> int:
     elif a.iso:
         cdrom = Path(a.iso).resolve()
         source = f"{cdrom.name} as CD-ROM (no Ventoy)"
+    elif a.pxe:
+        source = "network boot (PXE → netboot/server.py)"
+        ensure_netboot_server(cfg)
     elif not a.no_usb:
         base = Path(a.image).resolve() if a.image else next(
             (p for p in (cfg.build / "one-usb-card.img", cfg.image) if p.exists()), None)
@@ -153,7 +157,8 @@ def cmd_start(cfg: Config, a: argparse.Namespace) -> int:
 
     vm = VM(cfg, inst.dir, profile=a.profile, usb_image=usb, cdrom=cdrom, target_disk=target,
             net=not a.no_net, memory_mb=a.mem, smp=a.smp, name=a.name, usb_snapshot=snapshot,
-            display="window" if a.window else "none", agent=True, reboot=True, detach=True)
+            display="window" if a.window else "none", agent=True, reboot=True, detach=True,
+            pxe=a.pxe, target_bus=a.target_bus)
     vm.start()
     vm._close_qmp()  # free the single QMP slot for later commands
     inst.meta_path.write_text(json.dumps({
@@ -161,10 +166,34 @@ def cmd_start(cfg: Config, a: argparse.Namespace) -> int:
         "target": str(target) if target else None, "window": a.window, "net": not a.no_net,
         "started": time.time(), "accel": cfg.accel,
     }, indent=2))
+    tdev = "/dev/nvme0n1" if a.target_bus == "nvme" else "/dev/vda"
     print(f"started '{a.name}' (pid {vm.proc.pid}): {a.profile}, {cfg.accel}, {source}"
-          + (", target disk vda" if target else "") + (", window" if a.window else ", headless"))
+          + (f", target disk {tdev}" if target else "") + (", window" if a.window else ", headless"))
     print(f"next: oneusb-vm wait {a.name} --agent   then   oneusb-vm exec {a.name} -- <cmd>")
     return 0
+
+
+def ensure_netboot_server(cfg: Config, port: int = 8780) -> None:
+    """PXE VMs fetch the menu and the home base from netboot/server.py on the host."""
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=2).read()
+        return
+    except OSError:
+        pass
+    if not (cfg.build / "netboot" / "live" / "filesystem.squashfs").exists():
+        raise SystemExit("no network-boot files — run 'make netboot' first")
+    log = open(cfg.build / "netboot" / "server.out", "ab")
+    subprocess.Popen([sys.executable, str(cfg.repo / "netboot" / "server.py"), "--port", str(port)],
+                     stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+    for _ in range(50):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=1).read()
+            print(f"started the network boot server on :{port} (log: build/netboot/server.out)")
+            return
+        except OSError:
+            time.sleep(0.2)
+    raise SystemExit("the network boot server didn't start; see build/netboot/server.out")
 
 
 def cmd_list(cfg: Config, a: argparse.Namespace) -> int:
@@ -431,8 +460,11 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--image", help="raw stick image (default: build/one-usb-card.img, else one-usb-test.img)")
     src.add_argument("--iso", help="boot an ISO as CD-ROM instead of the stick")
     src.add_argument("--disk", help="physical stick, e.g. disk5 (macOS, sudo)")
+    src.add_argument("--pxe", action="store_true", help="no stick: boot from the network (starts netboot/server.py)")
     s.add_argument("--write", action="store_true", help="with --disk: write through to the stick")
-    s.add_argument("--target", metavar="SIZE", help="attach an empty install-target disk (/dev/vda), e.g. 20G")
+    s.add_argument("--target", metavar="SIZE", help="attach an empty install-target disk, e.g. 64G")
+    s.add_argument("--target-bus", choices=["nvme", "virtio"], default="nvme",
+                   help="nvme (default; /dev/nvme0n1 like an M.2 drive) or virtio (/dev/vda)")
     s.add_argument("--no-usb", action="store_true", help="boot the target disk only (after an install)")
     s.add_argument("--no-net", action="store_true")
     s.add_argument("--mem", type=int, default=4096)

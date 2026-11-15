@@ -28,6 +28,15 @@ while IFS= read -r a; do
   fi
 done < <(manifest artifacts)
 
+# 1b. "Network boot from a one-usb server": plain iPXE (UEFI). Ctrl-B at its banner for a
+#     shell, then: dhcp && chain http://<server>:8780/boot.ipxe (docs: operator-guide/05).
+if [[ -f "$BUILD_DIR/netboot/tftp/snponly.efi" ]]; then
+  cp "$BUILD_DIR/netboot/tftp/snponly.efi" "$PAYLOAD_DIR/ISO/one-usb-netboot.efi"
+  present+=("ISO/one-usb-netboot.efi")
+else
+  log "not staged (run 'make netboot' first): ISO/one-usb-netboot.efi"
+fi
+
 # 2. Persistence image: ext4 labelled "persistence" with "/ union" (Debian live).
 #    Fixed UUID + hash seed + SOURCE_DATE_EPOCH make it byte-reproducible.
 pers_mb="$(manifest get lightos.persistence_mb)"
@@ -51,6 +60,20 @@ fi
 
 # 4. Manifest copy so oneusb-restock knows what belongs here.
 cp "$ONEUSB_ROOT/manifest.yaml" "$PAYLOAD_DIR/oneusb/manifest.yaml"
+
+# 4b. The project itself: a git bundle (clone it anywhere: git clone one-usb.bundle) and the
+#     documentation rendered to HTML, readable on any computer straight from the stick.
+mkdir -p "$PAYLOAD_DIR/oneusb/src"
+if git -C "$ONEUSB_ROOT" -c safe.directory="$ONEUSB_ROOT" rev-parse --verify -q HEAD >/dev/null; then
+  # The checked-out branch only (other branches may be other sessions' work in progress).
+  branch="$(git -C "$ONEUSB_ROOT" -c safe.directory="$ONEUSB_ROOT" symbolic-ref -q --short HEAD || echo HEAD)"
+  git -C "$ONEUSB_ROOT" -c safe.directory="$ONEUSB_ROOT" bundle create -q "$PAYLOAD_DIR/oneusb/src/one-usb.bundle" "$branch"
+  cp "$PAYLOAD_DIR/oneusb/src/one-usb.bundle" "$BUILD_DIR/one-usb.bundle"   # also served by netboot/server.py
+else
+  warn "not a git repository: no source bundle on the stick"
+fi
+python3 "$ONEUSB_ROOT/scripts/render-docs.py" "$PAYLOAD_DIR/oneusb/docs"
+rm -rf "$BUILD_DIR/docs-html" && cp -r "$PAYLOAD_DIR/oneusb/docs" "$BUILD_DIR/docs-html"
 cat >"$PAYLOAD_DIR/oneusb/selftest/README.txt" <<'EOF'
 Self-test hook (ADR-0003). If run.sh exists here, the home base runs it at boot,
 writes results/<name>.json, prints ONEUSB-SELFTEST <name> PASS|FAIL on ttyS0 and

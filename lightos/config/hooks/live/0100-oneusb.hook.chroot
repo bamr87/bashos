@@ -5,6 +5,6 @@ systemctl enable oneusb-selftest.service
 systemctl enable serial-getty@ttyS0.service
 # Live user may run the oneusb tools without a password prompt.
 cat >/etc/sudoers.d/oneusb <<'SUDO'
-user ALL=(ALL) NOPASSWD: /usr/local/bin/oneusb-restock, /usr/local/bin/oneusb-install
+user ALL=(ALL) NOPASSWD: /usr/local/bin/oneusb-restock, /usr/local/bin/oneusb-install, /usr/local/bin/oneusb-steamos, /usr/local/bin/oneusb-mount-p1
 SUDO
 chmod 0440 /etc/sudoers.d/oneusb
