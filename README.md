@@ -28,7 +28,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 - **No API key** — your Claude Code OAuth reaches the engine through its environment, never disk; `ANTHROPIC_API_KEY` is the fallback.
 - **Deny-by-default tool policy**, enforced by the engine rather than a prompt; approval requests are refused, never awaited.
 - **Dry runs** — `bashos run -n` shows the routing and the rendered prompt without calling a model.
-- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, Phoenix tracing and a LangGraph API server.
+- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, the [one-usb](docs/ONE-USB.md) multiboot USB stick builder, Phoenix tracing and a LangGraph API server.
 
 ## Quick start
 
@@ -116,6 +116,16 @@ bashOS can also be the machine itself. **[os/](os/README.md)** is an Omarchy-sty
 ./bin/bashos os install               # Debian 13: layer + console + harness (sudo asks once)
 bashos os status                      # [ OK ]/[WARN]/[CRIT] per piece
 ./bin/bashos os image build --docker  # the bootable image (mkosi), then: bashos os image test --docker
+```
+
+## Boot media — one-usb
+
+**[one-usb/](docs/ONE-USB.md)** builds one USB stick that boots a persistent Debian home base, offers netboot.xyz and pinned offline installers from a Ventoy menu, carries Valve's SteamOS recovery, and serves the home base to PCs over the network — built from a manifest and tested in QEMU before it touches hardware. It is a git subtree of [bamr87/one-usb](https://github.com/bamr87/one-usb), self-contained with its own Makefile, builder container and harness.
+
+```bash
+make -C one-usb lint                    # shellcheck, ruff, manifest schema
+make -C one-usb lightos payload image   # home base ISO + a sparse test image (Docker on macOS)
+make -C one-usb test ARGS="-k t21 -v"   # one harness test in QEMU
 ```
 
 ## Auth — Claude Code OAuth, wired into the engine
@@ -237,6 +247,7 @@ Every document is indexed, one line each, in [docs/README.md](docs/README.md). S
 | `src/bashos/` | Kernel, loops, the engine layer, runtime backends, the CLI, the desktop and the GUI |
 | `bin/` | The `bashos` launcher and the `os-health` verdict script |
 | `chui/` | The optional macOS terminal environment |
+| `one-usb/` | The multiboot USB stick builder (git subtree of bamr87/one-usb) |
 | `docs/` | Design documents, the desktop tour, ADRs |
 | `tests/` | The offline pytest suite and the GUI reducer tests |
 | `tools/` | The desktop capture and the documentation generators |

@@ -8,7 +8,7 @@
 
 bashOS is a terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are routed by a LangGraph kernel (`src/bashos/kernel/`) through a loop (`src/bashos/loops/`) onto the OpenCode engine (`src/bashos/opencode/`), authenticated with the user's Claude Code OAuth. It serves people who want an AI-assisted terminal for software development and systems work, through three surfaces on one kernel: the Typer CLI (`shell/`), the Textual desktop (`desktop/`) and the loopback GUI (`gui/`). `chui/` is the optional macOS terminal environment. A change is done when `make test`, `make lint`, `node --test tests/shell.test.mjs` and `.venv/bin/bashos opencode sync` (leaving no diff) are all clean, the generated docs are current, and the docs a change affects are updated in the same PR.
 
-Design docs: [docs/HARNESS.md](docs/HARNESS.md) (layers, loops, extension guide), [docs/OPENCODE.md](docs/OPENCODE.md) (policy, credential bridge, projection), [docs/DESKTOP.md](docs/DESKTOP.md) (the Textual desktop and the GUI), [docs/FORGE.md](docs/FORGE.md) (the dev-box monitoring pattern behind `bin/os-health`, `/health`, `/dash`), [docs/OS.md](docs/OS.md) (bashOS as the operating system: the Debian 13 layer, the bootable image, the harness service). Every document is indexed in [docs/README.md](docs/README.md).
+Design docs: [docs/HARNESS.md](docs/HARNESS.md) (layers, loops, extension guide), [docs/OPENCODE.md](docs/OPENCODE.md) (policy, credential bridge, projection), [docs/DESKTOP.md](docs/DESKTOP.md) (the Textual desktop and the GUI), [docs/FORGE.md](docs/FORGE.md) (the dev-box monitoring pattern behind `bin/os-health`, `/health`, `/dash`), [docs/OS.md](docs/OS.md) (bashOS as the operating system: the Debian 13 layer, the bootable image, the harness service), [docs/ONE-USB.md](docs/ONE-USB.md) (the multiboot USB stick builder under `one-usb/`). Every document is indexed in [docs/README.md](docs/README.md).
 
 ## Hard rules
 
@@ -64,6 +64,7 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - `bin/` — `bashos` (the launcher: bootstraps `.venv`, dispatches `chui` before it) and `os-health` (the verdict floor `/health` and the desktop's Health app run).
 - `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI; formerly bamr87/chui, merged with history). See **chui** below.
 - `os/` — the optional Linux OS layer (Omarchy-style, Debian 13): `bashos os install` turns a machine into a bashOS machine (tty1 → the shared tmux console, the hub's Harness Console as a user service, updates + migrations), and `os/image/` builds it into a bootable mkosi disk image provisioned from a `BASHOS-SEED` drive. See **os** below.
+- `one-usb/` — the multiboot USB stick builder (a git subtree of bamr87/one-usb, merged with history): a manifest of pinned ISOs, the Ventoy stick and its Debian home base, the network boot server, SteamOS recovery, the flash wizard and a QEMU harness. Self-contained, with its own Makefile, builder container, docs and ADRs. See **one-usb** below.
 - `tools/` — repository scripts that do not ship: `capture_desktop.py` (the stills/GIFs in `docs/DESKTOP-TOUR.md`; not in CI, re-run when the front end changes, needs `pip install playwright pillow`), `gen_commands_table.py` and the vendored `docs_index.py`.
 - `docker-compose.yml`, `docker/` — optional services: `phoenix` (:6006), `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (the containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise.
 - `tests/` — the offline pytest suite (`tests/desktop/` has SVG snapshots) and `shell.test.mjs`; `features/`, `verify/` — the fleet feature index and user scenarios.
@@ -103,6 +104,13 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - It never widens `opencode/policy.py`, gives a loop a tool, or touches the engine's credential path. Changing what runs on forge (an install, an image written to a disk) is a deploy: it needs the maintainer's explicit go-ahead.
 - Tests: `os/tests/` (fake root + throwaway `$HOME`; in `make test`); the image is built and booted by `os/image/test/boot-smoke.sh` in the `os-image.yml` workflow. Docs: [os/README.md](os/README.md), [docs/OS.md](docs/OS.md).
 
+## one-usb
+
+- Self-contained: run it with `make -C one-usb <target>` (on macOS its Linux steps run in its Docker builder). Nothing in `src/bashos/` imports it, and it never widens `opencode/policy.py` or gives a loop a tool.
+- **Never write a real disk.** No `make flash`, `scripts/flash*.sh`, `write-image.py`, `dd`, `diskutil erase*` or `oneusb-install` against hardware: those are the maintainer's steps. The full working notes are in [one-usb/AGENTS.md](one-usb/AGENTS.md); read them before changing anything there.
+- The harness is the definition of done: `make -C one-usb lint` often, `make -C one-usb test ARGS="-k <id>"` for the test that covers a change. Its tests boot VMs, so they are not in `make test`.
+- It is a git subtree: `git subtree pull --prefix=one-usb https://github.com/bamr87/one-usb main` brings upstream in. Merge PRs that touch it with a merge commit, not a squash. Docs: [docs/ONE-USB.md](docs/ONE-USB.md), [one-usb/docs/README.md](one-usb/docs/README.md).
+
 ## Releasing
 
 Tag `vX.Y.Z` and push the tag; CI builds the sdist/wheel, cuts a GitHub release, publishes to PyPI and pushes the GHCR image. Agents do not tag or release unless explicitly asked.
@@ -113,7 +121,7 @@ Member of the bamr87 fleet, vendored in the hub as the `projects/bashos` submodu
 
 ## Standard deviations
 
-none
+- `one-usb/` was imported whole as a git subtree of bamr87/one-usb: its documents are hard-wrapped and do not open with a `>` summary, its Python is linted by its own `make -C one-usb lint` (the root `ruff check .` excludes it), and its tests run outside `make test`.
 
 ## Governance
 
