@@ -15,6 +15,7 @@ ventoy:
     secure_boot: true             # Ventoy2Disk -s
     reserve_mb: 0                 # space left after Ventoy's partitions (future native home base)
   menu_timeout: 10                # seconds before the default entry boots
+  windows11: {bypass_check: true, bypass_nro: true}  # Ventoy: skip TPM/Secure Boot/RAM checks; allow a local account
 
 lightos:
   builder: live-build
@@ -24,6 +25,7 @@ lightos:
   file: ISO/oneusb-lightos.iso    # where it goes on the stick (must be under ISO/)
   persistence_mb: 4096
   extra_packages: [gparted, network-manager, …]
+  backports: ["linux-image-*", "firmware-*", …]  # from <distribution>-backports (apt pin 990): new kernel + firmware for new hardware
 
 netboot:                          # same fields as isos
   - name: netboot.xyz-efi
@@ -38,9 +40,10 @@ netboot:                          # same fields as isos
 isos:
   - name: ubuntu-server
     file: ISO/ubuntu-server.iso
-    url: "https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso"
-    sha256: "dec49008…"
-    alias: "Ubuntu Server 26.04 installer (offline)"
+    url: "https://releases.ubuntu.com/resolute/ubuntu-26.04.1-live-server-amd64.iso"
+    sha256: "cc8a95cd…"
+    sha256_from: "https://releases.ubuntu.com/resolute/SHA256SUMS"   # make bump refreshes from it
+    alias: "Ubuntu Server 26.04.1 LTS installer (offline)"
     ci: true
     optional: true
     large: true                   # fetched only with FETCH_LARGE=1

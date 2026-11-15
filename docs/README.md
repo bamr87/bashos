@@ -25,6 +25,7 @@ code before it touches hardware.
 4. [Network install with netboot.xyz](user-guide/04-network-install.md) — dozens of OS installers over Ethernet
 5. [Install an OS onto another drive](user-guide/05-install-an-os.md) — `oneusb-install`, works over Wi-Fi
 6. [Adding and updating ISOs](user-guide/06-adding-isos.md) — drag-and-drop, `oneusb-restock`, Windows
+7. [Install SteamOS](user-guide/07-steamos.md) — Valve's recovery from the stick (F6), or over the network
 - 🖨 [Quick reference card](user-guide/quick-reference.md) — one printable page: keys, login, commands
 
 **Operator guide** — for whoever makes sticks
@@ -32,6 +33,7 @@ code before it touches hardware.
 2. [Building the image](operator-guide/02-building.md) — the pipeline, timings, Docker on macOS
 3. [Flashing from the command line](operator-guide/03-flashing-cli.md) — Linux and macOS, safety guards
 4. [Maintenance](operator-guide/04-maintenance.md) — updating pins, refreshing sticks, release checklist
+5. [The network boot server](operator-guide/05-network-boot-server.md) — PXE from your Mac: run, change, troubleshoot, SteamOS over the LAN
 
 **Developer guide** — for whoever changes the project
 1. [Architecture](developer-guide/01-architecture.md) — boot chain, disk layout, build and flash flows (diagrams)
@@ -47,6 +49,7 @@ code before it touches hardware.
 **Records and decisions**
 - [Design plan](../PLAN.md) · [ADRs](adr/) · [Phase 0 spike report](spike.md)
 - [Hardware checklist](hardware-checklist.md) · [Hardware results](hardware-results.md)
+- Field reports: [SteamOS on an X870E desktop — "No networks found" (2026-11-12)](field-reports/2026-11-12-steamos-silent-network.md)
 
 ## Screenshots
 

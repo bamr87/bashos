@@ -21,6 +21,11 @@ the builder container; `flash`, `card-boot`, `wizard`, `run` and `vm` run on the
 | `make test [ARGS=…]` | fast harness suite | `ARGS="-k t21 -v"` |
 | `make test-full` | all tests incl. nightly | |
 | `make test-image` | T00 only (no VM) | |
+| `make netboot` | extract the home base for network boot → `build/netboot/` | after `make lightos` |
+| `make pxe-start [IFACE=…]` | network boot server in the background (HTTP + ProxyDHCP + TFTP) | see [network boot server](../operator-guide/05-network-boot-server.md) |
+| `make pxe-status` / `pxe-logs` / `pxe-restart` / `pxe-stop` | manage it | `pxe-logs ARGS=-f` follows |
+| `make pxe-server IFACE=…` | the same, in the foreground | debugging |
+| `make steamos-fetch` | cache Valve's SteamOS image for the server (~3.4 GB) | |
 | `make lint` | shellcheck, ruff, manifest schema, no `<PIN>` | fast; run often |
 | `make bump` | propose new pins → `build/manifest.bump.yaml` + diff | never edits `manifest.yaml` |
 | `make shell` | interactive shell in the builder | |

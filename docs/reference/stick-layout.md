@@ -15,7 +15,9 @@ GPT partition table; Ventoy's legacy-BIOS boot code sits in the first 1 MiB.
 ISO/oneusb-lightos.iso          home base
 ISO/netboot.xyz.efi             netboot.xyz for UEFI (hidden in BIOS mode)
 ISO/netboot.xyz.iso             netboot.xyz for BIOS (hidden in UEFI mode)
-ISO/ubuntu-server.iso           optional offline installer
+ISO/<name>.iso                  optional offline installers (manifest isos:, e.g. ubuntu-desktop,
+                                ubuntu-server, debian-netinst, fedora-workstation, linuxmint,
+                                archlinux, proxmox-ve, systemrescue)
 ISO/windows11.iso               optional, user-supplied
 persistence/lightos.dat         ext4, label "persistence", persistence.conf = "/ union"
 persistence/lightos.dat.bak     after oneusb-restock --backup-persistence

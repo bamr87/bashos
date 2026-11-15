@@ -7,7 +7,7 @@ flowchart LR
     FW["PC firmware<br/>UEFI or legacy BIOS"] --> V["Ventoy<br/>(on the stick)"]
     V -->|default after 10 s| HB["Home base<br/>Debian + Xfce, persistent"]
     V --> NB["netboot.xyz<br/>(UEFI: .efi · BIOS: .iso)"]
-    V --> ISO["Offline ISOs<br/>Ubuntu Server, Windows, yours"]
+    V --> ISO["Offline ISOs<br/>Linux installers, Windows, yours"]
     NB -->|wired network| NET["Installers from the internet"]
 ```
 

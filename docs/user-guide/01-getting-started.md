@@ -9,7 +9,7 @@ the PC's own drives changes unless you choose to install something.
 |---|---|---|
 | **Home base (persistent)** | A Debian 13 desktop (Xfce) with repair and install tools. Files and settings you change are kept between boots. | — |
 | **Network install (netboot.xyz)** | A menu of installers for dozens of Linux distributions and utilities, downloaded on demand. | Wired Ethernet |
-| **Ubuntu Server 26.04 installer** *(if included)* | Offline installer. | — |
+| **Linux installers** *(if included)*: Ubuntu Desktop/Server, Debian, Fedora, Mint, Arch, Proxmox VE, SystemRescue | Offline installers and rescue tools ([list](06-adding-isos.md#linux-installers-on-the-stick)). | — |
 | **Windows 11 setup** *(if your operator added it)* | Offline installer from your own ISO. | — |
 | Any other `.iso` you copy onto the stick | Booted directly by Ventoy. | — |
 
