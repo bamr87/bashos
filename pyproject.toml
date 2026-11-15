@@ -77,6 +77,8 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# one-usb/ is a git subtree of bamr87/one-usb with its own lint (`make -C one-usb lint`).
+extend-exclude = ["one-usb"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
