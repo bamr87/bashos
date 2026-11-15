@@ -16,7 +16,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
-REUSABLE = "bamr87/.github/.github/workflows/release-please.yml@main"
+REUSABLE = "bamr87/.github/.github/workflows/release-please.yml@v1"
 
 
 def _workflow() -> dict:

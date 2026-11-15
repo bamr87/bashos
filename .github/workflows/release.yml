@@ -32,7 +32,7 @@ concurrency:
 jobs:
   release:
     if: github.event_name == 'push'
-    uses: bamr87/.github/.github/workflows/release-please.yml@main
+    uses: bamr87/.github/.github/workflows/release-please.yml@v1
     permissions:
       contents: write
       pull-requests: write
