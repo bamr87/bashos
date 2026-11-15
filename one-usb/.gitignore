@@ -1,0 +1,11 @@
+/cache/
+/build/
+/local-isos/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# Local agent/tool state and build keepsakes (not source)
+/.agents/
+/.codex/
+/keep-from-build/

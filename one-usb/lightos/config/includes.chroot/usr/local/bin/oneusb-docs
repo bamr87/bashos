@@ -1,0 +1,11 @@
+#!/bin/bash
+# oneusb-docs — open the one-usb documentation: from the stick, else from the boot server.
+set -u
+server="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^oneusb\.server=//p' | tail -1)"
+mnt=/run/oneusb/docs-p1
+if blkid -L Ventoy >/dev/null 2>&1; then
+  sudo mkdir -p "$mnt" && sudo oneusb-mount-p1 "$mnt" ro >/dev/null 2>&1
+  [[ -f $mnt/oneusb/docs/index.html ]] && exec xdg-open "file://$mnt/oneusb/docs/index.html"
+fi
+[[ -n $server ]] && exec xdg-open "$server/docs/index.html"
+echo "No documentation found: no one-usb stick and no boot server." >&2; exit 1

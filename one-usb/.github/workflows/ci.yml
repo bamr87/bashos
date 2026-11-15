@@ -1,0 +1,87 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  USE_DOCKER: "0"          # run natively on the runner (sudo for loop/mount)
+  CI: "true"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck python3-yaml python3-jinja2 jq
+      - run: pipx install ruff==0.14.3
+      - run: make lint
+      - name: No <PIN> on main
+        if: github.ref == 'refs/heads/main'
+        run: "! grep -n '<PIN>' manifest.yaml"
+
+  build-test:
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      apt-cache:
+        image: sameersbn/apt-cacher-ng:3.7.4-20220421
+        ports: ["3142:3142"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y live-build debootstrap squashfs-tools xorriso mtools isolinux syslinux-common \
+            qemu-system-x86 qemu-utils ovmf seabios ipxe-qemu exfatprogs exfat-fuse dosfstools e2fsprogs \
+            parted gdisk rsync jq zstd python3-yaml python3-jinja2 python3-pytest python3-jsonschema python3-pil tesseract-ocr
+          sudo modprobe nbd max_part=16
+
+      - name: Restore cache/
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: fetch-${{ hashFiles('manifest.yaml') }}
+      - run: make fetch
+
+      - name: Restore home base ISO
+        id: lightos-cache
+        uses: actions/cache@v4
+        with:
+          path: build/oneusb-lightos.iso
+          key: lightos-${{ hashFiles('lightos/**', 'manifest.yaml', 'scripts/build-lightos.sh') }}
+      - if: steps.lightos-cache.outputs.cache-hit != 'true'
+        run: make lightos
+
+      - run: make payload image
+
+      - name: Fast suite (T00–T51)
+        env:
+          ONEUSB_MIRROR: http://localhost:3142/deb.debian.org/debian
+        run: make test ARGS="-v --junitxml=build/junit.xml"
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-runs
+          path: |
+            build/test-runs/**/*.log
+            build/test-runs/**/*.pcap
+            build/test-runs/**/*.png
+            build/test-runs/**/*.json
+            build/lightos-build.log
+            build/junit.xml
+          retention-days: 14
