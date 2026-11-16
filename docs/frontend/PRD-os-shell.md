@@ -36,6 +36,18 @@ PostHog’s transferable bet (multi-window, dense apps, keyboard-first, side-by-
 
 ---
 
+
+## 1.1 Missions
+
+bashOS's direction is to become the ultimate open home for all things terminal-first AI runtime — data, tools, resources and transparency, gathered in one place that anyone can inspect and reuse.
+
+1. **Provide data, tools, resources and transparency for all stakeholders, operators, AI practitioners and the general public.** Operators, contributors, agent builders, and the general public are first-class audiences. The aim is a shared, open commons: the same kernel, the same tools, and the same trail of evidence for everyone.
+2. **Make AI assistance a first-class part of the terminal: route slash commands through a reliable kernel onto the engine, with runs, health and settings that anyone can inspect.** The path starts with Claude slash commands through a LangGraph kernel onto the OpenCode engine. The terminal remains the home of record; nothing important happens only in a hidden session.
+3. **Put that runtime in every operator's hands, from the CLI and from a GUI access layer that sits beside the terminal, not above it.** The same kernel serves both; a no-build front end is one path to Overview, Console, Commands, Runs, Health, Engine and Settings — an open toolkit for working with all things terminal-first AI runtime.
+
+These missions set the course; they do not claim the work is finished. They serve the README and the OS-shell PRD: a terminal-first runtime, with a GUI beside the terminal rather than above it. The earlier §1 text about `bashos gui` (one page, seven hash-routed scenes, same kernel, no-build front end) is absorbed into mission 3 and is kept as direction, not as a claim that the GUI already ships. Every feature must trace to them.
+
+
 ## 2. Goals
 
 1. Evolve the **existing** `gui/web` scene system into an L6 **OS shell**: scenes become apps/windows or panes, still bound to the same kernel and `/api/*` + SSE.  
@@ -202,6 +214,7 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | [BASHOS-029](../../features/features.yml) | Console on the physical monitor | partial | [`os/bin/bashos-console`](../../os/bin/bashos-console) · [`docs/OS.md`](../OS.md) | TBD |
 | [BASHOS-030](../../features/features.yml) | Harness Console service | partial | [`os/bin/bashos-harness`](../../os/bin/bashos-harness) · [`docs/OS.md`](../OS.md) | TBD |
 | [BASHOS-031](../../features/features.yml) | Managed OpenCode engine, always latest and verified | partial | [`os/install/engine.sh`](../../os/install/engine.sh) · [`docs/OPENCODE.md`](../OPENCODE.md) | TBD |
+| [BASHOS-032](../../features/features.yml) | Missions in constitution §1 | planned | [`docs/constitution.md`](../constitution.md) | §1.1 |
 
 **Requirement → feature trace**
 
@@ -211,6 +224,7 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | §6 | BASHOS-013, BASHOS-014, BASHOS-015, BASHOS-016, BASHOS-017, BASHOS-018, BASHOS-019, BASHOS-020 |
 | §7 | BASHOS-019, BASHOS-020, BASHOS-026 |
 | §9 | BASHOS-022, BASHOS-023 |
+| §1.1 | BASHOS-032 |
 <!-- features:end -->
 
 ## 8. PostHog → bashOS concept map

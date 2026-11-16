@@ -6,11 +6,17 @@
 > Agents read this before [AGENTS.md](../AGENTS.md) conventions, the [PRD](../PRD.md), or the
 > [feature catalog](../features/features.yml). Ratified by merged PR; amended only per § 8.
 
-## 1. Mission
+## 1. Missions
 
-PR #20 proposes/lands `bashos gui`: a GUI access layer beside the terminal, not above it. One page, seven hash-routed scenes (Overview, Console, Commands, Runs, Health, Engine, Settings), same kernel as the CLI, no-build front end.
+bashOS's direction is to become the ultimate open home for all things terminal-first AI runtime — data, tools, resources and transparency, gathered in one place that anyone can inspect and reuse.
 
-_Source: [docs/frontend/PRD-os-shell.md](frontend/PRD-os-shell.md)._
+1. **Provide data, tools, resources and transparency for all stakeholders, operators, AI practitioners and the general public.** Operators, contributors, agent builders, and the general public are first-class audiences. The aim is a shared, open commons: the same kernel, the same tools, and the same trail of evidence for everyone.
+2. **Make AI assistance a first-class part of the terminal: route slash commands through a reliable kernel onto the engine, with runs, health and settings that anyone can inspect.** The path starts with Claude slash commands through a LangGraph kernel onto the OpenCode engine. The terminal remains the home of record; nothing important happens only in a hidden session.
+3. **Put that runtime in every operator's hands, from the CLI and from a GUI access layer that sits beside the terminal, not above it.** The same kernel serves both; a no-build front end is one path to Overview, Console, Commands, Runs, Health, Engine and Settings — an open toolkit for working with all things terminal-first AI runtime.
+
+These missions set the course; they do not claim the work is finished. They serve the README and the OS-shell PRD: a terminal-first runtime, with a GUI beside the terminal rather than above it. The earlier §1 text about `bashos gui` (one page, seven hash-routed scenes, same kernel, no-build front end) is absorbed into mission 3 and is kept as direction, not as a claim that the GUI already ships. Every feature must trace to them.
+
+_Source: [frontend/PRD-os-shell.md](frontend/PRD-os-shell.md) §1.1._
 
 ## 2. Invariants (non-negotiable)
 
