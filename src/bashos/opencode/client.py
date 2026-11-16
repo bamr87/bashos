@@ -373,31 +373,22 @@ class OpencodeClient:
         """OpenCode 2 admits a prompt and runs it in the background: send what the session lacks,
         admit the text, wait for the session to go idle, then read the turn off its timeline."""
         if agent and self._session_agent.get(session_id) != agent:
-            await self._request("POST", self._path("agent", session=session_id), json={"agent": agent})
-            self._session_agent[session_id] = agent
-        if model and (parsed := split_model(model)) and self._session_model.get(session_id) != model:
-            ref = {"providerID": parsed[0], "id": parsed[1]}
-            await self._request("POST", self._path("model", session=session_id), json={"model": ref})
-            self._session_model[session_id] = model
+            await self.set_session_agent(session_id, agent)
+        if model and split_model(model) and self._session_model.get(session_id) != model:
+            await self.set_session_model(session_id, model)
         if (system or "") != self._session_system.get(session_id, ""):
-            entry = self._path("instructions", session=session_id, key=SYSTEM_ENTRY)
-            if system:
-                await self._request("PUT", entry, json={"value": system})
-                self._session_system[session_id] = system
-            else:
-                await self._request("DELETE", entry)
-                self._session_system.pop(session_id, None)
+            await self.set_session_system(session_id, system)
 
         admitted = v2.unwrap(await self._request(
-            "POST", self._path("prompt", session=session_id), json={"text": text}
+            "POST", self._v2_path("prompt", session=session_id), json={"text": text}
         ))
         message_id = str((admitted or {}).get("id", ""))
         if not message_id:
             raise OpencodeError("engine admitted a prompt with no message id")
         deadline = time.monotonic() + (PROMPT_TIMEOUT.read or 1800.0)
         while True:
-            await self._request("POST", self._path("wait", session=session_id), timeout=PROMPT_TIMEOUT)
-            payload = v2.message_payload(await self._timeline(session_id, message_id), message_id)
+            await self.wait_idle(session_id)
+            payload = v2.message_payload(await self.timeline(session_id, message_id), message_id)
             if payload is not None:
                 return payload
             if time.monotonic() > deadline:
@@ -405,12 +396,65 @@ class OpencodeClient:
             # admitted but not yet started when `wait` answered: the loop is about to run
             await asyncio.sleep(0.2)
 
-    async def _timeline(self, session_id: str, message_id: str, *, max_pages: int = 50) -> list[dict[str, Any]]:
-        """The session's messages back to `message_id`, oldest first."""
+    # OpenCode 2 keeps a session's agent, model and system prompt on the session, not on each
+    # prompt. These are the routes `_prompt_v2` drives; `bashos opencode verify` drives them too
+    # (contract.session_routes), so a release that moved one fails there, not on the next turn.
+
+    def _v2_path(self, name: str, **parts: str) -> str:
+        if not self.v2:
+            raise OpencodeError(f"OpenCode {self.major} has no `{name}` session route")
+        return self._path(name, **parts)
+
+    async def set_session_agent(self, session_id: str, agent: str) -> None:
+        """Run the session's next turn as `agent`."""
+        await self._request("POST", self._v2_path("agent", session=session_id), json={"agent": agent})
+        self._session_agent[session_id] = agent
+
+    async def set_session_model(self, session_id: str, model: str) -> None:
+        """Run the session's next turn on `model` (`provider/model`)."""
+        parsed = split_model(model)
+        if parsed is None:
+            raise OpencodeError(f"not a provider/model reference: {model!r}")
+        ref = {"providerID": parsed[0], "id": parsed[1]}
+        await self._request("POST", self._v2_path("model", session=session_id), json={"model": ref})
+        self._session_model[session_id] = model
+
+    async def set_session_system(self, session_id: str, system: str | None) -> None:
+        """Put the session's system prompt in its `bashos.system` instruction entry, or, with
+        no system prompt, delete that entry."""
+        entry = self._v2_path("instructions", session=session_id, key=SYSTEM_ENTRY)
+        if system:
+            await self._request("PUT", entry, json={"value": system})
+            self._session_system[session_id] = system
+        else:
+            await self._request("DELETE", entry)
+            self._session_system.pop(session_id, None)
+
+    async def wait_idle(self, session_id: str) -> None:
+        """Block until the session has no turn running (at once, on an idle session)."""
+        await self._request("POST", self._v2_path("wait", session=session_id), timeout=PROMPT_TIMEOUT)
+
+    async def probe_prompt(self, session_id: str) -> None:
+        """Prove the prompt route is still served, without running a turn.
+
+        A body with no text must be refused as invalid (400); a route the engine no longer
+        serves answers 404. An engine that admits it anyway is interrupted and reported.
+        """
+        try:
+            await self._request("POST", self._v2_path("prompt", session=session_id), json={})
+        except EngineHTTPError as exc:
+            if exc.status == 400:
+                return
+            raise
+        await self.abort(session_id)
+        raise OpencodeError("the engine admitted a prompt with no text")
+
+    async def timeline(self, session_id: str, message_id: str = "", *, max_pages: int = 50) -> list[dict[str, Any]]:
+        """The session's messages back to `message_id` (all of them, without one), oldest first."""
         newest_first: list[dict[str, Any]] = []
         params: dict[str, str] = {"order": "desc", "limit": "100"}
         for _ in range(max_pages):
-            page = await self._request("GET", self._path("messages", session=session_id), params=params) or {}
+            page = await self._request("GET", self._v2_path("messages", session=session_id), params=params) or {}
             items = list(page.get("data") or [])
             newest_first.extend(items)
             cursor = (page.get("cursor") or {}).get("next")

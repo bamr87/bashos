@@ -18,7 +18,9 @@ agent (`GET /agent`; on OpenCode 2, `GET /api/agent`). This module judges those
 OpenCode 2 can also evaluate a permission on request, so there `ask_engine`
 puts the same samples to the engine itself and requires its own answers to
 agree: a mirror of the semantics is a model of the engine, the engine's answer
-is the engine.
+is the engine. And `session_routes` drives, without running a turn, the 2.x
+routes a turn needs (two of them experimental), so a release that moved one
+fails verify instead of every later turn.
 
 Callers: `bashos opencode verify`, the OS layer before it promotes a new
 OpenCode release (os/install/engine.sh), the engine canary workflow, and the
@@ -29,12 +31,14 @@ a loop may use it.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from . import policy, project, rules
+from .client import OpencodeError
 
 
 @dataclass(frozen=True)
@@ -179,6 +183,57 @@ async def ask_engine(client: Any) -> list[Finding]:
         findings.append(Finding(f"{agent}: the engine's own answers", not wrong,
                                 "disagree: " + ", ".join(wrong[:8]) if wrong else f"{len(cases)} samples agree"))
     return findings
+
+
+# How long one route of `session_routes` may take on an idle throwaway session, in seconds.
+ROUTE_TIMEOUT = 10.0
+ROUTES_FINDING = "OpenCode 2 session routes"
+
+
+async def session_routes(client: Any, model: str) -> list[Finding]:
+    """Drive every OpenCode 2 route a turn uses besides the permission ones, without a turn.
+
+    `check` and `ask_engine` prove the policy, not that bashOS can still run a turn: a release
+    that moved one of these routes (two sit under 2.x's `/api/experimental`) would pass both,
+    and every `act()` and `complete()` would then fail. So on one throwaway session this
+    switches the agent and the model, puts and deletes the `bashos.system` instruction entry,
+    waits on the idle session, reads its timeline, proves the prompt route is served with a
+    body it must refuse, and reads the first frame of the event stream. No turn runs: verify
+    passes no credential. OpenCode 1 takes the agent, model and system prompt on the prompt
+    itself; there this returns nothing.
+    """
+    if getattr(client, "major", 1) < 2:
+        return []
+    session = await client.create_session(title="bashos opencode verify", agent=project.SEALED_AGENT)
+    steps = {
+        "agent": lambda: client.set_session_agent(session, project.READONLY_AGENT),
+        "model": lambda: client.set_session_model(session, model),
+        "system prompt put": lambda: client.set_session_system(session, "bashos opencode verify"),
+        "system prompt delete": lambda: client.set_session_system(session, None),
+        "wait": lambda: client.wait_idle(session),
+        "messages": lambda: client.timeline(session),
+        "prompt": lambda: client.probe_prompt(session),
+        "events": lambda: _first_event(client),
+    }
+    failed: list[str] = []
+    try:
+        for name, step in steps.items():
+            try:
+                await asyncio.wait_for(step(), timeout=ROUTE_TIMEOUT)
+            except (OpencodeError, TimeoutError) as exc:
+                failed.append(f"{name} ({str(exc)[:160] or 'timed out'})")
+    finally:
+        await client.delete_session(session)
+    return [Finding(ROUTES_FINDING, not failed,
+                    "failed: " + "; ".join(failed) if failed else ", ".join(steps))]
+
+
+async def _first_event(client: Any) -> None:
+    """The event stream opens with a frame (`server.connected`); a moved route yields none."""
+    async with contextlib.aclosing(client.events()) as stream:
+        async for _ in stream:
+            return
+    raise OpencodeError("the event stream ended before its first frame")
 
 
 async def resolved_agents(client: Any, *, timeout: float = 15.0) -> list[Mapping[str, object]]:

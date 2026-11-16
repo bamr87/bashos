@@ -701,6 +701,10 @@ class _V2Engine:
         self.calls.append((method, path, body))
         if not path.startswith("/api/"):
             return httpx.Response(200, text=SPA, headers={"content-type": "text/html"})
+        if (method, path) == ("POST", "/api/session/ses_1/prompt") and "text" not in (body or {}):
+            # what 2.0.20 answers a prompt with no text (measured), before admitting anything
+            return httpx.Response(400, json={"_tag": "InvalidRequestError", "kind": "Payload",
+                                             "message": 'Missing key\n  at ["text"]'})
         routes = {
             ("GET", "/api/info"): lambda: {"version": "2.0.20", "pid": 1, "urls": [], "paths": {"tmp": "/tmp"}},
             ("GET", "/api/agent"): lambda: {"location": {"directory": "/work"}, "data": self.agents},
@@ -886,3 +890,95 @@ def test_an_api_key_reaches_opencode_2_through_its_own_variable(no_credentials):
     config = env["OPENCODE_CONFIG_CONTENT"]
     assert "sk-ant-api-key" not in config
     assert json.loads(config)["provider"]["anthropic"]["options"]["apiKey"] == f"{{env:{auth.API_KEY_ENV}}}"
+
+
+# ------------------------------------------------- the session routes verify drives (#71)
+
+ENTRY = "/api/experimental/session/ses_1/instructions/entries/bashos.system"
+
+
+def _one_frame_events():
+    async def events():
+        yield {"type": "server.connected", "properties": {}}
+    return events
+
+
+async def test_verify_drives_the_session_routes_a_turn_uses_without_running_one():
+    """Two of them sit under 2.x's /api/experimental. The policy checks alone would pass a
+    release that moved them, and every turn would then fail."""
+    from bashos.opencode import contract
+
+    engine = _V2Engine()
+    client = _stub_client(engine, major=2)
+    client.events = _one_frame_events()
+    findings = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+
+    assert [f.name for f in findings] == [contract.ROUTES_FINDING] and contract.passed(findings), findings
+    sent = [(m, p) for m, p, _ in engine.calls]
+    for route in (("POST", "/api/session/ses_1/agent"), ("POST", "/api/session/ses_1/model"),
+                  ("PUT", ENTRY), ("DELETE", ENTRY), ("POST", "/api/experimental/session/ses_1/wait"),
+                  ("GET", "/api/session/ses_1/message"), ("DELETE", "/api/session/ses_1")):
+        assert route in sent, route
+    # the prompt route is proven with a body it must refuse: no turn is admitted
+    assert [b for _, p, b in engine.calls if p.endswith("/prompt")] == [{}]
+
+
+async def test_a_release_that_moved_a_session_route_fails_verify():
+    from bashos.opencode import contract
+
+    engine = _V2Engine()
+
+    def moved(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/wait") or "/instructions/" in request.url.path:
+            return httpx.Response(404)  # what 2.0.20 answers on a path it does not serve
+        return engine(request)
+
+    client = _stub_client(moved, major=2)
+    client.events = _one_frame_events()
+    [finding] = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+    assert not finding.ok
+    for name in ("system prompt put (", "system prompt delete (", "wait ("):
+        assert name in finding.detail, finding.detail
+    assert "agent (" not in finding.detail and "events (" not in finding.detail
+    assert ("DELETE", "/api/session/ses_1") in [(m, p) for m, p, _ in engine.calls]  # no session left behind
+
+
+async def test_a_silent_event_stream_or_an_admitted_empty_prompt_fails_verify(monkeypatch):
+    from bashos.opencode import contract
+
+    monkeypatch.setattr(contract, "ROUTE_TIMEOUT", 0.2)
+    engine = _V2Engine()
+
+    def admits_anything(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/prompt"):
+            return httpx.Response(200, json={"data": {"id": "msg_1", "type": "user"}})
+        return engine(request)
+
+    async def silent():
+        await asyncio.sleep(5)
+        yield {}
+
+    client = _stub_client(admits_anything, major=2)
+    client.events = silent
+    [finding] = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+    assert not finding.ok
+    assert "events (timed out)" in finding.detail
+    assert "prompt (the engine admitted a prompt with no text)" in finding.detail
+    assert ("POST", "/api/session/ses_1/interrupt") in [(m, p) for m, p, _ in engine.calls]
+
+
+async def test_opencode_1_takes_all_of_it_on_the_prompt_so_there_are_no_session_routes():
+    from bashos.opencode import contract
+
+    class Engine:
+        major = 1
+
+    assert await contract.session_routes(Engine(), "anthropic/claude-opus-5-5") == []
+    client = _stub_client(lambda r: httpx.Response(404))
+    with pytest.raises(OpencodeError, match="no `wait` session route"):
+        await client.wait_idle("ses_1")
+    await client.aclose()
+
