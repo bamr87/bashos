@@ -8,7 +8,10 @@ name: Release
 # tag-push trigger is involved, so the GITHUB_TOKEN "tags don't trigger
 # workflows" rule never applies. RELEASE_PLEASE_TOKEN (a repo secret) opens the
 # release PR, because this repo's Actions setting forbids GITHUB_TOKEN from
-# creating pull requests.
+# creating pull requests; `strict-pr-creation` therefore makes a release PR that
+# cannot be opened fail the run instead of only warning. The `release` job calls
+# the hub's reusable workflow at its floating major tag (decision D3; never a
+# branch, UPS-WORK-10).
 #
 # Recovery: `workflow_dispatch` with an existing tag re-runs the publish jobs
 # for that tag without going through release-please.
@@ -32,7 +35,9 @@ concurrency:
 jobs:
   release:
     if: github.event_name == 'push'
-    uses: bamr87/.github/.github/workflows/release-please.yml@v1
+    uses: bamr87/bamr87/.github/workflows/release-please.yml@v2
+    with:
+      strict-pr-creation: true
     permissions:
       contents: write
       pull-requests: write

@@ -16,7 +16,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
-REUSABLE = "bamr87/.github/.github/workflows/release-please.yml@v1"
+# The hub's own release-please workflow at its floating major tag (decision D3,
+# UPS-REPO-21; never a branch, UPS-WORK-10). bamr87/.github's copy is legacy.
+REUSABLE = "bamr87/bamr87/.github/workflows/release-please.yml@v2"
 
 
 def _workflow() -> dict:
@@ -55,6 +57,11 @@ def test_release_runs_on_main_through_the_fleet_reusable_workflow() -> None:
     release = wf["jobs"]["release"]
     assert release["uses"] == REUSABLE
     assert release["secrets"] == "inherit"
+    # RELEASE_PLEASE_TOKEN is the only credential that can open the release PR
+    # here (Actions may not create PRs), so a PR that cannot be opened fails the
+    # run instead of warning.
+    assert release["with"]["strict-pr-creation"] is True
+    assert release["permissions"] == {"contents": "write", "pull-requests": "write"}
 
 
 def test_publishing_is_chained_off_release_created_in_the_same_run() -> None:
