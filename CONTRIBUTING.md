@@ -12,8 +12,7 @@ make lint         # ruff + shellcheck
 
 Or without make: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`.
 
-Auth is only needed to run commands against a real model (`claude` login, `claude setup-token`, or `ANTHROPIC_API_KEY`); tests and dry-runs
-never call one. `bashos doctor` diagnoses your environment.
+Auth is only needed to run commands against a real model (`claude` login, `claude setup-token`, or `ANTHROPIC_API_KEY`); tests and dry-runs never call one. `bashos doctor` diagnoses your environment.
 
 ## Architecture
 
