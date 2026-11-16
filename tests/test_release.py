@@ -69,7 +69,24 @@ def test_publishing_is_chained_off_release_created_in_the_same_run() -> None:
     target = jobs["target"]
     assert target["needs"] == "release"
     assert "needs.release.outputs.release_created == 'true'" in target["if"]
-    for name in ("build", "github-release", "pypi", "ghcr"):
-        needs = jobs[name]["needs"]
+    assert "github.event_name == 'workflow_dispatch'" in target["if"]
+    # A job without `if:` gets an implicit success(), which GitHub evaluates over
+    # every ancestor job, not only its own `needs:`. On a manual dispatch the
+    # `release` job is skipped, so without an explicit condition every publish
+    # job would be skipped too and the recovery run would end green having
+    # published nothing (likewise when the tagging pass succeeds but the PR pass
+    # fails). Each publish job therefore gates on the jobs it actually needs.
+    for name, upstream in (
+        ("build", ["target"]),
+        ("github-release", ["target", "build"]),
+        ("pypi", ["target", "build"]),
+        ("ghcr", ["target"]),
+    ):
+        job = jobs[name]
+        needs = job["needs"]
         needs = [needs] if isinstance(needs, str) else needs
         assert "target" in needs, f"{name} must wait for the resolved release tag"
+        condition = job.get("if", "")
+        assert "!cancelled()" in condition, f"{name} must not inherit the skipped release job"
+        for dep in upstream:
+            assert f"needs.{dep}.result == 'success'" in condition, f"{name} must require {dep} to succeed"
