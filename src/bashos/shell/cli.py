@@ -185,8 +185,16 @@ def engine_sync() -> None:
 def engine_auth() -> None:
     """Show which credential the engine will run on, and where it came from."""
     from ..opencode import auth as engine_auth_mod
+    from ..opencode import server
+    from ..opencode.client import OpencodeError
 
-    env, description = engine_auth_mod.engine_environment()
+    # the wiring depends on the major of the binary bashOS would start; with none it can run,
+    # describe OpenCode 1's, as the engine's own start would report the missing binary
+    try:
+        major = asyncio.run(server.resolve_binary()).major
+    except OpencodeError:
+        major = server.LEGACY_MAJOR
+    env, description = engine_auth_mod.engine_environment(major)
     typer.echo(description)
     if not env:
         raise typer.Exit(1)

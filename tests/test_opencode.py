@@ -982,3 +982,27 @@ async def test_opencode_1_takes_all_of_it_on_the_prompt_so_there_are_no_session_
         await client.wait_idle("ses_1")
     await client.aclose()
 
+
+def _fake_opencode(path, version: str) -> str:
+    path.write_text(f"#!/bin/sh\necho '{version}'\n")
+    path.chmod(0o755)
+    return str(path)
+
+
+@pytest.mark.parametrize(("version", "wiring"), [
+    ("opencode v2.0.20", "BASHOS_ANTHROPIC_API_KEY, OPENCODE_CONFIG_CONTENT"),
+    ("1.19.5", "OPENCODE_AUTH_CONTENT"),
+    (None, "OPENCODE_AUTH_CONTENT"),  # no engine bashOS can run: OpenCode 1's wiring, as before
+])
+def test_opencode_auth_names_the_wiring_of_the_engine_bashos_would_start(no_credentials, tmp_path, version, wiring):
+    from typer.testing import CliRunner
+
+    from bashos.shell.cli import app
+
+    no_credentials.setenv("ANTHROPIC_API_KEY", "sk-ant-api-key")
+    binary = _fake_opencode(tmp_path / "opencode", version) if version else str(tmp_path / "absent")
+    no_credentials.setenv("BASHOS_OPENCODE_BIN", binary)
+    result = CliRunner().invoke(app, ["opencode", "auth"])
+    assert result.exit_code == 0, result.output
+    assert f"passed to the engine as: {wiring}" in result.output
+    assert "sk-ant-api-key" not in result.output
