@@ -18,7 +18,7 @@
 | [`SECURITY.md`](../SECURITY.md) | Which bashOS versions get security fixes, how to report a vulnerability privately, what is in scope, and how fast you will hear back. |
 | [`chui/`](../chui/README.md) | The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back. |
 | [`os/`](../os/README.md) | The Linux OS layer of bashOS: install it onto a Debian 13 machine, or build it into a bootable image, so the monitor boots into the bashOS console and the machine serves the bamr87 Harness Console. |
-| [`tools/`](../tools/README.md) | Repository scripts for bashOS — the desktop capture and the documentation generators; nothing here ships to users. |
+| [`tools/`](../tools/README.md) | Repository scripts for bashOS — the desktop capture, the documentation generators and the Markdown prose fixer; nothing here ships to users. |
 
 ### `docs/`
 

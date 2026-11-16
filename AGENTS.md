@@ -64,7 +64,7 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - `bin/` — `bashos` (the launcher: bootstraps `.venv`, dispatches `chui` before it) and `os-health` (the verdict floor `/health` and the desktop's Health app run).
 - `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI; formerly bamr87/chui, merged with history). See **chui** below.
 - `os/` — the optional Linux OS layer (Omarchy-style, Debian 13): `bashos os install` turns a machine into a bashOS machine (tty1 → the shared tmux console, the hub's Harness Console as a user service, updates + migrations), and `os/image/` builds it into a bootable mkosi disk image provisioned from a `BASHOS-SEED` drive. See **os** below.
-- `tools/` — repository scripts that do not ship: `capture_desktop.py` (the stills/GIFs in `docs/DESKTOP-TOUR.md`; not in CI, re-run when the front end changes, needs `pip install playwright pillow`), `gen_commands_table.py` and the vendored `docs_index.py`.
+- `tools/` — repository scripts that do not ship: `capture_desktop.py` (the stills/GIFs in `docs/DESKTOP-TOUR.md`; not in CI, re-run when the front end changes, needs `pip install playwright pillow`), `gen_commands_table.py`, and the vendored `docs_index.py` and `unwrap-prose.py` (the `markdown-oneline` gate's fixer).
 - `docker-compose.yml`, `docker/` — optional services: `phoenix` (:6006), `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (the containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise.
 - `tests/` — the offline pytest suite (`tests/desktop/` has SVG snapshots) and `shell.test.mjs`; `features/`, `verify/` — the fleet feature index and user scenarios.
 
