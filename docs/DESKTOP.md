@@ -52,27 +52,20 @@ Hybrid tiling. Under 110 columns one window is visible at a time and the taskbar
 
 ## The apps
 
-- **AI Console** — the old REPL, per window: slash commands, plain english
-(classified), follow-ups, `!` shell escapes, `exec`. Answers stream in; tool calls tick by in the activity feed; a route hint under the prompt shows where each line will go before you press enter (computed by the kernel's pure helpers — zero model calls). Each window has its own bounded conversation memory (3 turns × 280-char excerpts reach the model — the same contract the REPL had).
-- **Health** — `bin/os-health` verdict lines parsed into a table with the
-worst-verdict header; "ask /health" hands investigation to the react command. Deterministic floor, model for causes — the FORGE split.
+- **AI Console** — the old REPL, per window: slash commands, plain english (classified), follow-ups, `!` shell escapes, `exec`. Answers stream in; tool calls tick by in the activity feed; a route hint under the prompt shows where each line will go before you press enter (computed by the kernel's pure helpers — zero model calls). Each window has its own bounded conversation memory (3 turns × 280-char excerpts reach the model — the same contract the REPL had).
+- **Health** — `bin/os-health` verdict lines parsed into a table with the worst-verdict header; "ask /health" hands investigation to the react command. Deterministic floor, model for causes — the FORGE split.
 - **Doctor** — `bashos doctor`'s checks, in a window.
-- **Engine** — status rows (loads on demand; loading boots the engine),
-  the deny-by-default policy verbatim, and the live typed-event wire.
-- **Commands** — any registry command with a free dry-run preview (exactly
-  `bashos run -n`) before running it in a console.
-- **Trace** — the kernel's append-only routing trace per finished turn
-  (`bashos run -v`, but windowed).
-- **OpenCode TUI** — suspends the desktop and hands the real terminal to
-`opencode`, restoring on exit. It runs as an independent process in the project root: sessions there are separate from bashOS console turns. (Embedding a live pty widget is deferred — no maintained Textual terminal emulator exists, and pyte lacks what OpenCode's TUI needs.)
+- **Engine** — status rows (loads on demand; loading boots the engine), the deny-by-default policy verbatim, and the live typed-event wire.
+- **Commands** — any registry command with a free dry-run preview (exactly `bashos run -n`) before running it in a console.
+- **Trace** — the kernel's append-only routing trace per finished turn (`bashos run -v`, but windowed).
+- **OpenCode TUI** — suspends the desktop and hands the real terminal to `opencode`, restoring on exit. It runs as an independent process in the project root: sessions there are separate from bashOS console turns. (Embedding a live pty widget is deferred — no maintained Textual terminal emulator exists, and pyte lacks what OpenCode's TUI needs.)
 
 ## Shell escapes
 
 Inherited-stdio subprocesses are incompatible with a full-screen app, so:
 
 - `!cmd` and confirmed `exec` runs stream captured output into a window;
-- "run attached" (offered in the exec dialog) suspends the whole desktop,
-gives the command the real terminal, and restores — for interactive commands (editors, `top`, ssh).
+- "run attached" (offered in the exec dialog) suspends the whole desktop, gives the command the real terminal, and restores — for interactive commands (editors, `top`, ssh).
 
 The safety contract is unchanged: only `!` lines and an explicitly confirmed `exec` run anything, and the confirm dialog defaults to Cancel. Approval requests from engine runs are still auto-refused everywhere — an interactive approval queue remains a future, opt-in, separately-named policy profile (see ARCHITECTURE.md L6).
 
@@ -121,14 +114,10 @@ Nothing here is a second implementation. A console line goes through `build_kern
 
 **It is not a second way into the machine.** The window runs kernel lines and nothing else:
 
-- **No shell passthrough.** `!ls` is refused with a 403. In the terminal that
-escape hatch is your own shell, by your own keystroke, in a process you started. A local HTTP server that executes arbitrary commands is a different object with a different blast radius, so the desktop does not have one.
-- **No wider tool policy.** The react loop still reaches the real machine, and
-still only through the engine's deny-by-default gate in `opencode/policy.py`. The Health scene *renders* that allowlist; it does not extend it.
-- **No credentials on the wire.** `/api/doctor` reports where a credential came
-from — the same line `bashos doctor` prints — never the value. Secrets stay in the engine process's environment.
-- **No reasoning loop.** The GUI server dispatches and renders. If a feature
-would need a loop in `src/bashos/gui/`, it belongs in a kernel loop or in the engine.
+- **No shell passthrough.** `!ls` is refused with a 403. In the terminal that escape hatch is your own shell, by your own keystroke, in a process you started. A local HTTP server that executes arbitrary commands is a different object with a different blast radius, so the desktop does not have one.
+- **No wider tool policy.** The react loop still reaches the real machine, and still only through the engine's deny-by-default gate in `opencode/policy.py`. The Health scene *renders* that allowlist; it does not extend it.
+- **No credentials on the wire.** `/api/doctor` reports where a credential came from — the same line `bashos doctor` prints — never the value. Secrets stay in the engine process's environment.
+- **No reasoning loop.** The GUI server dispatches and renders. If a feature would need a loop in `src/bashos/gui/`, it belongs in a kernel loop or in the engine.
 
 ## How it is guarded
 
@@ -161,12 +150,9 @@ The token rides in the URL bashOS prints (`http://127.0.0.1:PORT/?k=…`). The p
                                    kernel ── loops ── policy ── engine
 ```
 
-- `gui/http.py` — ~300 lines of asyncio: request parsing, a path router, JSON,
-static files, server-sent events. bashOS has no web framework in its dependency tree and the desktop does not add one, so `pip install bashos` followed by `bashos gui` works with nothing else installed.
-- `gui/web/` — the front end: one HTML file, one stylesheet, two ES modules
-(`app.js` draws, `shell.js` decides the layout). No bundler, no npm, no build step. Editing and reloading is the whole development loop.
-- `gui/desktop.py` — the native window. `pip install "bashos[gui]"` adds
-pywebview, which drives the platform's own webview (WebKit on macOS, WebKit2GTK/Qt on Linux, WebView2 on Windows) — no bundled browser, no second runtime. Without it, the same URL opens in your default browser.
+- `gui/http.py` — ~300 lines of asyncio: request parsing, a path router, JSON, static files, server-sent events. bashOS has no web framework in its dependency tree and the desktop does not add one, so `pip install bashos` followed by `bashos gui` works with nothing else installed.
+- `gui/web/` — the front end: one HTML file, one stylesheet, two ES modules (`app.js` draws, `shell.js` decides the layout). No bundler, no npm, no build step. Editing and reloading is the whole development loop.
+- `gui/desktop.py` — the native window. `pip install "bashos[gui]"` adds pywebview, which drives the platform's own webview (WebKit on macOS, WebKit2GTK/Qt on Linux, WebView2 on Windows) — no bundled browser, no second runtime. Without it, the same URL opens in your default browser.
 
 The window toolkit owns the main thread on macOS, so the native path runs the asyncio server on a background loop and blocks the main thread in the toolkit. The browser path is a plain `asyncio.run`, the shape the rest of bashOS uses.
 
@@ -195,12 +181,9 @@ A run lives in memory, in this process, and is gone when the window closes — b
 
 ## Adding a scene
 
-1. Add a route in `gui/server.py` that returns JSON from something that already
-   exists. If it needs new state, it probably belongs elsewhere.
-2. Add a `scene*()` builder in `web/app.js` and an entry in `SCENES`. It works
-   in a pane for free — panes host the same builders.
-3. Build DOM with `el()`, never `innerHTML` — the one exception is
-   `renderMarkdown()`, which escapes before it structures.
+1. Add a route in `gui/server.py` that returns JSON from something that already exists. If it needs new state, it probably belongs elsewhere.
+2. Add a `scene*()` builder in `web/app.js` and an entry in `SCENES`. It works in a pane for free — panes host the same builders.
+3. Build DOM with `el()`, never `innerHTML` — the one exception is `renderMarkdown()`, which escapes before it structures.
 4. No inline `style` attributes: the CSP forbids them. Use a class.
 
 ## Keeping the docs honest

@@ -8,15 +8,7 @@
 ---
 
 
-> **Status update — Phases 0–2 landed, and Phase 3's windowing with them.**
-> Implemented: experiences `single` | `tiling` | `os` | `plain`, the four nav
-> intents, pane chrome, floating windows (drag, resize, edge snap, z-order,
-> minimize with a taskbar that restores), desktop icons, arrange tile/cascade,
-> workspace layouts (`?windows=` + per-tab restore), context menus, palette
-> depth and the keymap. The reducer is `src/bashos/gui/web/shell.js` with 36
-> unit tests in `tests/shell.test.mjs`; the DOM consumers are asserted by
-> `tools/capture_desktop.py` on every capture run. Still proposed: nostalgia
-> themes, a full a11y audit, remote auth. Never needed: a bundler.
+> **Status update — Phases 0–2 landed, and Phase 3's windowing with them.** Implemented: experiences `single` | `tiling` | `os` | `plain`, the four nav intents, pane chrome, floating windows (drag, resize, edge snap, z-order, minimize with a taskbar that restores), desktop icons, arrange tile/cascade, workspace layouts (`?windows=` + per-tab restore), context menus, palette depth and the keymap. The reducer is `src/bashos/gui/web/shell.js` with 36 unit tests in `tests/shell.test.mjs`; the DOM consumers are asserted by `tools/capture_desktop.py` on every capture run. Still proposed: nostalgia themes, a full a11y audit, remote auth. Never needed: a bundler.
 
 ---
 
@@ -206,9 +198,7 @@ interface ShellSettings {
 }
 ```
 
-**As implemented:** every field above is real except `expanded` (tiling's maximize, kept separate from the desktop's `snapped: "max"`). Geometry is percentages, `zIndex` is a monotonic counter bumped on focus, and `snapped`
-takes `left | right | max | null`. The serialized form is shorter than the
-schema above — `{v,e,f,w:[{s,r,x,y,cx,cy,m,k}]}` — because it travels in a URL; `decodeLayout` validates the version, drops scenes this build does not have, dedupes the Console, and clamps every number.
+**As implemented:** every field above is real except `expanded` (tiling's maximize, kept separate from the desktop's `snapped: "max"`). Geometry is percentages, `zIndex` is a monotonic counter bumped on focus, and `snapped` takes `left | right | max | null`. The serialized form is shorter than the schema above — `{v,e,f,w:[{s,r,x,y,cx,cy,m,k}]}` — because it travels in a URL; `decodeLayout` validates the version, drops scenes this build does not have, dedupes the Console, and clamps every number.
 
 ---
 

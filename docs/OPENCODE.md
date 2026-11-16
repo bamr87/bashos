@@ -4,11 +4,7 @@
 
 bashOS's [reference architecture](ARCHITECTURE.md) is explicit that the agent kernel must not contain a reasoning loop:
 
-> Note what `bashosd` does *not* contain: a specific model, a specific agent's
-> reasoning loop. Claude Code, Codex CLI, Gemini CLI, OpenCode — any of them can
-> run *on* bashOS as the reasoning engine, the way any POSIX program runs on
-> Linux. The OS supplies scheduling, identity, policy, sandboxes, memory, and
-> audit; the agent supplies the thinking.
+> Note what `bashosd` does *not* contain: a specific model, a specific agent's reasoning loop. Claude Code, Codex CLI, Gemini CLI, OpenCode — any of them can run *on* bashOS as the reasoning engine, the way any POSIX program runs on Linux. The OS supplies scheduling, identity, policy, sandboxes, memory, and audit; the agent supplies the thinking.
 
 This document describes that separation as it is actually built. **OpenCode is the engine.** It owns the agent loop, the tool broker, session state, and the permission gate. bashOS owns everything an OS owns: the userland registry, the routing kernel, the policy, the terminal, and the audit trace.
 
@@ -58,12 +54,9 @@ bashOS is subscription-native. The engine runs on the Claude Code login you alre
 
 This part was built against the running server rather than its documentation, because the documentation is out of date. Three findings shaped it:
 
-- **OpenCode 1.18 dropped Anthropic OAuth as a login method.** Its `anthropic`
-integration advertises `key` and `env` only. A stored `{"type":"oauth"}` credential does not register the provider at all — verified by writing one and watching `anthropic` stay absent from `/config/providers`, while the same file with `{"type":"api"}` registered it immediately.
-- **So the token is carried the way Claude Code carries it**: as an
-`Authorization: Bearer` header declared through `provider.anthropic.options.headers`. The capital `A` matters — a lowercase `authorization` key is dropped before the request goes out. `apiKey` is pinned to `""` so a bearer token is never also sent as `x-api-key`, and `anthropic-beta: oauth-2025-04-20` is merged with the engine's own betas. Declaring `env` is what makes OpenCode register the provider in the first place.
-- **The wiring is injected through the child's environment**, using
-`OPENCODE_CONFIG_CONTENT` and `OPENCODE_AUTH_CONTENT`, which merge with the project config at engine start. Two consequences, both deliberate: no secret is ever written to disk, and bashOS never touches `~/.local/share/opencode/auth.json` — if you ran `opencode auth login` yourself, you keep exactly what you had.
+- **OpenCode 1.18 dropped Anthropic OAuth as a login method.** Its `anthropic` integration advertises `key` and `env` only. A stored `{"type":"oauth"}` credential does not register the provider at all — verified by writing one and watching `anthropic` stay absent from `/config/providers`, while the same file with `{"type":"api"}` registered it immediately.
+- **So the token is carried the way Claude Code carries it**: as an `Authorization: Bearer` header declared through `provider.anthropic.options.headers`. The capital `A` matters — a lowercase `authorization` key is dropped before the request goes out. `apiKey` is pinned to `""` so a bearer token is never also sent as `x-api-key`, and `anthropic-beta: oauth-2025-04-20` is merged with the engine's own betas. Declaring `env` is what makes OpenCode register the provider in the first place.
+- **The wiring is injected through the child's environment**, using `OPENCODE_CONFIG_CONTENT` and `OPENCODE_AUTH_CONTENT`, which merge with the project config at engine start. Two consequences, both deliberate: no secret is ever written to disk, and bashOS never touches `~/.local/share/opencode/auth.json` — if you ran `opencode auth login` yourself, you keep exactly what you had.
 
 Because the provider registry is built when the server boots, the credential has to exist before the process does. That is why it rides in on the environment rather than being pushed over the API afterwards.
 
@@ -86,10 +79,8 @@ The policy is attached to the two bashOS agents, never to the project's global `
 
 Two boundaries are worth calling out because they are easy to get wrong:
 
-- **`external_directory` is denied.** OpenCode contributes its own defaults and
-its own trailing allows for the engine's state directories; bashOS's `deny` lands between them, so paths outside the project resolve to `deny` while the engine's own machinery keeps working.
-- **Approval prompts are refused, not awaited.** bashOS is non-interactive by
-construction: the policy *is* the answer, so a request for approval is a request the policy did not already allow. The engine watcher replies `reject` to `permission.asked` and `permission.v2.asked`. Without that, any rule resolving to `ask` would hang a headless run until it timed out.
+- **`external_directory` is denied.** OpenCode contributes its own defaults and its own trailing allows for the engine's state directories; bashOS's `deny` lands between them, so paths outside the project resolve to `deny` while the engine's own machinery keeps working.
+- **Approval prompts are refused, not awaited.** bashOS is non-interactive by construction: the policy *is* the answer, so a request for approval is a request the policy did not already allow. The engine watcher replies `reject` to `permission.asked` and `permission.v2.asked`. Without that, any rule resolving to `ask` would hang a headless run until it timed out.
 
 See the live policy any time, before anything runs:
 
