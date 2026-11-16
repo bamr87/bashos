@@ -226,7 +226,8 @@ def engine_verify(
 
     Judges the permission rules the engine itself resolved from opencode.jsonc — not
     the file — so a new OpenCode release that reads the config differently fails here
-    before it is trusted. No credential is passed: nothing is prompted.
+    before it is trusted. On OpenCode 2 the engine is also asked, sample by sample, how
+    it would answer, and must agree. No credential is passed: nothing is prompted.
     """
     import os
 
@@ -239,10 +240,13 @@ def engine_verify(
     os.environ.pop("BASHOS_OPENCODE_URL", None)  # always a fresh engine of this binary
 
     async def go() -> tuple[str, list[contract.Finding]]:
-        engine = OpencodeEngine(KernelConfig.from_env())
+        engine = OpencodeEngine(KernelConfig.from_env(), contract_gate=False)
         try:
             await engine.start()
-            return engine.version, contract.check(await engine.client.agents())
+            client = engine.client
+            findings = contract.check(await contract.resolved_agents(client), client.major)
+            findings += await contract.ask_engine(client)
+            return f"{engine.version} (OpenCode {client.major} API)", findings
         finally:
             await engine.stop()
 

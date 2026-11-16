@@ -4,6 +4,8 @@
 # copy is root-owned, so nothing running as the user can swap the binary that enforces the
 # policy. A release is promoted only after `bashos opencode verify` proves it still enforces
 # opencode/policy.py; one that fails keeps the machine on the newest release that passes.
+# That holds across majors: bashOS speaks OpenCode 1 and 2 (bamr87/bashos#71), and a 2.x release
+# is promoted exactly like a 1.x one, once the contract passes on it — never before.
 # Sourced by the runtime phase and by `bashos os engine`; bashos-engine-update.timer runs
 # `bashos os engine update` daily.
 # shellcheck shell=bash disable=SC2154  # the _os_* colours come from lib.sh
@@ -37,8 +39,8 @@ os_engine_latest() {
   curl -fsSL --max-time 30 "$OS_ENGINE_REGISTRY/opencode-ai/latest" | jq -re '.version'
 }
 
-# The newest stable release of one major: the fallback when `latest` is a major the contract
-# rejects (OpenCode 2 today, bamr87/bashos#71).
+# The newest stable release of one major: the fallback when `latest` is a new major whose
+# release fails the engine contract.
 os_engine_newest_in() {
   curl -fsSL --max-time 120 -H 'Accept: application/vnd.npm.install-v1+json' "$OS_ENGINE_REGISTRY/opencode-ai" |
     jq -r --arg m "$1" '.versions | keys[] | select(test("^" + $m + "\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -1
@@ -172,13 +174,13 @@ os_engine_update() {
     return 0
   fi
   os_engine_install "$latest" && return 0
-  # A new major the contract rejects (OpenCode 2, bamr87/bashos#71) must not freeze the machine:
-  # take the newest release of the major it runs.
+  # A new major whose release fails the contract must not freeze the machine on an old minor:
+  # take the newest release of the major it runs (verified the same way before it is promoted).
   local major=${current%%.*}
   [[ -n $current ]] || major=1
   if [[ ${latest%%.*} != "$major" ]] && target=$(os_engine_newest_in "$major") && [[ -n $target && $target != "$current" ]]; then
-    os_log "npm latest is opencode $latest (a new major the contract rejects) — newest $major.x is $target"
-    os_engine_install "$target" && os_engine_state ok "$target" "newest $major.x; $latest rejected (bamr87/bashos#71)"
+    os_log "npm latest is opencode $latest (a new major that failed the engine contract) — newest $major.x is $target"
+    os_engine_install "$target" && os_engine_state ok "$target" "newest $major.x; $latest failed the engine contract"
   fi
   return 0
 }

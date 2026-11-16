@@ -6,21 +6,33 @@ may touch without a single line of bashOS changing, so a new engine is trusted
 only after this check passes.
 
 OpenCode resolves `opencode.jsonc` into an ordered permission rule list per
-agent (`GET /agent`). This module judges those *resolved* rules with OpenCode's
-own semantics (`rules.py`) against what `policy.py` promises:
+agent (`GET /agent`; on OpenCode 2, `GET /api/agent`). This module judges those
+*resolved* rules with OpenCode's own semantics (`rules.py`) against what
+`policy.py` promises:
 
-  readonly agent   every denied tool refused; bash refuses every way out we
-                   know of; every allowlisted probe and read still runs
+  readonly agent   every denied tool refused; a tool policy.py never named
+                   refused; bash refuses every way out we know of; every
+                   allowlisted probe and read still runs
   sealed agent     no tool at all
 
+OpenCode 2 can also evaluate a permission on request, so there `ask_engine`
+puts the same samples to the engine itself and requires its own answers to
+agree: a mirror of the semantics is a model of the engine, the engine's answer
+is the engine.
+
 Callers: `bashos opencode verify`, the OS layer before it promotes a new
-OpenCode release (os/install/engine.sh), and the engine canary workflow.
+OpenCode release (os/install/engine.sh), the engine canary workflow, and the
+engine's start on any OpenCode 2 binary (engine.py), which runs `check` before
+a loop may use it.
 """
 
 from __future__ import annotations
 
+import asyncio
+import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from . import policy, project, rules
 
@@ -39,10 +51,14 @@ DENIED_SAMPLES = {
     "apply_patch": "src/bashos/__init__.py",
     "webfetch": "https://example.com",
     "websearch": "bashos",
+    "execute": "await fetch('https://example.com')",
     "task": "general",
     "external_directory": "/etc/*",
     "question": "*",
 }
+
+# A tool no release has shipped yet: the readonly agent must refuse what policy.py never named.
+UNKNOWN_TOOL = "bashos-contract-unnamed-tool"
 
 # Commands the readonly agent's bash must refuse: mutation, the network, a shell, privilege,
 # and the escapes that once got through (policy.BASH_ESCAPES).
@@ -63,16 +79,35 @@ BASH_ESCAPES = (
     "git log --output=/tmp/x",
 )
 
+READ_SAMPLE = "src/bashos/__init__.py"
+
 
 def _agent(agents: Iterable[Mapping[str, object]], name: str) -> Mapping[str, object] | None:
-    return next((a for a in agents if a.get("name") == name), None)
+    # OpenCode 1 names an agent by `name`; OpenCode 2 by `id` (its `name` is a display label)
+    return next((a for a in agents if a.get("id") == name or a.get("name") == name), None)
 
 
 def _allowed(found: list[str]) -> str:
     return "allowed: " + ", ".join(found)
 
 
-def check(agents: list[Mapping[str, object]]) -> list[Finding]:
+def samples(major: int = 1) -> dict[str, list[tuple[str, str, bool]]]:
+    """Every (action, input, must-be-allowed) the contract judges, per bashOS agent,
+    named the way an engine of `major` names its tools."""
+    def a(tool: str) -> str:
+        return rules.action(tool, major)
+
+    readonly = [(a(t), v, False) for t, v in DENIED_SAMPLES.items()]
+    readonly.append((UNKNOWN_TOOL, "*", False))
+    readonly += [(a("bash"), c, False) for c in BASH_ESCAPES]
+    readonly += [(a("bash"), cmd, True) for p in policy.PROBE_COMMANDS for cmd in (p, f"{p} -x")]
+    readonly += [(a(t), READ_SAMPLE, True) for t in policy.READ_TOOLS]
+    sealed = [(a(t), DENIED_SAMPLES.get(t, "anything"), False)
+              for t in (*policy.ALL_TOOLS, "external_directory", UNKNOWN_TOOL)]
+    return {project.READONLY_AGENT: readonly, project.SEALED_AGENT: sealed}
+
+
+def check(agents: list[Mapping[str, object]], major: int = 1) -> list[Finding]:
     """Judge an engine's resolved agents (`GET /agent`) against policy.py."""
     findings: list[Finding] = []
     readonly = _agent(agents, project.READONLY_AGENT)
@@ -81,6 +116,9 @@ def check(agents: list[Mapping[str, object]]) -> list[Finding]:
     findings.append(Finding("agents", not missing, "missing: " + ", ".join(missing) if missing else
                             f"{project.READONLY_AGENT}, {project.SEALED_AGENT}"))
 
+    def act(tool: str) -> str:
+        return rules.action(tool, major)
+
     if readonly is not None:
         ro = rules.from_agent(readonly)
         # No rules at all means the engine reports them in a shape this module does not know:
@@ -88,29 +126,76 @@ def check(agents: list[Mapping[str, object]]) -> list[Finding]:
         findings.append(Finding("readonly: rules", bool(ro), f"{len(ro)} resolved" if ro else
                                 "none in a known shape (GET /agent → permission)"))
         if ro:
-            open_tools = [t for t, v in DENIED_SAMPLES.items() if rules.evaluate(ro, t, v) == "allow"]
+            open_tools = [t for t, v in DENIED_SAMPLES.items() if rules.evaluate(ro, act(t), v) == "allow"]
             findings.append(Finding("readonly: denied tools", not open_tools,
                                     _allowed(open_tools) if open_tools else ", ".join(DENIED_SAMPLES)))
-            leaks = [c for c in BASH_ESCAPES if rules.evaluate(ro, "bash", c) == "allow"]
+            unnamed = rules.evaluate(ro, UNKNOWN_TOOL, "*")
+            findings.append(Finding("readonly: tools deny-by-default", unnamed != "allow",
+                                    f"a tool policy.py never named is {unnamed}"))
+            leaks = [c for c in BASH_ESCAPES if rules.evaluate(ro, act("bash"), c) == "allow"]
             findings.append(Finding("readonly: bash deny-by-default", not leaks,
                                     _allowed(leaks) if leaks else f"{len(BASH_ESCAPES)} ways out refused"))
             blocked = [p for p in policy.PROBE_COMMANDS
-                       if rules.evaluate(ro, "bash", p) != "allow" or rules.evaluate(ro, "bash", f"{p} -x") != "allow"]
+                       if rules.evaluate(ro, act("bash"), p) != "allow"
+                       or rules.evaluate(ro, act("bash"), f"{p} -x") != "allow"]
             findings.append(Finding("readonly: probes run", not blocked,
                                     "refused: " + ", ".join(blocked) if blocked else
                                     f"{len(policy.PROBE_COMMANDS)} probes"))
-            unread = [t for t in policy.READ_TOOLS if rules.evaluate(ro, t, "src/bashos/__init__.py") != "allow"]
+            unread = [t for t in policy.READ_TOOLS if rules.evaluate(ro, act(t), READ_SAMPLE) != "allow"]
             findings.append(Finding("readonly: reads", not unread,
                                     "refused: " + ", ".join(unread) if unread else ", ".join(policy.READ_TOOLS)))
 
     if sealed is not None:
         se = rules.from_agent(sealed)
-        open_tools = [t for t in (*policy.ALL_TOOLS, "external_directory")
-                      if rules.evaluate(se, t, DENIED_SAMPLES.get(t, "anything")) == "allow"]
+        open_tools = [t for t in (*policy.ALL_TOOLS, "external_directory", UNKNOWN_TOOL)
+                      if rules.evaluate(se, act(t), DENIED_SAMPLES.get(t, "anything")) == "allow"]
         findings.append(Finding("sealed: no tools", bool(se) and not open_tools,
                                 _allowed(open_tools) if open_tools else
                                 ("no rules in a known shape" if not se else f"{len(policy.ALL_TOOLS)} tools refused")))
     return findings
+
+
+async def ask_engine(client: Any) -> list[Finding]:
+    """Put every sample to an OpenCode 2 engine's own permission evaluation.
+
+    One throwaway session per bashOS agent; the engine answers allow, deny or ask, and a
+    sample passes when the engine allows exactly what policy.py allows. An "ask" counts
+    as not allowed (bashOS refuses every approval request), and the session that holds
+    it is deleted. OpenCode 1 has no such route: there the mirrored `check` is the contract.
+    """
+    if getattr(client, "major", 1) < 2:
+        return []
+    findings: list[Finding] = []
+    for agent, cases in samples(client.major).items():
+        session = await client.create_session(title="bashos opencode verify", agent=agent)
+        wrong: list[str] = []
+        try:
+            for action, value, allow in cases:
+                effect = await client.evaluate_permission(session, agent=agent, action=action, resource=value)
+                if (effect == "allow") != allow:
+                    wrong.append(f"{action}({value})={effect}")
+        finally:
+            await client.delete_session(session)
+        findings.append(Finding(f"{agent}: the engine's own answers", not wrong,
+                                "disagree: " + ", ".join(wrong[:8]) if wrong else f"{len(cases)} samples agree"))
+    return findings
+
+
+async def resolved_agents(client: Any, *, timeout: float = 15.0) -> list[Mapping[str, object]]:
+    """The engine's resolved agents, once it has read bashOS's.
+
+    OpenCode 2 boots a project lazily and lists its built-in agents a moment before the ones
+    from `opencode.jsonc` (measured on 2.0.20: `[]`, then the built-ins, then all of them).
+    Judging the first answer would report bashOS's agents missing, so this waits for them,
+    and returns whatever the engine has when the time runs out — the contract then says so.
+    """
+    deadline = time.monotonic() + timeout
+    wanted = (project.READONLY_AGENT, project.SEALED_AGENT)
+    while True:
+        agents = list(await client.agents())
+        if all(_agent(agents, name) is not None for name in wanted) or time.monotonic() > deadline:
+            return agents
+        await asyncio.sleep(0.25)
 
 
 def passed(findings: Iterable[Finding]) -> bool:
