@@ -29,6 +29,7 @@ Read [docs/HARNESS.md](docs/HARNESS.md) first. The short version:
 - The react loop's tool policy is deny-by-default read-only — PRs must not add write or network tools to it.
 - Found a vulnerability? Report it privately as described in [SECURITY.md](SECURITY.md), never in a public issue or PR.
 - New commands/loops ship with docs: regenerate the README commands table (`python3 tools/gen_commands_table.py --write`) and, for loops, add a section to docs/HARNESS.md. `opencode.jsonc` and the docs index are generated too: `bashos opencode sync`, `python3 tools/docs_index.py --write`.
+- Markdown is one paragraph per line. The `markdown-oneline` workflow unwraps soft-wrapped prose on a pull request and pushes the fix to its branch, except in `.claude/commands/`, which compiles into `opencode.jsonc`. Before you push, `python3 tools/unwrap-prose.py --write <files>` fixes the files you changed; after unwrapping a command, run `bashos opencode sync`.
 
 ## Releasing
 
