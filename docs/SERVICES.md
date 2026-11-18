@@ -103,4 +103,6 @@ The image bundles the Claude Code CLI (via npm) and shellcheck, so all three loo
 
 ## Image layout
 
-One image (`docker/Dockerfile`) backs both app services: `python:3.12-slim` + Node (for the Claude Code CLI) + shellcheck + the package installed with `.[trace]` extras + `langgraph-cli[inmem]`. The compose `command` selects the role: default `bashos`, or `langgraph dev` for the API server.
+One image (`docker/Dockerfile`) backs both app services: a slim Python base (its `FROM` line) + Node (for the OpenCode engine and the Claude Code CLI) + shellcheck + the package installed editable with `.[trace]` extras + `langgraph-cli[inmem]`. The compose `command` selects the role: default `bashos`, or `langgraph dev` for the API server.
+
+The layers run from the slowest-changing to the fastest. The system packages and the engine come first, then the Python dependencies, keyed on `pyproject.toml` and `README.md` alone: the editable install is made against a one-file stub package and only puts `/app/src` on the import path. The source comes last (`langgraph.json`, `opencode.jsonc`, `src/`, `.claude/`, `docs/`) with nothing run after it, so a change there rebuilds only those copies. CI's `docker` job in `ci.yml` builds the image only when one of these inputs, `docker/`, `.dockerignore` or the workflow itself changed, and only a push to `main` writes the build cache that pull requests read.

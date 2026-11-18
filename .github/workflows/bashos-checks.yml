@@ -58,15 +58,54 @@ jobs:
   docker:
     name: docker image builds
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A pull request checks out its merge commit: depth 2 brings the base
+          # parent the path gate diffs against. A push fetches its `before` itself.
+          fetch-depth: 2
+      # The image is never pushed from here, so building it only proves it still
+      # builds: skip it when nothing it is built from changed. The job still
+      # concludes success, and any doubt (no usable base) builds.
+      - name: path gate (did an image input change?)
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # What docker/Dockerfile copies, the build-context rules, and this workflow (bashos-checks.yml).
+          inputs='^(docker/|src/|\.claude/|docs/|pyproject\.toml$|README\.md$|langgraph\.json$|opencode\.jsonc$|\.dockerignore$|\.github/workflows/bashos-checks\.yml$)'
+          zero=0000000000000000000000000000000000000000
+          base=""
+          if [ "$EVENT" = pull_request ]; then
+            base=HEAD^1 since="the base branch"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "$zero" ] \
+            && git fetch --no-tags --depth=1 origin "$BEFORE"; then
+            base=$BEFORE since=${BEFORE:0:7}
+          fi
+          build=true
+          # --no-renames: a path moved out of an input still counts as changed there.
+          if [ -n "$base" ] && changed=$(git diff --name-only --no-renames "$base" HEAD); then
+            if hits=$(grep -E "$inputs" <<<"$changed"); then
+              printf 'image inputs changed since %s:\n%s\n' "$since" "$hits"
+            else
+              build=false
+              echo "::notice title=docker image::no image input changed since $since, so the image build is skipped"
+            fi
+          else
+            echo "no base to diff against: building the image"
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v4
+        if: steps.gate.outputs.build == 'true'
       - name: build service image
+        if: steps.gate.outputs.build == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           push: false
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Only main writes the cache; a pull request reads it and leaves it alone.
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
