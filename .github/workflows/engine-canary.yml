@@ -40,6 +40,18 @@ jobs:
         run: |
           version=$(os/os.sh engine latest)
           echo "npm latest: opencode-ai $version"
+          # OpenCode tags opencode-ai `latest` minutes before its platform packages land
+          # (1.19.6: the tag at 07:22, opencode-linux-x64-baseline at 07:30 UTC). Wait, bounded,
+          # for this machine's package to publish that version, so a publish in flight is not
+          # read as a contract failure. Every other fetch failure still fails the run.
+          # shellcheck source=/dev/null
+          pkg=$(source os/install/engine.sh && os_engine_package)
+          for attempt in $(seq 1 15); do
+            curl -fsS -o /dev/null --max-time 30 "https://registry.npmjs.org/$pkg/$version" && break
+            [ "$attempt" -eq 15 ] && { echo "::error::$pkg $version still not on the registry after 15 minutes"; exit 1; }
+            echo "$pkg $version not published yet (attempt $attempt/15), waiting 60s"
+            sleep 60
+          done
           os/os.sh engine fetch "$version" "$RUNNER_TEMP/engine"
           cat "$RUNNER_TEMP/engine/PACKAGE"
           "$RUNNER_TEMP/engine/bin/opencode" --version
