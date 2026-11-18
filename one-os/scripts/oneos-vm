@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# oneos-vm — start, drive and debug one-os VMs by name. See --help, CLAUDE.md.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# sudo resets PATH; prefer Homebrew's Python/QEMU when present.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+PYTHONPATH="$ROOT/harness${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m oneos_harness.cli "$@"

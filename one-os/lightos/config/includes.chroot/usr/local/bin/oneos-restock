@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""oneos-restock — keep the stick's ISOs in line with its manifest (PLAN §6.1).
+
+  oneos-restock                     download missing/outdated ISOs from P1:/oneos/manifest.yaml
+  oneos-restock --list              show what the manifest wants and what's present
+  oneos-restock --add URL --sha256 SUM [--name N] [--alias TEXT]
+                                     fetch an ad-hoc ISO into /ISO and record it in the manifest
+  oneos-restock --prune             delete /ISO files the manifest doesn't know about
+  oneos-restock --backup-persistence
+                                     copy persistence/lightos.dat → persistence/lightos.dat.bak
+  --p1 DIR                           use an already-mounted P1 instead of finding label "Ventoy"
+  --include-large                    also fetch artifacts marked large: true
+  --dry-run                          say what would happen
+
+Downloads go to <file>.part, are sha256-verified, then atomically renamed.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import shutil
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+import yaml
+
+LIGHTOS_KEYS = ("netboot", "isos")
+
+
+def log(msg: str) -> None:
+    print(f"oneos-restock: {msg}", file=sys.stderr, flush=True)
+
+
+def find_p1() -> tuple[Path, bool]:
+    """Return (mountpoint, we_mounted_it)."""
+    for existing in ("/run/oneos/p1", "/run/oneos/restock"):
+        if subprocess.run(["mountpoint", "-q", existing]).returncode == 0:
+            subprocess.run(["mount", "-o", "remount,rw", existing], check=False)
+            return Path(existing), False
+    mnt = Path("/run/oneos/restock")
+    r = subprocess.run(["oneos-mount-p1", str(mnt), "rw"], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(r.stderr.strip() or "oneos-restock: cannot mount the Ventoy partition")
+    return mnt, True
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def download(url: str, dest: Path, sha256: str, dry: bool) -> bool:
+    if dry:
+        log(f"would download {url} → {dest}")
+        return True
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    log(f"downloading {url}")
+    h = hashlib.sha256()
+    req = urllib.request.Request(url, headers={"User-Agent": "oneos-restock/1"})
+    with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        while chunk := r.read(1 << 20):
+            f.write(chunk)
+            h.update(chunk)
+            done += len(chunk)
+            if total and sys.stderr.isatty():
+                print(f"\r  {done * 100 // total:3d}% of {total >> 20} MiB", end="", file=sys.stderr)
+        f.flush()
+        os.fsync(f.fileno())
+    if sys.stderr.isatty():
+        print(file=sys.stderr)
+    got = h.hexdigest()
+    if got != sha256:
+        part.unlink(missing_ok=True)
+        log(f"checksum mismatch for {url}: expected {sha256}, got {got} — discarded")
+        return False
+    os.replace(part, dest)
+    log(f"ok: {dest.name}")
+    return True
+
+
+def entries(m: dict) -> list[dict]:
+    return [a for k in LIGHTOS_KEYS for a in (m.get(k) or [])]
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--p1", type=Path)
+    ap.add_argument("--list", action="store_true")
+    ap.add_argument("--add")
+    ap.add_argument("--sha256")
+    ap.add_argument("--name")
+    ap.add_argument("--alias")
+    ap.add_argument("--prune", action="store_true")
+    ap.add_argument("--backup-persistence", action="store_true")
+    ap.add_argument("--include-large", action="store_true")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    mounted = False
+    if args.p1:
+        p1 = args.p1
+    else:
+        if os.geteuid() != 0:
+            sys.exit("oneos-restock: run as root (sudo oneos-restock)")
+        p1, mounted = find_p1()
+    try:
+        return run(args, p1)
+    finally:
+        os.sync()
+        if mounted:
+            subprocess.run(["umount", str(p1)], check=False)
+
+
+def run(args: argparse.Namespace, p1: Path) -> int:
+    mpath = p1 / "oneos" / "manifest.yaml"
+    m = yaml.safe_load(mpath.read_text(encoding="utf-8"))
+    lightos_file = (m.get("lightos") or {}).get("file", "ISO/oneos-lightos.iso")
+
+    if args.backup_persistence:
+        src = p1 / "persistence" / "lightos.dat"
+        log(f"backing up {src}")
+        if not args.dry_run:
+            shutil.copyfile(src, src.with_suffix(".dat.bak"))
+        return 0
+
+    if args.add:
+        if not args.sha256 or len(args.sha256) != 64:
+            sys.exit("oneos-restock: --add needs --sha256 <64 hex chars>")
+        fname = os.path.basename(args.add.split("?")[0])
+        name = args.name or Path(fname).stem
+        entry = {"name": name, "file": f"ISO/{fname}", "url": args.add, "sha256": args.sha256.lower(),
+                 "ci": False, "added_by": "oneos-restock"}
+        if args.alias:
+            entry["alias"] = args.alias
+        if not download(args.add, p1 / entry["file"], entry["sha256"], args.dry_run):
+            return 1
+        m.setdefault("isos", [])
+        m["isos"] = [a for a in m["isos"] if a.get("file") != entry["file"]] + [entry]
+        if not args.dry_run:
+            tmp = mpath.with_suffix(".yaml.part")
+            tmp.write_text(yaml.safe_dump(m, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            os.replace(tmp, mpath)
+        log(f"recorded {name} in {mpath}")
+        return 0
+
+    known = {lightos_file} | {a["file"] for a in entries(m) if a.get("file")}
+
+    if args.prune:
+        for f in sorted((p1 / "ISO").rglob("*")):
+            rel = f.relative_to(p1).as_posix()
+            if f.is_file() and rel not in known:
+                log(f"{'would remove' if args.dry_run else 'removing'} {rel}")
+                if not args.dry_run:
+                    f.unlink()
+        return 0
+
+    failures = 0
+    for a in entries(m):
+        dest = p1 / a["file"]
+        state = "missing"
+        if dest.exists():
+            if a.get("sha256"):
+                state = "ok" if sha256_file(dest) == a["sha256"] else "outdated"
+            else:
+                state = "present"
+        if args.list:
+            print(f"{state:9} {a['file']:40} {a.get('name', '')}")
+            continue
+        if state in ("ok", "present"):
+            continue
+        if a.get("source") == "user-supplied" or not a.get("url"):
+            log(f"skip {a['name']}: user-supplied, copy it to {a['file']} yourself")
+            continue
+        if a.get("large") and not args.include_large:
+            log(f"skip {a['name']}: large (use --include-large)")
+            continue
+        if not download(a["url"], dest, a["sha256"], args.dry_run):
+            failures += 1
+    if args.list:
+        lo = p1 / lightos_file
+        print(f"{'present' if lo.exists() else 'missing':9} {lightos_file:40} home base")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

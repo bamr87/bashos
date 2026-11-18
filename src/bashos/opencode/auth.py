@@ -27,6 +27,15 @@ chosen against the running server rather than from its docs:
 `ANTHROPIC_API_KEY` remains the fallback, and takes the plain `api` credential
 path that OpenCode supports natively.
 
+OpenCode 2 reads the same `OPENCODE_CONFIG_CONTENT`, but measured against
+2.0.20 it differs in two ways that matter here (bamr87/bashos#71):
+
+* A provider that declares `env` sends that variable as `x-api-key` too, so the
+  OAuth token would go out in both headers. On 2.x the block omits `env`: the
+  config alone registers the provider, and only `Authorization` is sent.
+* `OPENCODE_AUTH_CONTENT` is ignored. The API key rides in its own variable,
+  `BASHOS_ANTHROPIC_API_KEY`, which the provider's `apiKey` names.
+
 Set `BASHOS_OPENCODE_AUTH=never` to wire nothing and let the engine use
 whatever credentials it already has.
 """
@@ -46,10 +55,11 @@ CREDENTIALS_FILE = Path.home() / ".claude" / ".credentials.json"
 KEYCHAIN_SERVICE = "Claude Code-credentials"
 
 # The beta Anthropic requires for subscription (OAuth) inference, and the
-# private env var the generated provider block reads the token from — the token
-# itself never appears in the config, only this name.
+# private env vars the generated provider block reads a credential from — the
+# credential itself never appears in the config, only these names.
 OAUTH_BETA = "oauth-2025-04-20"
 BEARER_ENV = "BASHOS_ANTHROPIC_BEARER"
+API_KEY_ENV = "BASHOS_ANTHROPIC_API_KEY"  # OpenCode 2 only: it ignores OPENCODE_AUTH_CONTENT
 
 # A `claude setup-token` access token carries no refresh token. Project its
 # expiry forward so the engine uses it directly instead of attempting a refresh
@@ -162,34 +172,39 @@ def enabled() -> bool:
     return os.environ.get("BASHOS_OPENCODE_AUTH", "").strip().lower() != "never"
 
 
-def oauth_provider_config() -> dict[str, object]:
+def oauth_provider_config(major: int = 1) -> dict[str, object]:
     """The `provider.anthropic` block that carries a Claude Code bearer token.
 
-    Declaring `env` is what makes OpenCode register the provider at all; the
-    header is what actually authenticates the request.
+    On OpenCode 1, declaring `env` is what makes it register the provider at
+    all; the header is what actually authenticates the request. OpenCode 2
+    registers a configured provider by itself and would send a declared `env`
+    as `x-api-key`, so there the declaration is left out.
     """
-    return {
-        "provider": {
-            PROVIDER_ID: {
-                "env": [BEARER_ENV],
-                "options": {
-                    "apiKey": "",  # never send an OAuth token as x-api-key
-                    "headers": {
-                        "Authorization": f"Bearer {{env:{BEARER_ENV}}}",
-                        "anthropic-beta": OAUTH_BETA,
-                    },
-                },
-            }
-        }
+    block: dict[str, object] = {
+        "options": {
+            "apiKey": "",  # never send an OAuth token as x-api-key
+            "headers": {
+                "Authorization": f"Bearer {{env:{BEARER_ENV}}}",
+                "anthropic-beta": OAUTH_BETA,
+            },
+        },
     }
+    if major < 2:
+        block = {"env": [BEARER_ENV], **block}
+    return {"provider": {PROVIDER_ID: block}}
+
+
+def api_key_provider_config() -> dict[str, object]:
+    """OpenCode 2's route for an API key: the provider reads it from bashOS's own variable."""
+    return {"provider": {PROVIDER_ID: {"options": {"apiKey": f"{{env:{API_KEY_ENV}}}"}}}}
 
 
 def api_key_credential(key: str) -> dict[str, object]:
     return {PROVIDER_ID: {"type": "api", "key": key}}
 
 
-def engine_environment() -> tuple[dict[str, str], str]:
-    """Environment that authenticates a freshly spawned engine.
+def engine_environment(major: int = 1) -> tuple[dict[str, str], str]:
+    """Environment that authenticates a freshly spawned engine of `major`.
 
     Returns (env additions, human description). Nothing here is written to
     disk — the child process holds the secret and dies with it.
@@ -203,15 +218,18 @@ def engine_environment() -> tuple[dict[str, str], str]:
         return (
             {
                 BEARER_ENV: credential.access,
-                "OPENCODE_CONFIG_CONTENT": json.dumps(oauth_provider_config()),
+                "OPENCODE_CONFIG_CONTENT": json.dumps(oauth_provider_config(major)),
             },
             f"claude code oauth ← {credential.source} ({note})",
         )
     if key := anthropic_api_key():
-        return (
-            {"OPENCODE_AUTH_CONTENT": json.dumps(api_key_credential(key))},
-            "ANTHROPIC_API_KEY (fallback — no Claude Code login found)",
-        )
+        described = "ANTHROPIC_API_KEY (fallback — no Claude Code login found)"
+        if major >= 2:
+            return (
+                {API_KEY_ENV: key, "OPENCODE_CONFIG_CONTENT": json.dumps(api_key_provider_config())},
+                described,
+            )
+        return {"OPENCODE_AUTH_CONTENT": json.dumps(api_key_credential(key))}, described
     return {}, "no credential found — log in with `claude`, or set ANTHROPIC_API_KEY"
 
 

@@ -1,0 +1,11 @@
+# one-os keeps the lint rules it was written under (wider lines, pycodestyle warnings).
+# `ruff check .` at the repo root picks this file up for everything below one-os/.
+line-length = 110
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[lint.isort]
+known-first-party = ["oneos_harness"]

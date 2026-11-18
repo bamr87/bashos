@@ -1,0 +1,19 @@
+{
+  "control": [
+    { "VTOY_DEFAULT_SEARCH_ROOT": "/ISO" },
+    { "VTOY_MENU_TIMEOUT": "{{ m.ventoy.menu_timeout }}" },
+    { "VTOY_DEFAULT_IMAGE": "/{{ m.lightos.file }}" },
+    { "VTOY_LINUX_REMOUNT": "1" },
+    { "VTOY_SECONDARY_BOOT_MENU": "0" },
+    { "VTOY_WIN11_BYPASS_CHECK": "{{ 1 if (m.ventoy.windows11 or {}).bypass_check else 0 }}" },
+    { "VTOY_WIN11_BYPASS_NRO": "{{ 1 if (m.ventoy.windows11 or {}).bypass_nro else 0 }}" }
+  ],
+  "persistence": [
+    { "image": "/{{ m.lightos.file }}", "backend": "/persistence/lightos.dat", "autosel": 1, "timeout": 3 }
+  ],
+{#- Ventoy plugin keys take a _uefi / _legacy suffix to apply in one firmware mode only.
+    Lists are computed in scripts/manifest.py:menu() from what is actually staged. #}
+  "image_blacklist_uefi": {{ blacklist.uefi | tojson }},
+  "image_blacklist_legacy": {{ blacklist.legacy | tojson }},
+  "menu_alias": {{ aliases | tojson }}
+}

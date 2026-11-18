@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=one-os boot task
+Exec=/usr/local/bin/oneos-task
+NoDisplay=true
+X-XFCE-Autostart-Override=true

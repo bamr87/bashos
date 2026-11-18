@@ -1,0 +1,11 @@
+[Unit]
+Description=one-os: virtual keyboard and pointer for remote control (uinput)
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/share/oneos-remote/bin/oneos-input serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

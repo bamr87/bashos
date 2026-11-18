@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# oneos-claude: run Claude Code sessions on this machine in tmux, recorded, so they can be
+# driven and watched over SSH.
+#   oneos-claude start NAME [--cwd DIR] [--prompt TEXT] [-- CLAUDE ARGS…]   interactive session
+#   oneos-claude send NAME TEXT [--no-enter]      type into it (then Enter)
+#   oneos-claude keys NAME KEY…                   tmux key names: Enter Escape Up Down Tab C-c …
+#   oneos-claude view NAME [--lines N]            what the session shows now
+#   oneos-claude wait NAME [--timeout S] [--quiet S]   until the screen stops changing
+#   oneos-claude list | stop NAME | log NAME [--tail N]
+#   oneos-claude run [--cwd DIR] PROMPT [-- CLAUDE ARGS…]   one headless prompt, answer on stdout
+# Every session gets a folder under ~/.local/state/oneos-remote/claude/ with meta.json and a
+# terminal recording (term.log + term.timing, replay with scriptreplay); headless runs keep
+# the full event stream (stream.jsonl).
+set -Eeuo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=oneos-lib.sh
+source "$HERE/oneos-lib.sh"
+ROOT="$ONEOS_STATE/claude"; mkdir -p "$ROOT"
+
+claude_bin() {
+  if [[ -n "${ONEOS_CLAUDE_BIN:-}" ]]; then echo "$ONEOS_CLAUDE_BIN"; return; fi
+  if command -v claude >/dev/null; then command -v claude; return; fi
+  local c
+  c="$(find "$HOME/.var/app/com.visualstudio.code/data/vscode/extensions" "$HOME/.vscode/extensions" \
+    -maxdepth 4 -path '*anthropic.claude-code-*/resources/native-binary/claude' 2>/dev/null | sort -V | tail -1)"
+  [[ -x "$c" ]] || die "no claude binary found (install Claude Code, or set ONEOS_CLAUDE_BIN)"
+  echo "$c"
+}
+
+valid_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,40}$ ]] || die "bad session name '$1' (letters, digits, - and _)"; }
+tm() { echo "oneos-$1"; }
+# A dedicated tmux server (socket "oneos"). It must not live in the SSH login's session scope:
+# logind kills that scope when the login ends, and the sessions with it. systemd-run puts the
+# server under the user manager instead.
+T() { tmux -L oneos "$@"; }
+tmux_new() {
+  if T has-session 2>/dev/null || ! command -v systemd-run >/dev/null; then T new-session "$@"
+  else systemd-run --user --scope --quiet --collect -- tmux -L oneos new-session "$@"; fi
+}
+has() { T has-session -t "=$(tm "$1")" 2>/dev/null; }
+need() { valid_name "$1"; has "$1" || die "no running session '$1' (oneos-claude list)"; }
+session_dir() { readlink -f "$ROOT/$1.current" 2>/dev/null || true; }
+
+write_meta() {  # DIR key=value…
+  local dir="$1"; shift
+  python3 - "$dir/meta.json" "$@" <<'PY'
+import json, sys
+path, *pairs = sys.argv[1:]
+json.dump(dict(p.split("=", 1) for p in pairs), open(path, "w", encoding="utf-8"), indent=2)
+PY
+}
+
+start() {
+  local name="$1"; shift; valid_name "$name"
+  local cwd="$HOME" prompt="" args=()
+  while (($#)); do
+    case "$1" in
+      --cwd) cwd="$2"; shift 2 ;;
+      --prompt) prompt="$2"; shift 2 ;;
+      --) shift; args=("$@"); break ;;
+      *) die "unknown option '$1'" ;;
+    esac
+  done
+  has "$name" && die "session '$name' is already running (oneos-claude stop $name)"
+  [[ -d "$cwd" ]] || die "no such directory: $cwd"
+  local bin dir; bin="$(claude_bin)"
+  dir="$ROOT/$name-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$dir"
+  [[ -n "$prompt" ]] && args+=("$prompt")
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'cd %q\n' "$cwd"
+    printf 'exec %q' "$bin"; ((${#args[@]})) && printf ' %q' "${args[@]}"; echo
+  } >"$dir/run.sh"
+  chmod 700 "$dir/run.sh"
+  write_meta "$dir" name="$name" kind=interactive cwd="$cwd" started="$(date -Is)" claude="$bin" prompt="$prompt"
+  ln -sfn "$dir" "$ROOT/$name.current"
+  tmux_new -d -s "$(tm "$name")" -x 200 -y 50 -c "$cwd" \
+    "script -qf --log-out $(printf %q "$dir/term.log") --log-timing $(printf %q "$dir/term.timing") -c $(printf %q "$dir/run.sh")"
+  event claude-start name="$name" cwd="$cwd" dir="$dir"
+  echo "started '$name' in $cwd (recording: $dir)"
+}
+
+send() {
+  local name="$1" text="$2" enter=1; need "$name"
+  [[ "${3:-}" == --no-enter ]] && enter=0
+  T send-keys -t "=$(tm "$name"):" -l -- "$text"
+  if ((enter)); then sleep 0.4; T send-keys -t "=$(tm "$name"):" Enter; fi
+  event claude-send name="$name" chars="${#text}"
+}
+
+view() {
+  local name="$1" lines=0; need "$name"
+  [[ "${2:-}" == --lines ]] && lines="$3"
+  if ((lines > 0)); then T capture-pane -p -t "=$(tm "$name"):" -S "-$lines"; else T capture-pane -p -t "=$(tm "$name"):"; fi
+}
+
+wait_idle() {
+  local name="$1"; shift; need "$name"
+  local timeout=300 quiet=6
+  while (($#)); do
+    case "$1" in --timeout) timeout="$2"; shift 2 ;; --quiet) quiet="$2"; shift 2 ;; *) die "unknown option '$1'" ;; esac
+  done
+  local start last="" same_since now cur; start=$(date +%s); same_since=$start
+  while :; do
+    has "$name" || { echo "session '$name' ended"; return 0; }
+    cur="$(T capture-pane -p -t "=$(tm "$name"):" | cksum)"; now=$(date +%s)
+    [[ "$cur" != "$last" ]] && { last="$cur"; same_since=$now; }
+    ((now - same_since >= quiet)) && { echo "idle for ${quiet}s after $((now - start))s"; return 0; }
+    ((now - start >= timeout)) && { echo "still changing after ${timeout}s"; return 1; }
+    sleep 1
+  done
+}
+
+list() {
+  local s name dir
+  while IFS= read -r s; do
+    name="${s#oneos-}"; dir="$(session_dir "$name")"
+    printf '%-20s running  %s\n' "$name" "${dir:-?}"
+  done < <(T ls -F '#S' 2>/dev/null | grep '^oneos-' || true)
+  for dir in "$ROOT"/*/; do
+    [[ -f "$dir/meta.json" && ! -L "${dir%/}" ]] || continue
+    name="$(basename "$dir")"
+    has "${name%-????????-??????}" && [[ "$(session_dir "${name%-????????-??????}")" == "${dir%/}" ]] && continue
+    printf '%-20s recorded %s\n' "$name" "${dir%/}"
+  done
+}
+
+stop() {
+  local name="$1"; need "$name"
+  T kill-session -t "=$(tm "$name")"
+  event claude-stop name="$name"
+  echo "stopped '$name'; recording kept in $(session_dir "$name")"
+}
+
+log() {
+  local name="$1" n=40; valid_name "$name"
+  [[ "${2:-}" == --tail ]] && n="$3"
+  local dir; dir="$(session_dir "$name")"
+  [[ -n "$dir" && -d "$dir" ]] || die "no recording for '$name'"
+  echo "# $dir"; cat "$dir/meta.json"; echo
+  if [[ -f "$dir/stream.jsonl" ]]; then tail -n "$n" "$dir/stream.jsonl"
+  else echo "# replay: scriptreplay --log-out $dir/term.log --log-timing $dir/term.timing"; fi
+}
+
+run() {
+  local cwd="$HOME" prompt="" args=()
+  while (($#)); do
+    case "$1" in
+      --cwd) cwd="$2"; shift 2 ;;
+      --) shift; args=("$@"); break ;;
+      *) prompt="$1"; shift ;;
+    esac
+  done
+  [[ -n "$prompt" ]] || die "usage: oneos-claude run [--cwd DIR] PROMPT [-- CLAUDE ARGS…]"
+  [[ -d "$cwd" ]] || die "no such directory: $cwd"
+  local bin dir rc=0; bin="$(claude_bin)"
+  dir="$ROOT/run-$(date +%Y%m%d-%H%M%S)-$$"; mkdir -p "$dir"
+  write_meta "$dir" name="$(basename "$dir")" kind=headless cwd="$cwd" started="$(date -Is)" claude="$bin" prompt="$prompt"
+  event claude-run dir="$dir" cwd="$cwd"
+  (cd "$cwd" && "$bin" -p "$prompt" --output-format stream-json --verbose "${args[@]}" </dev/null >"$dir/stream.jsonl" 2>"$dir/stderr.log") || rc=$?
+  python3 - "$dir/stream.jsonl" <<'PY'
+import json, sys
+result = None
+for line in open(sys.argv[1], encoding="utf-8"):
+    try:
+        rec = json.loads(line)
+    except ValueError:
+        continue
+    if rec.get("type") == "result":
+        result = rec
+if result is None:
+    sys.exit("oneos-claude: no result in the stream (see stderr.log beside it)")
+print(result.get("result", ""))
+PY
+  event claude-run-done dir="$dir" rc="$rc"
+  echo "# recorded: $dir" >&2
+  return "$rc"
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  start) (($# >= 1)) || die "usage: oneos-claude start NAME [--cwd DIR] [--prompt TEXT]"; start "$@" ;;
+  send) (($# >= 2)) || die "usage: oneos-claude send NAME TEXT [--no-enter]"; send "$@" ;;
+  keys) (($# >= 2)) || die "usage: oneos-claude keys NAME KEY…"; need "$1"; n="$1"; shift; T send-keys -t "=$(tm "$n"):" "$@" ;;
+  view) (($# >= 1)) || die "usage: oneos-claude view NAME [--lines N]"; view "$@" ;;
+  wait) (($# >= 1)) || die "usage: oneos-claude wait NAME [--timeout S] [--quiet S]"; wait_idle "$@" ;;
+  list) list ;;
+  stop) (($# >= 1)) || die "usage: oneos-claude stop NAME"; stop "$1" ;;
+  log) (($# >= 1)) || die "usage: oneos-claude log NAME [--tail N]"; log "$@" ;;
+  run) run "$@" ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
