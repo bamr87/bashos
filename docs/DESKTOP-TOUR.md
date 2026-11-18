@@ -189,10 +189,8 @@ Host facts first: OS and kernel, the Python running the kernel, the shell, and t
 Claude Code credential and where it was found, whether `opencode.jsonc` is in sync, the `claude` CLI, `ANTHROPIC_API_KEY`, the resolved backend, shellcheck, and the Python version. *Re-check* re-runs it. It reports where a credential came from — never its value.
 - **Live engine** boots (or attaches to) a local `opencode serve`, installs your
 Claude Code credential into its environment, and reports the URL, version, auth status, connected providers, config state and loaded agents. This is `bashos opencode status` with a button.
-- **Tool policy** renders the deny-by-default ruleset as chips: `*=deny`, `read=allow`,
-  `write=deny`, `webfetch=deny`, `bash:*=deny` followed by each allowed probe.
-- **opencode.jsonc** shows whether the generated engine config is in sync with
-  the registry, and expands to the file itself.
+- **Tool policy** renders the deny-by-default ruleset as chips: `*=deny`, `read=allow`, `write=deny`, `webfetch=deny`, `bash:*=deny` followed by each allowed probe.
+- **opencode.jsonc** shows whether the generated engine config is in sync with the registry, and expands to the file itself.
 
 ---
 
