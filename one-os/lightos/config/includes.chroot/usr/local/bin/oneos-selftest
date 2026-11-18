@@ -1,0 +1,77 @@
+#!/bin/bash
+# oneos-selftest — file-based self-test hook (ADR-0003, PLAN §6.3).
+#
+# Normal boot: P1:/oneos/selftest/run.sh absent → print ONEOS-READY, exit 0.
+# Test boot:   run it, write P1:/oneos/selftest/results/<name>.json,
+#              print "ONEOS-SELFTEST <name> PASS|FAIL" and power off.
+#
+# Test name: first line matching "# name: <name>" in run.sh, else "selftest".
+# run.sh runs as root with ONEOS_P1 (mount point) and ONEOS_RESULT_DIR set,
+# and with a timeout (default 1800 s, override with "# timeout: <s>").
+set -uo pipefail
+
+SERIAL=/dev/ttyS0
+say() {
+  echo "$*"
+  [[ -w $SERIAL ]] && echo "$*" >"$SERIAL" 2>/dev/null
+  return 0
+}
+
+mnt=/run/oneos/p1
+err="$(oneos-mount-p1 "$mnt" rw 2>&1)"
+case $? in
+  0) ;;
+  2) say "ONEOS-READY (no Ventoy partition)"; exit 0 ;;
+  *) say "ONEOS-READY (P1 not mountable: $err)"; exit 0 ;;
+esac
+
+hook="$mnt/oneos/selftest/run.sh"
+if [[ ! -f "$hook" ]]; then
+  umount "$mnt" 2>/dev/null || true
+  say "ONEOS-READY"
+  exit 0
+fi
+
+name="$(sed -n 's/^#[[:space:]]*name:[[:space:]]*\([A-Za-z0-9_.-]\+\).*/\1/p' "$hook" | head -1)"
+name="${name:-selftest}"
+timeout_s="$(sed -n 's/^#[[:space:]]*timeout:[[:space:]]*\([0-9]\+\).*/\1/p' "$hook" | head -1)"
+timeout_s="${timeout_s:-1800}"
+results="$mnt/oneos/selftest/results"
+mkdir -p "$results"
+log="$(mktemp)"
+
+say "ONEOS-SELFTEST-START $name"
+start=$(date +%s)
+# Copy first: exFAT has no exec bit and P1 may go read-only under us.
+cp "$hook" /run/oneos/run.sh
+ONEOS_P1="$mnt" ONEOS_RESULT_DIR="$results" ONEOS_TEST_NAME="$name" \
+  timeout "$timeout_s" bash /run/oneos/run.sh >"$log" 2>&1
+rc=$?
+end=$(date +%s)
+status=FAIL
+[[ $rc -eq 0 ]] && status=PASS
+
+# Stream the script's output to serial too (helps debugging from the harness log).
+while IFS= read -r line; do say "[selftest:$name] $line"; done <"$log"
+
+python3 - "$results/$name.json" "$name" "$status" "$rc" "$((end - start))" "$log" <<'PY'
+import json, sys
+path, name, status, rc, dur, log = sys.argv[1:]
+extra = {}
+try:
+    # A test may leave structured data in $ONEOS_RESULT_DIR/<name>.extra.json
+    with open(path.replace(".json", ".extra.json")) as f:
+        extra = json.load(f)
+except (OSError, ValueError):
+    pass
+with open(log, errors="replace") as f:
+    out = f.read()[-20000:]
+with open(path, "w") as f:
+    json.dump({"name": name, "status": status, "rc": int(rc), "duration_s": int(dur),
+               "output": out, "extra": extra}, f, indent=2)
+PY
+sync
+umount "$mnt" 2>/dev/null || true
+say "ONEOS-SELFTEST $name $status"
+sync
+systemctl poweroff --no-block

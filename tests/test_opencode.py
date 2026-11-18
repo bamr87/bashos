@@ -91,9 +91,18 @@ def test_rules_mirror_opencodes_wildcard():
 def test_mutating_and_outbound_tools_are_denied_and_hidden():
     permission = policy.readonly_permission()
     tools = policy.readonly_tools()
-    for tool in ("edit", "write", "apply_patch", "webfetch", "websearch", "task"):
+    for tool in ("edit", "write", "apply_patch", "webfetch", "websearch", "execute", "task"):
         assert permission[tool] == "deny", f"{tool} must be denied"
         assert tools[tool] is False, f"{tool} must not be offered to the model"
+
+
+def test_a_tool_the_policy_never_named_is_refused_first():
+    """Engines add tools (OpenCode 2's `execute` can fetch): the catch-all must resolve before
+    every allow, and engines place the `tools` map's keys first, so it leads both blocks."""
+    assert next(iter(policy.readonly_tools().items())) == ("*", False)
+    assert next(iter(policy.readonly_permission().items())) == ("*", "deny")
+    assert policy.readonly_policy()[0] == "*=deny"
+    assert rules.evaluate(rules.from_config(policy.readonly_permission()), "execute", "x") == "deny"
 
 
 def test_readonly_profile_cannot_escape_the_project_or_stop_to_ask():
@@ -450,7 +459,7 @@ class _StubClient:
         for event in self._events:
             yield event
 
-    async def reject_permission(self, session_id, permission_id):
+    async def reject_permission(self, session_id, permission_id, message=""):
         self.rejected.append((session_id, permission_id))
 
     async def reject_permission_v2(self, request_id, message):
@@ -664,3 +673,336 @@ async def test_react_renders_a_user_abort_as_stopped_not_error(registry, monkeyp
     result = await node({"command": "sys", "args": "why is it slow", "trace": []})
     assert result["output"] == "stopped."
     assert result.get("route") != "error"
+
+
+# ------------------------------------------------------------ OpenCode 2 (#71)
+
+FIXTURES = find_root() / "tests" / "fixtures"
+SPA = "<!doctype html><html><body><div id='root'></div></body></html>"
+
+
+def _timeline() -> list[dict]:
+    """A real 2.0.20 turn (tests/fixtures/opencode-2.0.20-messages.json), oldest first."""
+    return json.loads((FIXTURES / "opencode-2.0.20-messages.json").read_text())
+
+
+class _V2Engine:
+    """Just enough of OpenCode 2's /api — and, like the real one, the web UI everywhere else."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, object]] = []
+        self.timeline = _timeline()
+        self.user_id = next(m["id"] for m in self.timeline if m["type"] == "user")
+        self.agents = json.loads((FIXTURES / "opencode-2.0.20-agents.json").read_text())
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        path, method = request.url.path, request.method
+        body = json.loads(request.content) if request.content else None
+        self.calls.append((method, path, body))
+        if not path.startswith("/api/"):
+            return httpx.Response(200, text=SPA, headers={"content-type": "text/html"})
+        if (method, path) == ("POST", "/api/session/ses_1/prompt") and "text" not in (body or {}):
+            # what 2.0.20 answers a prompt with no text (measured), before admitting anything
+            return httpx.Response(400, json={"_tag": "InvalidRequestError", "kind": "Payload",
+                                             "message": 'Missing key\n  at ["text"]'})
+        routes = {
+            ("GET", "/api/info"): lambda: {"version": "2.0.20", "pid": 1, "urls": [], "paths": {"tmp": "/tmp"}},
+            ("GET", "/api/agent"): lambda: {"location": {"directory": "/work"}, "data": self.agents},
+            ("POST", "/api/session"): lambda: {"data": {"id": "ses_1", "agent": (body or {}).get("agent")}},
+            ("POST", "/api/session/ses_1/prompt"): lambda: {"data": {"id": self.user_id, "type": "user"}},
+            ("GET", "/api/session/ses_1/message"): lambda: {"data": self.timeline[::-1], "cursor": {}},
+        }
+        if (method, path) in routes:
+            return httpx.Response(200, json=routes[(method, path)]())
+        if method in ("POST", "PUT", "DELETE") and path.startswith("/api/"):
+            return httpx.Response(204)
+        return httpx.Response(404, json={"_tag": "NotFound"})
+
+
+async def test_an_engine_that_serves_only_api_routes_is_driven_end_to_end():
+    """OpenCode 2 moved every route under /api; the old paths answer with its web UI's HTML."""
+    engine = _V2Engine()
+    client = _stub_client(engine, directory="/work", major=2)
+
+    assert (await client.health())["version"] == "2.0.20"
+    assert {a["id"] for a in await client.agents()} == {"bashos", "bashos-sealed"}
+    session = await client.create_session(title="t", agent="bashos")
+    result = await client.prompt(session, "inspect this machine", agent="bashos",
+                                 model="anthropic/claude-opus-5-5", system="house rules")
+    await client.reject_permission(session, "per_1", "Denied by bashOS policy")
+    await client.aclose()
+
+    assert session == "ses_1"
+    assert result.failed is False and result.text == "hello from the mock"
+    assert [(c.tool, c.status) for c in result.tool_calls] == [
+        ("shell", "completed"), ("shell", "error"), ("read", "completed")]
+    assert result.tool_calls[0].describe() == "shell(uname -a)"
+    sent = {(m, p): b for m, p, b in engine.calls}
+    assert sent[("POST", "/api/session")]["location"] == {"directory": "/work"}
+    assert sent[("POST", "/api/session/ses_1/prompt")] == {"text": "inspect this machine"}
+    # OpenCode 2 keeps the model and the system prompt on the session, not on the prompt
+    assert sent[("POST", "/api/session/ses_1/model")] == {"model": {"providerID": "anthropic", "id": "claude-opus-5-5"}}
+    assert sent[("PUT", "/api/experimental/session/ses_1/instructions/entries/bashos.system")] == {"value": "house rules"}
+    assert ("POST", "/api/session/ses_1/agent") not in sent  # created with that agent already
+    assert sent[("POST", "/api/session/ses_1/permission/per_1/reply")] == {
+        "decision": "reject", "message": "Denied by bashOS policy"}
+    assert all(p.startswith("/api/") for _, p, _ in engine.calls)
+
+
+async def test_an_opencode_1_client_cannot_drive_an_opencode_2_engine():
+    """What main did against 2.x: /global/health is the web UI, so health() gets HTML."""
+    client = _stub_client(_V2Engine())
+    with pytest.raises(OpencodeError, match="non-JSON"):
+        await client.health()
+    await client.aclose()
+
+
+async def test_an_attached_engine_s_major_is_probed_from_its_routes():
+    v2_client = _stub_client(_V2Engine())
+    assert await v2_client.detect() == 2 and v2_client.major == 2
+    assert await v2_client.version() == "2.0.20"
+    await v2_client.aclose()
+
+    v1_client = _stub_client(lambda r: httpx.Response(200, json={"healthy": True, "version": "1.19.5"}))
+    assert await v1_client.detect() == 1
+    await v1_client.aclose()
+
+    locked = _stub_client(lambda r: httpx.Response(401, text="bad password"))
+    with pytest.raises(client_mod.EngineAuthError):
+        await locked.detect()  # a wrong password is not a reason to guess another major
+    await locked.aclose()
+
+
+async def test_a_session_is_told_only_what_changed():
+    engine = _V2Engine()
+    client = _stub_client(engine, major=2)
+    session = await client.create_session(title="t", agent="bashos")
+    for _ in range(2):
+        await client.prompt(session, "again", agent="bashos", model="anthropic/claude-opus-5-5", system="rules")
+    await client.prompt(session, "plain", agent="bashos-sealed", model="anthropic/claude-opus-5-5")
+    await client.aclose()
+    sent = [(m, p) for m, p, _ in engine.calls]
+    assert sent.count(("POST", "/api/session/ses_1/model")) == 1
+    assert sent.count(("PUT", "/api/experimental/session/ses_1/instructions/entries/bashos.system")) == 1
+    # a prompt without a system prompt removes the one an earlier prompt left on the session
+    assert sent.count(("DELETE", "/api/experimental/session/ses_1/instructions/entries/bashos.system")) == 1
+    assert sent.count(("POST", "/api/session/ses_1/agent")) == 1
+
+
+async def test_a_turn_that_has_not_reached_idle_is_waited_for():
+    engine = _V2Engine()
+    finished = engine.timeline
+    engine.timeline = [m for m in finished if m["type"] != "idle"]  # admitted, still running
+    client = _stub_client(engine, major=2)
+
+    async def finish_later():
+        await asyncio.sleep(0.3)
+        engine.timeline = finished
+
+    task = asyncio.create_task(finish_later())
+    result = await client.prompt("ses_1", "inspect")
+    await task
+    await client.aclose()
+    assert result.text == "hello from the mock"
+    assert len([c for c in engine.calls if c[1].endswith("/wait")]) >= 2
+
+
+def test_an_opencode_2_turn_reads_like_an_opencode_1_message():
+    from bashos.opencode import v2
+
+    timeline = _timeline()
+    user = next(m["id"] for m in timeline if m["type"] == "user")
+    payload = v2.message_payload(timeline, user)
+    assert payload is not None and payload["info"]["modelID"] == "m"
+    assert v2.message_payload([m for m in timeline if m["type"] != "idle"], user) is None  # still running
+
+    failed = [{"id": "u", "type": "user"},
+              {"id": "a", "type": "assistant", "model": {"id": "claude-opus-5-5"}, "content": [],
+               "error": {"type": "provider.auth", "message": "no credential"}},
+              {"id": "i", "type": "idle", "outcome": "failed"}]
+    result = client_mod._read_message(v2.message_payload(failed, "u"))
+    assert result.failed and result.error == "no credential"
+    assert client_mod.classify_result_error({"name": result.error_name}) == "auth"
+    stopped = [{"id": "u", "type": "user"}, {"id": "i", "type": "idle", "outcome": "interrupted"}]
+    assert client_mod._read_message(v2.message_payload(stopped, "u")).aborted
+
+
+async def test_opencode_2_events_drive_the_same_watcher():
+    """A real 2.0.20 event stream, normalized, gives the typed events OpenCode 1's did."""
+    from bashos.opencode import v2
+
+    frames = json.loads((FIXTURES / "opencode-2.0.20-events.json").read_text())
+    session = next(f["data"]["sessionID"] for f in frames if f["type"] == "session.created")
+    normalize = v2.EventNormalizer()
+    # the turn, then an approval request as 2.0.20 sends one for a rule that resolves to "ask"
+    frames.append({"type": "permission.asked", "data": {
+        "id": "per_1", "sessionID": session, "action": "external_directory", "resources": ["/etc/hosts"]}})
+    events = [e for e in (normalize(f) for f in frames) if e is not None]
+
+    stub, typed = await _typed_watch(events, session=session)
+    tools = [e for e in typed if isinstance(e, events_mod.ToolEvent)]
+    assert [(e.tool, e.status) for e in tools if e.status in ("completed", "error")] == [
+        ("shell", "completed"), ("shell", "error"), ("read", "completed")]
+    assert tools[-1].description == "read(opencode.jsonc)"
+    text = "".join(e.text for e in typed if isinstance(e, events_mod.TextDelta))
+    assert text == "hello from the mock"
+    perms = [e for e in typed if isinstance(e, events_mod.PermissionEvent)]
+    assert stub.rejected == [(session, "per_1")] and perms[0].action == "external_directory"
+
+
+async def test_providers_and_an_attached_api_key_on_opencode_2():
+    seen: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, json.loads(request.content) if request.content else None))
+        if request.url.path == "/api/provider":
+            return httpx.Response(200, json={"data": [
+                {"id": "anthropic", "activation": "enabled"}, {"id": "other", "activation": "disabled"}]})
+        return httpx.Response(200, json={"data": {"id": "cred_1"}})
+
+    client = _stub_client(handler, major=2)
+    assert await client.connected_providers() == ["anthropic"]
+    await client.set_auth("anthropic", {"type": "api", "key": "sk-ant-api-key"})
+    with pytest.raises(OpencodeError, match="API key"):
+        await client.set_auth("anthropic", {"type": "oauth", "access": "x"})
+    await client.aclose()
+    assert seen[-1] == ("POST", "/api/credential", {
+        "integrationID": "anthropic", "value": {"type": "key", "key": "sk-ant-api-key"}})
+
+
+def test_the_oauth_bridge_never_sends_the_token_as_an_api_key_on_opencode_2(no_credentials):
+    """2.0.20 sends a provider's declared `env` as x-api-key, so 2.x gets the header alone."""
+    no_credentials.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-tok")
+    env, _ = auth.engine_environment(2)
+    provider = json.loads(env["OPENCODE_CONFIG_CONTENT"])["provider"]["anthropic"]
+    assert "env" not in provider
+    assert provider["options"]["headers"]["Authorization"] == f"Bearer {{env:{auth.BEARER_ENV}}}"
+    assert provider["options"]["apiKey"] == ""
+    assert env[auth.BEARER_ENV] == "sk-ant-oat01-tok" and "sk-ant-oat01-tok" not in env["OPENCODE_CONFIG_CONTENT"]
+
+
+def test_an_api_key_reaches_opencode_2_through_its_own_variable(no_credentials):
+    """2.0.20 ignores OPENCODE_AUTH_CONTENT; the provider reads the key from bashOS's variable."""
+    no_credentials.setenv("ANTHROPIC_API_KEY", "sk-ant-api-key")
+    env, described = auth.engine_environment(2)
+    assert "ANTHROPIC_API_KEY" in described and "OPENCODE_AUTH_CONTENT" not in env
+    assert env[auth.API_KEY_ENV] == "sk-ant-api-key"
+    config = env["OPENCODE_CONFIG_CONTENT"]
+    assert "sk-ant-api-key" not in config
+    assert json.loads(config)["provider"]["anthropic"]["options"]["apiKey"] == f"{{env:{auth.API_KEY_ENV}}}"
+
+
+# ------------------------------------------------- the session routes verify drives (#71)
+
+ENTRY = "/api/experimental/session/ses_1/instructions/entries/bashos.system"
+
+
+def _one_frame_events():
+    async def events():
+        yield {"type": "server.connected", "properties": {}}
+    return events
+
+
+async def test_verify_drives_the_session_routes_a_turn_uses_without_running_one():
+    """Two of them sit under 2.x's /api/experimental. The policy checks alone would pass a
+    release that moved them, and every turn would then fail."""
+    from bashos.opencode import contract
+
+    engine = _V2Engine()
+    client = _stub_client(engine, major=2)
+    client.events = _one_frame_events()
+    findings = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+
+    assert [f.name for f in findings] == [contract.ROUTES_FINDING] and contract.passed(findings), findings
+    sent = [(m, p) for m, p, _ in engine.calls]
+    for route in (("POST", "/api/session/ses_1/agent"), ("POST", "/api/session/ses_1/model"),
+                  ("PUT", ENTRY), ("DELETE", ENTRY), ("POST", "/api/experimental/session/ses_1/wait"),
+                  ("GET", "/api/session/ses_1/message"), ("DELETE", "/api/session/ses_1")):
+        assert route in sent, route
+    # the prompt route is proven with a body it must refuse: no turn is admitted
+    assert [b for _, p, b in engine.calls if p.endswith("/prompt")] == [{}]
+
+
+async def test_a_release_that_moved_a_session_route_fails_verify():
+    from bashos.opencode import contract
+
+    engine = _V2Engine()
+
+    def moved(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/wait") or "/instructions/" in request.url.path:
+            return httpx.Response(404)  # what 2.0.20 answers on a path it does not serve
+        return engine(request)
+
+    client = _stub_client(moved, major=2)
+    client.events = _one_frame_events()
+    [finding] = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+    assert not finding.ok
+    for name in ("system prompt put (", "system prompt delete (", "wait ("):
+        assert name in finding.detail, finding.detail
+    assert "agent (" not in finding.detail and "events (" not in finding.detail
+    assert ("DELETE", "/api/session/ses_1") in [(m, p) for m, p, _ in engine.calls]  # no session left behind
+
+
+async def test_a_silent_event_stream_or_an_admitted_empty_prompt_fails_verify(monkeypatch):
+    from bashos.opencode import contract
+
+    monkeypatch.setattr(contract, "ROUTE_TIMEOUT", 0.2)
+    engine = _V2Engine()
+
+    def admits_anything(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/prompt"):
+            return httpx.Response(200, json={"data": {"id": "msg_1", "type": "user"}})
+        return engine(request)
+
+    async def silent():
+        await asyncio.sleep(5)
+        yield {}
+
+    client = _stub_client(admits_anything, major=2)
+    client.events = silent
+    [finding] = await contract.session_routes(client, "anthropic/claude-opus-5-5")
+    await client.aclose()
+    assert not finding.ok
+    assert "events (timed out)" in finding.detail
+    assert "prompt (the engine admitted a prompt with no text)" in finding.detail
+    assert ("POST", "/api/session/ses_1/interrupt") in [(m, p) for m, p, _ in engine.calls]
+
+
+async def test_opencode_1_takes_all_of_it_on_the_prompt_so_there_are_no_session_routes():
+    from bashos.opencode import contract
+
+    class Engine:
+        major = 1
+
+    assert await contract.session_routes(Engine(), "anthropic/claude-opus-5-5") == []
+    client = _stub_client(lambda r: httpx.Response(404))
+    with pytest.raises(OpencodeError, match="no `wait` session route"):
+        await client.wait_idle("ses_1")
+    await client.aclose()
+
+
+def _fake_opencode(path, version: str) -> str:
+    path.write_text(f"#!/bin/sh\necho '{version}'\n")
+    path.chmod(0o755)
+    return str(path)
+
+
+@pytest.mark.parametrize(("version", "wiring"), [
+    ("opencode v2.0.20", "BASHOS_ANTHROPIC_API_KEY, OPENCODE_CONFIG_CONTENT"),
+    ("1.19.5", "OPENCODE_AUTH_CONTENT"),
+    (None, "OPENCODE_AUTH_CONTENT"),  # no engine bashOS can run: OpenCode 1's wiring, as before
+])
+def test_opencode_auth_names_the_wiring_of_the_engine_bashos_would_start(no_credentials, tmp_path, version, wiring):
+    from typer.testing import CliRunner
+
+    from bashos.shell.cli import app
+
+    no_credentials.setenv("ANTHROPIC_API_KEY", "sk-ant-api-key")
+    binary = _fake_opencode(tmp_path / "opencode", version) if version else str(tmp_path / "absent")
+    no_credentials.setenv("BASHOS_OPENCODE_BIN", binary)
+    result = CliRunner().invoke(app, ["opencode", "auth"])
+    assert result.exit_code == 0, result.output
+    assert f"passed to the engine as: {wiring}" in result.output
+    assert "sk-ant-api-key" not in result.output

@@ -28,7 +28,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 - **No API key** — your Claude Code OAuth reaches the engine through its environment, never disk; `ANTHROPIC_API_KEY` is the fallback.
 - **Deny-by-default tool policy**, enforced by the engine rather than a prompt; approval requests are refused, never awaited.
 - **Dry runs** — `bashos run -n` shows the routing and the rendered prompt without calling a model.
-- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, Phoenix tracing and a LangGraph API server.
+- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, [one-os](docs/ONE-OS.md) for building, booting and deploying machines, Phoenix tracing and a LangGraph API server.
 
 ## Quick start
 
@@ -254,7 +254,7 @@ Contributions are welcome via pull request. Use [Conventional Commits](https://w
 
 ## Changelog
 
-Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md); the full record is in the [commit history](https://github.com/bamr87/bashos/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/bashos/releases).
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md), which release-please writes from Conventional Commits when a release PR merges; the full record is in the [commit history](https://github.com/bamr87/bashos/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/bashos/releases).
 
 ## License
 

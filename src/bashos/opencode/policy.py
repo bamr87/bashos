@@ -15,9 +15,21 @@ Two profiles ship:
   sealed     no tools at all. Used for single-completion calls, where a tool
              loop is not a feature but a bug.
 
-OpenCode resolves bash patterns with "last matching rule wins", so `"*": "deny"`
-is emitted first and the allowlist follows. Dicts preserve insertion order and
+OpenCode resolves rules with "last matching rule wins", so every `"*": "deny"`
+is emitted first and the allowlist follows: for the readonly profile's tools as
+a whole, and again for `bash`'s commands. Dicts preserve insertion order and
 `json.dumps` keeps it, so the emitted `opencode.json` carries the precedence.
+
+The tool-level catch-all is what keeps a new engine's new tool out: OpenCode 2
+ships `execute` ("Code Mode", JavaScript with `fetch`), which an engine offers
+any agent whose rules do not refuse it. Measured on OpenCode 2.0.20 before the
+catch-all: the readonly agent's `execute` reached the network (bamr87/bashos#71).
+
+Where the catch-all lands is decided by the engine, not by this block's key
+order: OpenCode 1.19 and 2.x both build an agent's rules from its `tools` map
+first and then fold `permission` into that, a key it already has keeping its
+place. So the catch-all leads the `tools` map (`readonly_tools`) as well, which
+puts it first in both majors; the engine contract checks the resolved order.
 
 Widening this file is the only way to widen bashOS's blast radius — which is
 the point. Never add a tool here that writes, connects out, or escalates.
@@ -50,7 +62,8 @@ BASH_ESCAPES = ("tmux *#(*", "git log *--output*")
 # permits and what it refuses.
 READ_TOOLS = ("read", "glob", "grep", "list")
 MUTATING_TOOLS = ("edit", "write", "apply_patch")
-OUTBOUND_TOOLS = ("webfetch", "websearch")
+# `execute` is OpenCode 2's Code Mode: JavaScript that can `fetch` and call other tools
+OUTBOUND_TOOLS = ("webfetch", "websearch", "execute")
 DELEGATING_TOOLS = ("task",)
 
 # Denied for the same reason in every profile: they either mutate the machine,
@@ -74,8 +87,8 @@ def bash_rules() -> dict[str, str]:
 
 
 def readonly_permission() -> dict[str, object]:
-    """The permission block for machine-inspection runs."""
-    block: dict[str, object] = {"bash": bash_rules()}
+    """The permission block for machine-inspection runs: every tool refused unless named."""
+    block: dict[str, object] = {"*": "deny", "bash": bash_rules()}
     for tool in READ_TOOLS:
         block[tool] = "allow"
     for tool in DENIED_TOOLS:
@@ -88,8 +101,12 @@ def readonly_permission() -> dict[str, object]:
 
 
 def readonly_tools() -> dict[str, bool]:
-    """Tool visibility for machine-inspection runs — denied tools stay hidden."""
-    tools = {tool: True for tool in ("bash", *READ_TOOLS)}
+    """Tool visibility for machine-inspection runs — denied tools stay hidden.
+
+    `"*": False` leads, so the engine resolves the tool catch-all before every allow.
+    """
+    tools: dict[str, bool] = {"*": False}
+    tools.update({tool: True for tool in ("bash", *READ_TOOLS)})
     tools.update({tool: False for tool in DENIED_TOOLS})
     return tools
 
@@ -109,7 +126,8 @@ def readonly_policy() -> list[str]:
     One greppable line per rule: what `bashos run -n` prints, what the tests
     assert invariants against, and what `docs/HARNESS.md` documents.
     """
-    atoms = [f"{tool}=allow" for tool in READ_TOOLS]
+    atoms = ["*=deny"]
+    atoms += [f"{tool}=allow" for tool in READ_TOOLS]
     atoms += [f"{tool}=deny" for tool in DENIED_TOOLS]
     atoms += [f"bash:{pattern}={action}" for pattern, action in bash_rules().items()]
     return atoms

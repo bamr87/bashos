@@ -11,6 +11,9 @@
 #   --docker   run this script inside debian:trixie with --privileged (from macOS, or any host
 #              without mkosi); the image lands in the same --out
 #
+#   BASHOS_PKG_CACHE=DIR  keep mkosi's downloaded packages in DIR between builds (--package-cache-dir;
+#              with --docker, DIR is mounted at /cache). Unset: every build downloads them afresh.
+#
 # Needs Linux with mkosi >= 25, as root (or in a privileged container). The output is a GPT disk
 # image (bashos_<version>.raw) to write to a USB stick or a disk: os/image/README.md.
 set -Eeuo pipefail
@@ -36,7 +39,7 @@ while (($#)); do
     --seed) seed=${2:?--seed DIR}; shift ;;
     --docker) docker=1 ;;
     --) shift; mkosi_args=("$@"); break ;;
-    -h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) os_die "unknown option $1 (bashos os image build --help)" ;;
   esac
   shift
@@ -57,9 +60,14 @@ if ((docker)); then
     seed_mount=(-v "$(cd "$seed" && pwd):/seed:ro")
     seed=/seed
   fi
+  cache_mount=()
+  if [[ -n ${BASHOS_PKG_CACHE:-} ]]; then
+    mkdir -p "$BASHOS_PKG_CACHE"
+    cache_mount=(-v "$(cd "$BASHOS_PKG_CACHE" && pwd):/cache" -e BASHOS_PKG_CACHE=/cache)
+  fi
   # A version-pinned base would go stale; trixie is the release the image is built from.
   exec docker run --rm --privileged --platform "$platform" \
-    -v "$OS_SRC:/src:ro" -v "$out_abs:/out" "${seed_mount[@]}" \
+    -v "$OS_SRC:/src:ro" -v "$out_abs:/out" "${seed_mount[@]}" "${cache_mount[@]}" \
     -e BASHOS_BUILD_COMMIT="$commit" -e BASHOS_BUILD_VERSION="${version%-dirty}" -e BASHOS_BUILD_DIRTY="$dirty" \
     -e BASHOS_BUILD_SOURCE="$OS_SRC" \
     debian:trixie bash -c '
@@ -102,9 +110,14 @@ if [[ -n $seed ]]; then
 fi
 
 mapfile -t packages < <(os_packages --all base console services)
+cache_args=()
+if [[ -n ${BASHOS_PKG_CACHE:-} ]]; then
+  mkdir -p "$BASHOS_PKG_CACHE"
+  cache_args=(--package-cache-dir "$BASHOS_PKG_CACHE")
+fi
 os_step "mkosi build · $arch · $version · ${#packages[@]} layer packages"
 mkosi --directory "$HERE" --output-directory "$out" --architecture "$arch" \
   --image-version "${version//[^A-Za-z0-9._-]/_}" --extra-tree "$stage:/" \
-  --package "$(IFS=,; printf '%s' "${packages[*]}")" "${mkosi_args[@]}" --force build
+  --package "$(IFS=,; printf '%s' "${packages[*]}")" "${cache_args[@]}" "${mkosi_args[@]}" --force build
 rm -rf "$stage"
 os_ok "$(find "$out" -maxdepth 1 -name 'bashos*.raw' -newer "$out" -print -quit 2>/dev/null || find "$out" -maxdepth 1 -name 'bashos*.raw' | head -1)"

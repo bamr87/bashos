@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""oneos-monitor: log who connects to this machine and record the screen while they do.
+
+Runs on the remote machine as a user service. Every 2 seconds it looks at:
+  - VNC clients (established TCP connections to the VNC port, default 5900)
+  - SSH clients (port 22)
+  - Claude sessions started with oneos-claude (tmux sessions on the `oneos` socket)
+and appends a line to events.jsonl whenever one of them changes.
+
+While a VNC client is connected, or while the file `record-on` exists in the state folder,
+it takes one screenshot a second (Spectacle) and turns each 5 minutes into an MP4 under
+screen/YYYY-MM-DD/. Recordings older than ONEOS_KEEP_DAYS (14) are deleted.
+
+  oneos-monitor serve      the loop
+  oneos-monitor status     current state as JSON
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+STATE = Path(os.environ.get("ONEOS_REMOTE_STATE") or Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "oneos-remote")
+EVENTS = STATE / "events.jsonl"
+SCREEN = STATE / "screen"
+FORCE = STATE / "record-on"
+VNC_PORT = int(os.environ.get("ONEOS_VNC_PORT", "5900"))
+KEEP_DAYS = int(os.environ.get("ONEOS_KEEP_DAYS", "14"))
+SEGMENT_FRAMES = 300
+
+
+def session_env() -> dict:
+    env = dict(os.environ)
+    run = env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path={run}/bus")
+    if "WAYLAND_DISPLAY" not in env:
+        socks = sorted(p.name for p in Path(run).glob("wayland-[0-9]"))
+        env["WAYLAND_DISPLAY"] = socks[0] if socks else "wayland-0"
+    return env
+
+
+def event(kind: str, **fields) -> None:
+    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "event": kind, **fields}
+    with EVENTS.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
+def peers(port: int) -> list[str]:
+    """Remote addresses of established TCP connections to a local port."""
+    try:
+        out = subprocess.run(["ss", "-Htn", "state", "established", f"( sport = :{port} )"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    found = []
+    for line in out.splitlines():
+        cols = line.split()
+        if cols:
+            found.append(cols[-1].rsplit(":", 1)[0].strip("[]"))
+    return sorted(found)
+
+
+def claude_sessions() -> list[str]:
+    try:
+        out = subprocess.run(["tmux", "-L", "oneos", "ls", "-F", "#S"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    return sorted(s.removeprefix("oneos-") for s in out.split() if s.startswith("oneos-"))
+
+
+class Recorder:
+    """One screenshot a second into a frames folder; each segment becomes an MP4."""
+
+    def __init__(self) -> None:
+        self.frames: Path | None = None
+        self.count = 0
+        self.failures = 0
+        self.retry_at = 0.0
+
+    @property
+    def active(self) -> bool:
+        return self.frames is not None
+
+    def start(self, reason: str) -> None:
+        day = SCREEN / time.strftime("%Y-%m-%d")
+        self.frames = day / f".frames-{time.strftime('%H%M%S')}"
+        self.frames.mkdir(parents=True, exist_ok=True)
+        self.count = 0
+        event("record-start", reason=reason)
+
+    def grab(self) -> None:
+        if self.frames is None or time.time() < self.retry_at:
+            return
+        target = self.frames / f"{self.count:06d}.jpg"
+        try:
+            ok = subprocess.run(["spectacle", "-b", "-n", "-f", "-p", "-o", str(target)], env=session_env(),
+                                capture_output=True, timeout=15).returncode == 0 and target.exists()
+        except (OSError, subprocess.TimeoutExpired):
+            ok = False
+        if not ok:
+            self.failures += 1
+            self.retry_at = time.time() + min(60, 5 * self.failures)  # no desktop session (Gaming Mode): back off
+            if self.failures == 1:
+                event("record-error", detail="screenshot failed; retrying with back-off")
+            return
+        self.failures = 0
+        self.count += 1
+        if self.count >= SEGMENT_FRAMES:
+            self.encode()
+            self.start("next segment")
+
+    def encode(self) -> None:
+        frames, count = self.frames, self.count
+        self.frames, self.count = None, 0
+        if frames is None:
+            return
+        if count:
+            out = frames.parent / f"screen-{frames.name.removeprefix('.frames-')}.mp4"
+            cmd = ["ffmpeg", "-loglevel", "error", "-y", "-framerate", "1", "-i", str(frames / "%06d.jpg"),
+                   "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-r", "5", "-c:v", "libx264", "-preset", "veryfast",
+                   "-crf", "30", "-pix_fmt", "yuv420p", str(out)]
+            try:
+                done = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                if done.returncode == 0:
+                    event("record-saved", file=str(out), seconds=count, bytes=out.stat().st_size)
+                else:
+                    event("record-error", detail=done.stderr.strip()[-300:])
+                    return  # keep the frames
+            except (OSError, subprocess.TimeoutExpired) as e:
+                event("record-error", detail=str(e))
+                return
+        shutil.rmtree(frames, ignore_errors=True)
+
+    def stop(self) -> None:
+        if self.active:
+            self.encode()
+            event("record-stop")
+
+
+def prune() -> None:
+    cutoff = time.time() - KEEP_DAYS * 86400
+    if not SCREEN.is_dir():
+        return
+    for day in SCREEN.iterdir():
+        if day.is_dir() and day.stat().st_mtime < cutoff:
+            shutil.rmtree(day, ignore_errors=True)
+            event("record-pruned", folder=day.name)
+
+
+def snapshot() -> dict:
+    return {"vnc": peers(VNC_PORT), "ssh": peers(22), "claude": claude_sessions()}
+
+
+def serve() -> int:
+    STATE.mkdir(parents=True, exist_ok=True)
+    rec = Recorder()
+    last: dict = {}
+    event("monitor-start", vnc_port=VNC_PORT)
+    next_scan = next_prune = 0.0
+    try:
+        while True:
+            tick = time.time()
+            if tick >= next_scan:
+                now = snapshot()
+                for key in now:
+                    old, new = last.get(key, []), now[key]
+                    for item in sorted(set(new) - set(old)):
+                        event(f"{key}-connect" if key != "claude" else "claude-session-up", who=item)
+                    for item in sorted(set(old) - set(new)):
+                        event(f"{key}-disconnect" if key != "claude" else "claude-session-down", who=item)
+                last = now
+                want = bool(now["vnc"]) or FORCE.exists()
+                if want and not rec.active:
+                    rec.start("vnc client" if now["vnc"] else "record-on")
+                elif not want and rec.active:
+                    rec.stop()
+                next_scan = tick + 2
+            if tick >= next_prune:
+                prune()
+                next_prune = tick + 3600
+            rec.grab()
+            time.sleep(max(0.05, 1.0 - (time.time() - tick)))
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        rec.stop()
+        event("monitor-stop")
+
+
+def status() -> int:
+    recs = sorted(SCREEN.glob("*/screen-*.mp4")) if SCREEN.is_dir() else []
+    running = subprocess.run(["systemctl", "--user", "is-active", "oneos-monitor.service"],
+                             capture_output=True, text=True).stdout.strip()
+    info = {
+        **snapshot(),
+        "monitor": running,
+        "recording_now": any(SCREEN.glob("*/.frames-*")) if SCREEN.is_dir() else False,
+        "record_forced": FORCE.exists(),
+        "recordings": len(recs),
+        "recordings_bytes": sum(p.stat().st_size for p in recs),
+        "latest_recording": str(recs[-1]) if recs else None,
+        "state": str(STATE),
+    }
+    print(json.dumps(info, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "serve":
+        sys.exit(serve())
+    if cmd == "status":
+        sys.exit(status())
+    print(__doc__, file=sys.stderr)
+    sys.exit(2)
