@@ -1,0 +1,10 @@
+#!/bin/sh
+# Enable the self-test unit and make sure the serial console gets a login.
+set -e
+systemctl enable oneos-selftest.service
+systemctl enable serial-getty@ttyS0.service
+# Live user may run the oneos tools without a password prompt.
+cat >/etc/sudoers.d/oneos <<'SUDO'
+user ALL=(ALL) NOPASSWD: /usr/local/bin/oneos-restock, /usr/local/bin/oneos-install, /usr/local/bin/oneos-steamos, /usr/local/bin/oneos-mount-p1
+SUDO
+chmod 0440 /etc/sudoers.d/oneos

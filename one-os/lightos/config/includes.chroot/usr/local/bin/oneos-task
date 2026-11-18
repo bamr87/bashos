@@ -1,0 +1,10 @@
+#!/bin/bash
+# oneos-task — run the task the boot menu asked for (kernel argument oneos.task=…).
+# Started from the desktop session (xdg autostart); does nothing on a normal boot.
+task="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^oneos\.task=//p' | tail -1)"
+case "$task" in
+  steamos-install)
+    exec xfce4-terminal --maximize --title "Install SteamOS" -x sudo /usr/local/bin/oneos-steamos ;;
+  "") exit 0 ;;
+  *) echo "oneos-task: unknown task '$task'" >&2; exit 1 ;;
+esac

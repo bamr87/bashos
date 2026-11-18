@@ -1,0 +1,22 @@
+#!/bin/sh
+# live-build configuration for the one-os home base. Called by `lb config`.
+# DISTRIBUTION and ARCH come from manifest.yaml via scripts/build-lightos.sh.
+set -e
+
+lb config noauto \
+  --mode debian \
+  --distribution "${DISTRIBUTION:-trixie}" \
+  --architectures "${ARCH:-amd64}" \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --binary-images iso-hybrid \
+  --bootloaders "grub-efi syslinux" \
+  --debian-installer none \
+  --memtest none \
+  --firmware-binary true \
+  --firmware-chroot true \
+  --apt-recommends false \
+  --iso-volume "ONEOS_LIGHTOS" \
+  --iso-application "one-os home base" \
+  --iso-publisher "one-os" \
+  --bootappend-live "boot=live components persistence username=user hostname=oneos console=tty0 console=ttyS0,115200" \
+  "${@}"

@@ -28,7 +28,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 - **No API key** — your Claude Code OAuth reaches the engine through its environment, never disk; `ANTHROPIC_API_KEY` is the fallback.
 - **Deny-by-default tool policy**, enforced by the engine rather than a prompt; approval requests are refused, never awaited.
 - **Dry runs** — `bashos run -n` shows the routing and the rendered prompt without calling a model.
-- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, Phoenix tracing and a LangGraph API server.
+- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, [one-os](docs/ONE-OS.md) for building, booting and deploying machines, Phoenix tracing and a LangGraph API server.
 
 ## Quick start
 
