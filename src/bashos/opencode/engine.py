@@ -1,12 +1,13 @@
 """The engine façade — the one object the kernel talks to.
 
 `OpencodeEngine` is bashOS's handle on the reasoning engine. Starting it is
-four steps, in this order:
+five steps, in this order:
 
   1. project the registry onto `opencode.jsonc`   (config is read at boot)
   2. attach to a running server, or supervise a private one
   3. install the Claude Code OAuth credential      (subscription, not API key)
-  4. hand the kernel two verbs
+  4. on OpenCode 2, prove the engine contract before anything runs on it
+  5. hand the kernel two verbs
 
 The two verbs are the whole surface:
 
@@ -85,7 +86,7 @@ async def watch_events(
                 continue  # another session on the same engine
 
             if kind == "permission.asked":
-                await client.reject_permission(session_id, str(props.get("id")))
+                await client.reject_permission(session_id, str(props.get("id")), _REJECTION)
                 _emit(sink, events.PermissionEvent(
                     session_id=session_id,
                     request_id=str(props.get("id")),
@@ -172,10 +173,13 @@ class OpencodeEngine:
         *,
         root: Path | None = None,
         registry: dict[str, CommandSpec] | None = None,
+        contract_gate: bool = True,
     ) -> None:
         self.config = config
         self.root = root or find_root()
         self._registry = registry
+        # `bashos opencode verify` runs the contract itself and reports every finding
+        self.contract_gate = contract_gate
         self._handle: server.EngineHandle | None = None
         self._bus = None
         self._sessions: set[str] = set()  # open EngineSessions, swept on stop
@@ -225,15 +229,41 @@ class OpencodeEngine:
             self.auth_status = await self._install_attached_credential()
         else:
             # the credential rides in on the child's environment, so it has to
-            # be resolved before the process exists
-            env_extra, self.auth_status = auth.engine_environment()
+            # be resolved before the process exists — and its wiring depends on
+            # the binary's major
+            binary = await server.resolve_binary()
+            env_extra, self.auth_status = auth.engine_environment(binary.major)
             self._handle = await server.spawn(
                 directory=str(self.root),
                 log_path=self._log_path(),
                 env_extra=env_extra,
+                engine=binary,
             )
             self.version = await self.client.version()
+        if self.contract_gate and self.client.major >= 2:
+            await self._prove_contract()
         return self
+
+    @property
+    def major(self) -> int:
+        """The OpenCode major this engine speaks (1 until started)."""
+        return self._handle.major if self._handle else 1
+
+    async def _prove_contract(self) -> None:
+        """An OpenCode 2 engine runs nothing until it resolves policy.py the way the contract
+        requires (bamr87/bashos#71). A managed engine passed `verify` before it was promoted;
+        one from Homebrew or `opencode upgrade --major` never did, so it is checked here."""
+        from . import contract
+
+        findings = contract.check(await contract.resolved_agents(self.client), self.client.major)
+        if contract.passed(findings):
+            return
+        failed = "; ".join(f"{f.name}: {f.detail}" for f in findings if not f.ok)
+        await self.stop()
+        raise OpencodeError(
+            f"opencode {self.version} does not enforce opencode/policy.py ({failed}) — "
+            "bashOS will not run on it. Run `bashos opencode verify` for the whole report."
+        )
 
     @property
     def bus(self):

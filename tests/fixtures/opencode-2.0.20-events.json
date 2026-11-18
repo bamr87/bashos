@@ -1,0 +1,812 @@
+[
+ {
+  "id": "evt_1e2f7b262001bEcmxcWOfLrnyp",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1e2f7b49f001JVa2zLQVxDnVqw",
+  "created": 1794809246879,
+  "type": "session.created",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "slug": "calm-circuit",
+   "version": "2.0.20",
+   "projectID": "95a6268a6b70d2c0a495ef57e87bbf979199ac90",
+   "location": {
+    "directory": "/work"
+   },
+   "subpath": "",
+   "title": "bashos:bashos",
+   "agent": "bashos"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 0,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b4ae001whiGXk2FI2Arf2",
+  "created": 1794809246894,
+  "type": "session.model.selected",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "model": {
+    "id": "m",
+    "providerID": "mock"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 1,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b4b5001HHX4zX3knT8rM2",
+  "created": 1794809246901,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "inboxID": "msg_1e2f7b4b30017ey3n38PSFPAHz",
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "inspect this machine"
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 2,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b4b7001kcCP8DqS3OoF5C",
+  "created": 1794809246903,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 3,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b4c40013jNW5VnPicB6T0",
+  "created": 1794809246916,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "inboxID": "msg_1e2f7b4b30017ey3n38PSFPAHz"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 5,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b534001tvLvILvS2hnVrq",
+  "created": 1794809247028,
+  "type": "session.step.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "agent": "bashos",
+   "model": {
+    "id": "m",
+    "providerID": "mock",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "started": 1794809247021
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 6,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b536001ERt5r6wdmG51Gf",
+  "created": 1794809247030,
+  "type": "session.tool.input.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "id": "call_0",
+   "name": "shell"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 7,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5380012As0DNcXiOsqnM",
+  "created": 1794809247032,
+  "type": "session.tool.input.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "id": "call_0",
+   "text": "{\"command\": \"uname -a\"}"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 8,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b53b001KYFu4LdeZOPIKB",
+  "created": 1794809247035,
+  "type": "session.tool.called",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "id": "call_0",
+   "input": {
+    "command": "uname -a"
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 9,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b53f001k82Bn2KDolhKz5",
+  "created": 1794809247039,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 10,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b56f002ch7FoYiAdDHhpM",
+  "created": 1794809247087,
+  "type": "session.tool.progress",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "id": "call_0",
+   "metadata": {
+    "shellID": "sh_1e2f7b56a001x5UwhiGFLnpXL2"
+   }
+  }
+ },
+ {
+  "id": "evt_1e2f7b579001Z6YP3CwzWOdkUz",
+  "created": 1794809247097,
+  "type": "session.tool.success",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "id": "call_0",
+   "content": [
+    {
+     "type": "text",
+     "text": "Darwin host 27.0.0 Darwin host Version 27.0.0: Tue Aug 11 21:06:24 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6030 arm64\n"
+    }
+   ],
+   "metadata": {
+    "status": "completed",
+    "truncated": false,
+    "exit": 0
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 11,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1e2f7b5ad001Fki4McwABugcDW",
+  "created": 1794809247149,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b4cc001KoF84URf6yhm4p",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 12,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5b0001VuW6WkLieWRrmJ",
+  "created": 1794809247152,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1e2f7b5e2001KSbgWcwZnoAgCi",
+  "created": 1794809247202,
+  "type": "session.step.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "agent": "bashos",
+   "model": {
+    "id": "m",
+    "providerID": "mock",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "started": 1794809247197
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 13,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5e5001gUdQm6FioKk8CQ",
+  "created": 1794809247205,
+  "type": "session.tool.input.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "id": "call_1",
+   "name": "shell"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 14,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5e7001Ut9vjv1tN01A59",
+  "created": 1794809247207,
+  "type": "session.tool.input.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "id": "call_1",
+   "text": "{\"command\": \"curl -s http://127.0.0.1:47812/escape-shell\"}"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 15,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5e9001jkvW5BLwdGUhGH",
+  "created": 1794809247209,
+  "type": "session.tool.called",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "id": "call_1",
+   "input": {
+    "command": "curl -s http://127.0.0.1:47812/escape-shell"
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 16,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5ed001QJN43FzGY7egyO",
+  "created": 1794809247213,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 17,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b5f3001r99dzwneYnGXz3",
+  "created": 1794809247219,
+  "type": "session.tool.failed",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "id": "call_1",
+   "error": {
+    "type": "permission.rejected",
+    "message": "Permission denied: shell"
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 18,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1e2f7b61f001GCUddjHIiBSi7W",
+  "created": 1794809247263,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b5b5001Px5AelQbGwja7L",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 19,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b624001ycRWRlpMmKJd2D",
+  "created": 1794809247268,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "cost": 0,
+   "tokens": {
+    "input": 10,
+    "output": 6,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1e2f7b671001ex5bTnmnSg2QOV",
+  "created": 1794809247345,
+  "type": "session.step.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "agent": "bashos",
+   "model": {
+    "id": "m",
+    "providerID": "mock",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "started": 1794809247340
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 20,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b674001BXF3ORljNFx1C2",
+  "created": 1794809247348,
+  "type": "session.tool.input.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "id": "call_2",
+   "name": "read"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 21,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b6790014dTMM9lFLk47B3",
+  "created": 1794809247353,
+  "type": "session.tool.input.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "id": "call_2",
+   "text": "{\"path\": \"opencode.jsonc\", \"limit\": 3}"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 22,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b67b001brOXNWRPhibAOp",
+  "created": 1794809247356,
+  "type": "session.tool.called",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "id": "call_2",
+   "input": {
+    "path": "opencode.jsonc",
+    "limit": 3
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 23,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b67e001qHYkOgSDp1Lg5K",
+  "created": 1794809247358,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 24,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b68d001Hmp6vNlynvAqnT",
+  "created": 1794809247373,
+  "type": "session.tool.success",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "id": "call_2",
+   "content": [
+    {
+     "type": "text",
+     "text": "Read file opencode.jsonc, lines 1-3\n1: // generated by `bashos opencode sync` — do not edit.\n2: // source of truth: .claude/commands/*.md and src/bashos/opencode/policy.py\n3: {\n[Output truncated. Continue reading with offset: 4]"
+    }
+   ],
+   "metadata": {
+    "truncated": true
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 25,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1e2f7b6bf0014t58bh68oNbeTl",
+  "created": 1794809247423,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b62d001lgb3wwySESeiUV",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 26,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b6c2001t4j3zedkGMZgC9",
+  "created": 1794809247426,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "cost": 0,
+   "tokens": {
+    "input": 15,
+    "output": 9,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1e2f7b705001jcZdHFXgzX5OOq",
+  "created": 1794809247493,
+  "type": "session.step.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "agent": "bashos",
+   "model": {
+    "id": "m",
+    "providerID": "mock",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz",
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "started": 1794809247488
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 27,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b706001Bxa7hRyEZAkAQR",
+  "created": 1794809247494,
+  "type": "session.text.started",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz",
+   "ordinal": 0
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 28,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b708001uv0ICdONyafB4D",
+  "created": 1794809247496,
+  "type": "session.text.delta",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz",
+   "ordinal": 0,
+   "delta": "hello from the mock"
+  }
+ },
+ {
+  "id": "evt_1e2f7b70800299E6ug8kFdmT3J",
+  "created": 1794809247496,
+  "type": "session.text.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz",
+   "ordinal": 0,
+   "text": "hello from the mock"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 29,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b709001QZ6oPU1eOL8896",
+  "created": 1794809247497,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 30,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b72a001VYKXgdCL1Ekz3v",
+  "created": 1794809247530,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "/work"
+  },
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "assistantMessageID": "msg_1e2f7b6ca001EP6MtAjqllBZRz",
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "snapshot": "8e20dc421a9ae0e35b15cc5442b864be04980b29",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 31,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e2f7b72c001mR4x4T1wf4TCMD",
+  "created": 1794809247532,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "cost": 0,
+   "tokens": {
+    "input": 20,
+    "output": 12,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1e2f7b72d001ePNLSNgyh9MWzK",
+  "created": 1794809247533,
+  "type": "session.execution.succeeded",
+  "data": {
+   "sessionID": "ses_e1d084baaffeI2Y3VtdqFznMSO"
+  },
+  "durable": {
+   "aggregateID": "ses_e1d084baaffeI2Y3VtdqFznMSO",
+   "seq": 32,
+   "version": 1
+  }
+ }
+]

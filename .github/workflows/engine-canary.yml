@@ -4,8 +4,14 @@ name: engine canary
 # release. Each day this fetches npm's latest OpenCode exactly the way a bashOS machine does
 # (os/install/engine.sh: the platform binary from the registry, sha512 checked) and runs the
 # engine contract (`bashos opencode verify`) against it. A release that reads bashOS's policy
-# differently — or a new major bashOS does not speak yet (bamr87/bashos#71) — turns this red the
-# day it ships, while every machine's own gate keeps it on the last release that passed.
+# differently turns this red the day it ships, while every machine's own gate keeps it on the
+# last release that passed.
+#
+# bashOS speaks OpenCode 1 and 2 (bamr87/bashos#71). npm's `latest` is still OpenCode 1, so a
+# second leg checks the newest OpenCode 2 the way Homebrew and Arch users get it: OpenCode's own
+# GitHub release (anomalyco/opencode, the repository Homebrew builds from), its linux-x64
+# baseline binary checked twice — against the release's SHA256SUMS and against the digest GitHub
+# computed when the asset was uploaded — before it runs.
 on:
   schedule:
     - cron: "23 7 * * *"
@@ -55,6 +61,62 @@ jobs:
             if [ "${{ job.status }}" = success ]; then
               echo "npm's latest OpenCode passes the engine contract: bashOS machines will promote it."
             else
-              echo "npm's latest OpenCode does **not** pass the engine contract. bashOS machines keep the last release that passed; see the log, and bamr87/bashos#71 for OpenCode 2."
+              echo "npm's latest OpenCode does **not** pass the engine contract. bashOS machines keep the last release that passed; see the log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  opencode-2:
+    name: newest OpenCode 2 release enforces the policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE: anomalyco/opencode
+      ASSET: opencode-linux-x64-baseline.tar.gz
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: install bashOS
+        run: pip install -e .
+      - name: fetch the newest OpenCode 2 release, checksum-verified
+        id: fetch
+        run: |
+          tag=$(gh release list -R "$SOURCE" --exclude-drafts --exclude-pre-releases --limit 50 \
+            --json tagName --jq '[.[].tagName | select(test("^v2\\.[0-9]+\\.[0-9]+$"))][0] // empty')
+          if [ -z "$tag" ]; then
+            echo "no OpenCode 2 release on $SOURCE"
+            exit 1
+          fi
+          echo "newest OpenCode 2: $SOURCE $tag"
+          dl="$RUNNER_TEMP/download"
+          gh release download "$tag" -R "$SOURCE" -p "$ASSET" -p SHA256SUMS -D "$dl"
+          (cd "$dl" && grep "  $ASSET\$" SHA256SUMS | sha256sum -c -)
+          want=$(gh release view "$tag" -R "$SOURCE" --json assets --jq ".assets[] | select(.name == \"$ASSET\") | .digest")
+          got="sha256:$(sha256sum "$dl/$ASSET" | cut -d' ' -f1)"
+          if [ "$want" != "$got" ]; then
+            echo "$ASSET does not match the digest GitHub recorded ($want) — refused"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/engine2"
+          tar -xzf "$dl/$ASSET" -C "$RUNNER_TEMP/engine2"
+          bin=$(find "$RUNNER_TEMP/engine2" -type f -name opencode | head -1)
+          chmod +x "$bin"
+          "$bin" --version
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: the engine contract (bashos opencode verify)
+        run: bashos opencode verify --binary "${{ steps.fetch.outputs.bin }}"
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "### engine canary: opencode ${{ steps.fetch.outputs.version }} (OpenCode 2, $SOURCE release)"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "The newest OpenCode 2 passes the engine contract: bashOS runs on it, and promotes it once npm ships it."
+            else
+              echo "The newest OpenCode 2 does **not** pass the engine contract: bashOS refuses to run on it (engine start runs the same check). See the log."
             fi
           } >> "$GITHUB_STEP_SUMMARY"

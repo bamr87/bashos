@@ -16,6 +16,11 @@ Each registration feeds its slice of the stream through the same pure
 `engine.watch_events` loop that tests drive directly, so per-session
 semantics (tool dedupe, permission refusal, text deltas) live in one place.
 
+The routing is the same for both engine majors: on OpenCode 2 the client
+subscribes to `/api/event` and translates its frames into the OpenCode 1
+shapes above (`v2.EventNormalizer`); its approval requests always name a
+session, so they reach the watcher, which refuses them through that session.
+
 A dead stream must never wedge a prompt: on stream loss every waiter is
 released and `stream.lost` is emitted; the pump reconnects with capped
 backoff and `stream.reconnected` follows on the next healthy frame.
