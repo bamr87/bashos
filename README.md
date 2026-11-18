@@ -28,7 +28,7 @@ bashOS does not implement a reasoning loop. It runs one: [OpenCode](https://open
 - **No API key** — your Claude Code OAuth reaches the engine through its environment, never disk; `ANTHROPIC_API_KEY` is the fallback.
 - **Deny-by-default tool policy**, enforced by the engine rather than a prompt; approval requests are refused, never awaited.
 - **Dry runs** — `bashos run -n` shows the routing and the rendered prompt without calling a model.
-- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, the [os](os/README.md) Linux OS layer and bootable image, [one-os](docs/ONE-OS.md) for building, booting and deploying machines, Phoenix tracing and a LangGraph API server.
+- **Optional extras** — the [chui](chui/README.md) macOS terminal environment, bashOS as a bootable operating system ([os](os/README.md) on [Amrchy](docs/AMRCHY.md), the maintainer's Omarchy fork), [one-os](docs/ONE-OS.md) for building, checking and deploying machines (custom PCs included), Phoenix tracing and a LangGraph API server.
 
 ## Quick start
 
@@ -107,15 +107,17 @@ chui restore                          # roll back to the snapshot
 
 `bashos chui …` is plain shell, so it works on a fresh Mac before any virtualenv exists. Install is idempotent and never deletes a file. Coming from the standalone `bamr87/chui` clone? See [chui/README.md](chui/README.md#moving-from-the-standalone-bamr87chui-clone).
 
-## The operating system (Linux) — os
+## The operating system (Linux) — amrchy and os
 
-bashOS can also be the machine itself. **[os/](os/README.md)** is an Omarchy-style layer on Debian 13: the monitor auto-logs in to one shared tmux console whose first window is the bashOS desktop (in a cage + foot kiosk when there is a GPU), every ssh login joins it, the bamr87 hub's Harness Console runs as a supervised service, and `bashos os update` pulls, re-applies and migrates. Install it in place, or build the bootable disk image ([docs/OS.md](docs/OS.md)).
+bashOS can also be the machine itself. It boots as **[Amrchy](docs/AMRCHY.md)** (`amrchy/`, the maintainer's fork of Omarchy: Arch, Hyprland, its installer and updates) with **[os/](os/README.md)** as its layer. One shared tmux console, whose first window is the bashOS desktop, opens on the desktop at login and is joined by every ssh login. The bamr87 hub's Harness Console runs as a supervised service, and `bashos os update` pulls, re-applies and migrates. The same layer installs in place on Amrchy or on Debian 13 ([docs/OS.md](docs/OS.md)).
 
 ```bash
 ./bin/bashos os install --dry-run     # the plan for this machine, nothing changed
-./bin/bashos os install               # Debian 13: layer + console + harness (sudo asks once)
+./bin/bashos os install               # Amrchy or Debian 13: layer + console + harness (sudo asks once)
 bashos os status                      # [ OK ]/[WARN]/[CRIT] per piece
-./bin/bashos os image build --docker  # the bootable image (mkosi), then: bashos os image test --docker
+./bin/bashos os iso build             # the bashOS ISO: Amrchy with the bashOS layer (Docker, ~30 GB)
+./bin/bashos os iso seed --user U --disk /dev/nvme0n1 --disk-bytes N   # install it unattended
+./bin/bashos one-os machine check x870e-dark-hero --system bashos      # will this PC's chips work?
 ```
 
 ## Auth — Claude Code OAuth, wired into the engine
@@ -237,6 +239,9 @@ Every document is indexed, one line each, in [docs/README.md](docs/README.md). S
 | `src/bashos/` | Kernel, loops, the engine layer, runtime backends, the CLI, the desktop and the GUI |
 | `bin/` | The `bashos` launcher and the `os-health` verdict script |
 | `chui/` | The optional macOS terminal environment |
+| `amrchy/` | The framework bashOS boots on: the Omarchy fork, a squashed subtree of bamr87/amrchy |
+| `os/` | The bashOS layer on Amrchy or Debian 13, the ISO build and its first boot |
+| `one-os/` | Build, boot, check and deploy machines: the stick, PXE, machine profiles, a QEMU harness |
 | `docs/` | Design documents, the desktop tour, ADRs |
 | `tests/` | The offline pytest suite and the GUI reducer tests |
 | `tools/` | The desktop capture and the documentation generators |

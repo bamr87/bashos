@@ -15,11 +15,21 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY pyproject.toml README.md langgraph.json opencode.jsonc ./
+# Dependencies first, keyed on the packaging files alone. The editable install
+# is made against a one-file stub package: it only records /app/src on the
+# import path (a .pth file) plus the `bashos` entry point, so the real source
+# copied below is what runs, and a change under src/, .claude/ or docs/ reuses
+# this layer instead of resolving and installing every dependency again.
+COPY pyproject.toml README.md ./
+RUN mkdir -p src/bashos \
+    && touch src/bashos/__init__.py \
+    && pip install -e ".[trace]" "langgraph-cli[inmem]>=0.2"
+
+# The source last, with nothing run after it: a source change rebuilds only
+# these copies.
+COPY langgraph.json opencode.jsonc ./
 COPY src ./src
 COPY .claude ./.claude
 COPY docs ./docs
-
-RUN pip install -e ".[trace]" "langgraph-cli[inmem]>=0.2"
 
 CMD ["bashos"]

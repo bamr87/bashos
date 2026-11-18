@@ -1,0 +1,3 @@
+# The container plane on Arch (Amrchy ships it), for the harness's compose mode and the hub's
+# stacks. Skipped when a docker CLI already exists. Same line format as ../base.list.
+docker docker-compose cmd:docker

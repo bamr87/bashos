@@ -17,13 +17,14 @@
 | [`CHANGELOG.md`](../CHANGELOG.md) | Release history: the notable changes in each version, newest first. |
 | [`SECURITY.md`](../SECURITY.md) | Which bashOS versions get security fixes, how to report a vulnerability privately, what is in scope, and how fast you will hear back. |
 | [`chui/`](../chui/README.md) | The optional macOS terminal environment of bashOS — Oh My Zsh, Powerlevel10k, Zellij and the modern CLI — and how to install, use, configure and roll it back. |
-| [`os/`](../os/README.md) | The Linux OS layer of bashOS: install it onto a Debian 13 machine, or build it into a bootable image, so the monitor boots into the bashOS console and the machine serves the bamr87 Harness Console. |
+| [`os/`](../os/README.md) | The Linux OS layer of bashOS: install it onto an Amrchy (Arch) or Debian 13 machine, or build it into a bootable image (the Amrchy ISO, or the Debian disk image), so the machine opens the bashOS console and serves the bamr87 Harness… |
 | [`tools/`](../tools/README.md) | Repository scripts for bashOS — the desktop capture and the documentation generators; nothing here ships to users. |
 
 ### `docs/`
 
 | Document | What it covers |
 | --- | --- |
+| [`docs/AMRCHY.md`](AMRCHY.md) | How bashOS boots on a machine: amrchy (the Omarchy fork, kept in `amrchy/` as a squashed subtree of bamr87/amrchy) is the framework, bashOS is the layer on it, and `bashos os iso` builds the two into one ISO that installs unattended from a… |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | A buildable software stack for bashOS — an image-based Linux appliance where the agent kernel is a first-class OS service, from microVMs to policy plane |
 | [`docs/constitution.md`](constitution.md) | The rules every change to this repo must satisfy, whoever makes it — a human or an AI agent. Agents read this before [AGENTS.md](../AGENTS.md) conventions, the [PRD](../PRD.md), or the [feature catalog](../features/features.yml). Ratified… |
 | [`docs/DESKTOP-TOUR.md`](DESKTOP-TOUR.md) | Everything `bashos gui` does, scene by scene, with real captures of the running app: the console, side by side, the desktop, commands, runs, health, the engine, settings and keys. |
@@ -32,7 +33,7 @@
 | [`docs/HARNESS.md`](HARNESS.md) | The design of the AI harness at the core of bashOS: its layers, the kernel, the loop contract, the engine and model runtime, failure semantics, and how to extend each one. |
 | [`docs/ONE-OS.md`](ONE-OS.md) | How bashOS builds, boots, manages and deploys machines: one manifest and one test harness that put the right operating system on a machine from a USB stick, over the network, or as a native disk image. |
 | [`docs/OPENCODE.md`](OPENCODE.md) | Why OpenCode is bashOS's engine and runs as a separate process, how the Claude Code credential reaches it, what the deny-by-default policy enforces, and how the command registry is compiled into its config. |
-| [`docs/OS.md`](OS.md) | How bashOS becomes the machine itself — an Omarchy-style layer on Debian 13 that boots the physical monitor into the bashOS console and serves the bamr87 Harness Console, delivered either in place (`bashos os install`) or as a bootable… |
+| [`docs/OS.md`](OS.md) | How bashOS becomes the machine itself: one OS layer (`os/`) that turns an Amrchy (Arch) or Debian 13 machine into a bashOS machine, with the shared console and the bamr87 Harness Console. It arrives in place (`bashos os install`), as the… |
 | [`docs/SERVICES.md`](SERVICES.md) | Deploying and observing the optional container stack: Phoenix tracing, the kernel over HTTP through LangGraph, auth inside containers, and the image layout. |
 | [`docs/adr/`](adr/README.md) | Decisions for bashos that are hard to reverse — the stack, data model, security model, public interfaces, and any relaxation of a gate — one file each. |
 | [`docs/amendments/`](amendments/README.md) | The append-only log of changes to [the constitution](constitution.md). |
