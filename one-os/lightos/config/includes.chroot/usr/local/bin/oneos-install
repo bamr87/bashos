@@ -1,0 +1,238 @@
+#!/bin/bash
+# oneos-install — install a full OS onto another drive from the home base (PLAN §6.2).
+#
+#   oneos-install --target /dev/nvme0n1 --distro debian|ubuntu|arch \
+#                  [--hostname X] [--user Y] [--suite S] [--mirror URL]
+#                  [--unattended] [--efi|--bios]
+#
+# Default firmware mode is both: a GPT disk with an ESP *and* a BIOS boot
+# partition, so the disk boots on UEFI and legacy machines.
+set -euo pipefail
+
+die()  { echo "oneos-install: error: $*" >&2; exit 1; }
+log()  { echo "oneos-install: $*" >&2; }
+serial() { [[ -w /dev/ttyS0 ]] && echo "$*" >/dev/ttyS0 2>/dev/null; return 0; }
+
+usage() {
+  cat <<'EOF'
+Usage: oneos-install [--target DISK] [--distro debian|ubuntu|arch] [options]
+
+Install a full OS onto another drive from the home base. The target is ERASED.
+Asks for anything not given (unless --unattended).
+
+  --target DISK          whole disk to install onto, e.g. /dev/nvme0n1
+  --distro NAME          debian (default), ubuntu or arch
+  --suite NAME           release (debian: trixie, ubuntu: noble)
+  --hostname NAME        system name (default: oneos-<distro>)
+  --user NAME            first user, gets sudo (default: oneos)
+  --password-hash HASH   user's password hash (openssl passwd -6); otherwise asked
+  --mirror URL           package mirror (or ONEOS_MIRROR)
+  --efi | --bios         install only one boot loader (default: both)
+  --unattended           never prompt
+EOF
+}
+
+target="" distro="" hostname="" user="" suite="" mirror="${ONEOS_MIRROR:-}"
+unattended=0 fw=both password_hash=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target) target="$2"; shift 2 ;;
+    --distro) distro="$2"; shift 2 ;;
+    --hostname) hostname="$2"; shift 2 ;;
+    --user) user="$2"; shift 2 ;;
+    --password-hash) password_hash="$2"; shift 2 ;;
+    --suite) suite="$2"; shift 2 ;;
+    --mirror) mirror="$2"; shift 2 ;;
+    --unattended) unattended=1; shift ;;
+    --efi) fw=efi; shift ;;
+    --bios) fw=bios; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+[[ $EUID -eq 0 ]] || die "must run as root"
+
+ask() {  # ask <var> <prompt> [default]
+  local cur="${!1}"
+  [[ -n "$cur" ]] && return
+  [[ $unattended == 1 ]] && { [[ -n "${3:-}" ]] && printf -v "$1" '%s' "$3" && return; die "--$1 is required with --unattended"; }
+  read -r -p "$2${3:+ [$3]}: " cur
+  printf -v "$1" '%s' "${cur:-${3:-}}"
+}
+if [[ -z "$target" && $unattended == 0 ]]; then
+  lsblk -dpo NAME,SIZE,MODEL,TRAN,RM | grep -v -E 'loop|sr[0-9]'
+fi
+ask target "Target disk (WILL BE ERASED)"
+ask distro "Distro (debian|ubuntu|arch)" debian
+ask hostname "Hostname" "oneos-$distro"
+ask user "User name" oneos
+
+case "$distro" in
+  debian) suite="${suite:-trixie}"; mirror="${mirror:-http://deb.debian.org/debian}" ;;
+  ubuntu) suite="${suite:-noble}"; mirror="${mirror:-http://archive.ubuntu.com/ubuntu}" ;;
+  arch)   mirror="${mirror:-https://geo.mirror.pkgbuild.com}" ;;
+  *) die "unsupported distro: $distro" ;;
+esac
+
+# ---------------------------------------------------------------- guards
+[[ -b "$target" ]] || die "$target is not a block device"
+[[ "$(lsblk -dno TYPE "$target")" == disk ]] || die "$target is not a whole disk"
+
+# Every whole disk underneath a block device (follows dm/ventoy mappings).
+disks_under() { lsblk -spno NAME,TYPE "$1" 2>/dev/null | awk '$2=="disk"{print $1}' | sed 's/^[^/]*//'; }
+protected=()
+for src in "$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)" \
+           "$(blkid -L Ventoy 2>/dev/null || true)" \
+           "$(findmnt -no SOURCE /run/live/persistence/* 2>/dev/null | head -1 || true)"; do
+  [[ -n "$src" && -b "$src" ]] || continue
+  while IFS= read -r d; do [[ -n "$d" ]] && protected+=("$d"); done < <(disks_under "$src")
+done
+[[ -b /dev/mapper/ventoy ]] && while IFS= read -r d; do protected+=("$d"); done < <(disks_under /dev/mapper/ventoy)
+real_target="$(readlink -f "$target")"
+for d in "${protected[@]}"; do
+  [[ "$(readlink -f "$d")" == "$real_target" ]] && die "$target is the disk the home base booted from — refusing"
+done
+if lsblk -nrpo MOUNTPOINTS "$target" | grep -q .; then die "$target has mounted partitions"; fi
+
+if [[ $unattended == 0 ]]; then
+  lsblk -o NAME,SIZE,MODEL,SERIAL "$target"
+  read -r -p "ERASE $target and install $distro? Type 'yes': " ok
+  [[ "$ok" == yes ]] || die "aborted"
+fi
+log "installing $distro${suite:+ ($suite)} → $target (firmware: $fw)"
+
+# ---------------------------------------------------------------- partition
+part() { if [[ "$target" =~ [0-9]$ ]]; then echo "${target}p$1"; else echo "${target}$1"; fi; }
+wipefs -aq "$target"
+sgdisk -Z "$target" >/dev/null
+sgdisk -n1:0:+1M -t1:EF02 -c1:biosboot \
+       -n2:0:+512M -t2:EF00 -c2:ESP \
+       -n3:0:0 -t3:8304 -c3:root "$target" >/dev/null
+partprobe "$target"; udevadm settle -t 10 || true
+esp="$(part 2)" root="$(part 3)"
+mkfs.vfat -F32 -n ESP "$esp" >/dev/null
+mkfs.ext4 -q -F -L root "$root"
+
+mnt=/mnt/oneos-target
+mkdir -p "$mnt"
+mount "$root" "$mnt"
+mkdir -p "$mnt/boot/efi"
+mount "$esp" "$mnt/boot/efi"
+cleanup() {
+  for m in dev/pts dev proc sys run boot/efi; do umount -l "$mnt/$m" 2>/dev/null || true; done
+  umount -l "$mnt" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+bind_chroot() { for m in dev dev/pts proc sys run; do mkdir -p "$mnt/$m"; mount --bind "/$m" "$mnt/$m"; done; }
+in_target() { chroot "$mnt" /usr/bin/env DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8 "$@"; }
+
+# ---------------------------------------------------------------- bootstrap
+case "$distro" in
+  debian|ubuntu)
+    kernel=linux-image-amd64; comps=main
+    [[ $distro == ubuntu ]] && kernel=linux-image-generic && comps="main universe"
+    [[ $distro == debian ]] && comps="main contrib non-free-firmware"
+    # shellcheck disable=SC2054  # commas belong to --components/--include values
+    ds=(debootstrap --variant=minbase --components="${comps// /,}"
+        --include=systemd-sysv,udev,ca-certificates,"$kernel",grub-efi-amd64-bin,grub-pc-bin,grub2-common,initramfs-tools,sudo,ifupdown,isc-dhcp-client,locales
+        "$suite" "$mnt" "$mirror")
+    # Newer Ubuntu suites may postdate this debootstrap; they all share the gutsy script.
+    [[ -e "/usr/share/debootstrap/scripts/$suite" ]] || ds+=(/usr/share/debootstrap/scripts/gutsy)
+    "${ds[@]}"
+    echo "deb $mirror $suite $comps" >"$mnt/etc/apt/sources.list"
+    bind_chroot
+    ;;
+  arch)
+    work=/var/tmp/oneos-arch
+    mkdir -p "$work"
+    tarball=archlinux-bootstrap-x86_64.tar.zst
+    curl -fsSL -o "$work/sha256sums.txt" "$mirror/iso/latest/sha256sums.txt"
+    curl -fL --retry 3 -o "$work/$tarball" "$mirror/iso/latest/$tarball"
+    (cd "$work" && grep " $tarball\$" sha256sums.txt | sha256sum -c -) || die "arch bootstrap checksum mismatch"
+    rm -rf "$work/root.x86_64"
+    tar -C "$work" --zstd -xf "$work/$tarball"
+    boot="$work/root.x86_64"
+    echo "Server = $mirror/\$repo/os/\$arch" >"$boot/etc/pacman.d/mirrorlist"
+    for m in dev dev/pts proc sys run; do mount --bind "/$m" "$boot/$m"; done
+    mkdir -p "$boot/mnt"; mount --bind "$mnt" "$boot/mnt"
+    cp -L /etc/resolv.conf "$boot/etc/resolv.conf"
+    chroot "$boot" /bin/bash -euc '
+      pacman-key --init && pacman-key --populate archlinux
+      sed -i "s/^#\?ParallelDownloads.*/ParallelDownloads = 5/; s/^CheckSpace/#CheckSpace/" /etc/pacman.conf
+      pacstrap -K /mnt base linux linux-firmware grub efibootmgr sudo dhcpcd
+      genfstab -U /mnt >/mnt/etc/fstab'
+    umount -l "$boot/mnt"; for m in run sys proc dev/pts dev; do umount -l "$boot/$m"; done
+    bind_chroot
+    ;;
+esac
+
+# ---------------------------------------------------------------- configure
+echo "$hostname" >"$mnt/etc/hostname"
+printf '127.0.0.1 localhost\n127.0.1.1 %s\n' "$hostname" >"$mnt/etc/hosts"
+if [[ $distro != arch ]]; then
+  cat >"$mnt/etc/fstab" <<EOF
+UUID=$(blkid -s UUID -o value "$root") /         ext4 errors=remount-ro 0 1
+UUID=$(blkid -s UUID -o value "$esp")  /boot/efi vfat umask=0077        0 1
+EOF
+  nic=eth0
+  for n in /sys/class/net/en* /sys/class/net/eth*; do [[ -e "$n" ]] && { nic="${n##*/}"; break; }; done
+  printf 'auto lo\niface lo inet loopback\nallow-hotplug %s\niface %s inet dhcp\n' "$nic" "$nic" \
+    >"$mnt/etc/network/interfaces"
+  echo 'en_US.UTF-8 UTF-8' >"$mnt/etc/locale.gen"; in_target locale-gen >/dev/null || true
+else
+  in_target systemctl enable dhcpcd.service
+fi
+
+in_target useradd -m -s /bin/bash "$user"
+in_target getent group sudo >/dev/null && in_target usermod -aG sudo "$user"
+in_target getent group wheel >/dev/null && in_target usermod -aG wheel "$user"
+if [[ -n "$password_hash" ]]; then
+  in_target usermod -p "$password_hash" "$user"
+elif [[ $unattended == 0 ]]; then
+  in_target passwd "$user"
+else
+  in_target passwd -l "$user" >/dev/null
+fi
+mkdir -p "$mnt/etc/sudoers.d"
+echo "$user ALL=(ALL) ALL" >"$mnt/etc/sudoers.d/90-oneos"; chmod 0440 "$mnt/etc/sudoers.d/90-oneos"
+
+# Marker unit: proves on serial that the installed system itself booted (T50).
+cat >"$mnt/etc/systemd/system/oneos-installed-marker.service" <<'EOF'
+[Unit]
+Description=one-os install marker
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo ONEOS-INSTALLED-OK > /dev/ttyS0; echo ONEOS-INSTALLED-OK'
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
+EOF
+in_target systemctl enable oneos-installed-marker.service
+
+# ---------------------------------------------------------------- bootloader
+grubdefault="$mnt/etc/default/grub"
+touch "$grubdefault"
+sed -i '/^GRUB_CMDLINE_LINUX=/d; /^GRUB_TIMEOUT=/d; /^GRUB_TERMINAL=/d' "$grubdefault"
+cat >>"$grubdefault" <<'EOF'
+GRUB_TIMEOUT=2
+GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200"
+GRUB_TERMINAL="console serial"
+EOF
+grub_install=grub-install grub_mkconfig=grub-mkconfig cfg=/boot/grub/grub.cfg
+[[ $distro == arch ]] || in_target update-initramfs -u -k all >/dev/null
+if [[ $fw != bios ]]; then
+  # --removable: boots via \EFI\BOOT\BOOTX64.EFI, no NVRAM entry needed (fresh firmware, other machines).
+  in_target "$grub_install" --target=x86_64-efi --efi-directory=/boot/efi --removable --no-nvram
+fi
+if [[ $fw != efi ]]; then
+  in_target "$grub_install" --target=i386-pc "$target"
+fi
+in_target "$grub_mkconfig" -o "$cfg"
+
+sync
+log "done: $distro installed on $target"
+serial "ONEOS-INSTALL-DONE $distro $target"

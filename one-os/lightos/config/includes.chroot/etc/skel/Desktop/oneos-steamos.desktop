@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Install SteamOS
+Comment=Install the latest SteamOS onto this PC's M.2 drive (erases it)
+Exec=xfce4-terminal --maximize --title "Install SteamOS" -x sudo /usr/local/bin/oneos-steamos
+Icon=system-software-install
+Categories=System;

@@ -185,8 +185,16 @@ def engine_sync() -> None:
 def engine_auth() -> None:
     """Show which credential the engine will run on, and where it came from."""
     from ..opencode import auth as engine_auth_mod
+    from ..opencode import server
+    from ..opencode.client import OpencodeError
 
-    env, description = engine_auth_mod.engine_environment()
+    # the wiring depends on the major of the binary bashOS would start; with none it can run,
+    # describe OpenCode 1's, as the engine's own start would report the missing binary
+    try:
+        major = asyncio.run(server.resolve_binary()).major
+    except OpencodeError:
+        major = server.LEGACY_MAJOR
+    env, description = engine_auth_mod.engine_environment(major)
     typer.echo(description)
     if not env:
         raise typer.Exit(1)
@@ -226,11 +234,13 @@ def engine_verify(
 
     Judges the permission rules the engine itself resolved from opencode.jsonc — not
     the file — so a new OpenCode release that reads the config differently fails here
-    before it is trusted. No credential is passed: nothing is prompted.
+    before it is trusted. On OpenCode 2 the engine is also asked, sample by sample, how
+    it would answer, and must agree, and the session routes a turn uses are driven on a
+    throwaway session. No credential is passed: nothing is prompted.
     """
     import os
 
-    from ..opencode import contract
+    from ..opencode import contract, project
     from ..opencode.engine import OpencodeEngine
 
     if binary:
@@ -239,10 +249,14 @@ def engine_verify(
     os.environ.pop("BASHOS_OPENCODE_URL", None)  # always a fresh engine of this binary
 
     async def go() -> tuple[str, list[contract.Finding]]:
-        engine = OpencodeEngine(KernelConfig.from_env())
+        engine = OpencodeEngine(KernelConfig.from_env(), contract_gate=False)
         try:
             await engine.start()
-            return engine.version, contract.check(await engine.client.agents())
+            client = engine.client
+            findings = contract.check(await contract.resolved_agents(client), client.major)
+            findings += await contract.ask_engine(client)
+            findings += await contract.session_routes(client, project.qualify_model(engine.config.model))
+            return f"{engine.version} (OpenCode {client.major} API)", findings
         finally:
             await engine.stop()
 
@@ -254,7 +268,11 @@ def engine_verify(
     typer.echo(f"opencode {version}")
     for f in findings:
         typer.echo(f"  {'ok  ' if f.ok else 'FAIL'}  {f.name}: {f.detail}")
-    if not contract.passed(findings):
+    failed = {f.name for f in findings if not f.ok}
+    if failed == {contract.ROUTES_FINDING}:
+        typer.echo("bashOS cannot run a turn on this engine's API — do not run bashOS on it")
+        raise typer.Exit(1)
+    if failed:
         typer.echo("the engine does not enforce opencode/policy.py — do not run bashOS on it")
         raise typer.Exit(1)
     typer.echo("policy enforced")

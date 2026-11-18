@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# oneos-gui: look at and drive the desktop session of this machine, over SSH.
+#   oneos-gui shot OUT [--max PIXELS]   screenshot to OUT (png/jpg); --max scales the long side down
+#   oneos-gui click X Y [--button B] [--count N]   X Y are pixels in the LAST shot (scaled or not)
+#   oneos-gui move X Y
+#   oneos-gui key COMBO…  |  type TEXT [--delay S]  |  scroll DY
+# Screenshots use Spectacle (KDE Plasma, Wayland); input goes through oneos-input (uinput).
+set -Eeuo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=oneos-lib.sh
+source "$HERE/oneos-lib.sh"
+LAST="$ONEOS_STATE/last-shot"
+
+png_size() {  # prints "W H" of a PNG
+  python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(24); print(*struct.unpack(">II", d[16:24]))' "$1"
+}
+
+shot() {
+  local out="" max=0
+  while (($#)); do
+    case "$1" in
+      --max) max="$2"; shift 2 ;;
+      *) out="$1"; shift ;;
+    esac
+  done
+  [[ -n "$out" ]] || die "usage: oneos-gui shot OUT [--max PIXELS]"
+  command -v spectacle >/dev/null || die "spectacle not found (this needs a KDE Plasma session)"
+  local raw; raw="$(mktemp --suffix=.png)"
+  # Spectacle can return an empty file when another capture (the session recorder) runs at
+  # the same moment: try a few times.
+  local _try
+  for _try in 1 2 3 4; do
+    timeout 20 spectacle -b -n -f -p -o "$raw" >/dev/null 2>&1 && [[ -s "$raw" ]] && break
+    sleep 0.4
+  done
+  [[ -s "$raw" ]] || { rm -f "$raw"; die "screenshot failed (is a Plasma desktop session running?)"; }
+  local w h sw sh
+  read -r w h < <(png_size "$raw")
+  sw="$w"; sh="$h"
+  if ((max > 0 && (w > max || h > max))) || [[ "$out" != *.png ]]; then
+    if ((max > 0 && w >= h && w > max)); then sw="$max"; sh=$(( h * max / w ))
+    elif ((max > 0 && h > w && h > max)); then sh="$max"; sw=$(( w * max / h )); fi
+    ffmpeg -loglevel error -y -i "$raw" -vf "scale=${sw}:${sh}:flags=lanczos" -q:v 3 "$out"
+    rm -f "$raw"
+  else
+    mv -f "$raw" "$out"
+  fi
+  printf '%s %s %s %s\n' "$w" "$h" "$sw" "$sh" >"$LAST"
+  echo "screen ${w}x${h}, image ${sw}x${sh}: $out"
+}
+
+# Convert a point in the last shot's pixels to real screen pixels; prints "X Y W H".
+to_screen() {
+  [[ -s "$LAST" ]] || die "take a screenshot first (oneos-gui shot): coordinates refer to it"
+  local w h sw sh; read -r w h sw sh <"$LAST"
+  python3 -c 'import sys; x,y,w,h,sw,sh=map(float,sys.argv[1:]); print(round(x*w/sw,1), round(y*h/sh,1), int(w), int(h))' "$1" "$2" "$w" "$h" "$sw" "$sh"
+}
+
+pointer() {  # move|click X Y [opts…]
+  local op="$1" x="$2" y="$3"; shift 3
+  local sx sy w h; read -r sx sy w h < <(to_screen "$x" "$y")
+  "$HERE/oneos-input" "$op" "$sx" "$sy" --screen "${w}x${h}" "$@"
+}
+
+case "${1:-}" in
+  shot) shift; shot "$@" ;;
+  click | move) (($# >= 3)) || die "usage: oneos-gui $1 X Y"; pointer "$@" ;;
+  key | type | scroll | ping) exec "$HERE/oneos-input" "$@" ;;
+  *) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

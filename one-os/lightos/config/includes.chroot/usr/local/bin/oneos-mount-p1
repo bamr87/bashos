@@ -1,0 +1,35 @@
+#!/bin/bash
+# oneos-mount-p1 <mountpoint> [rw|ro]
+# Mount the stick's Ventoy data partition (label "Ventoy") at <mountpoint>.
+#
+# While an ISO is booted, Ventoy's device-mapper mapping claims P1, and a plain
+# mount can fail with EBUSY (seen in UEFI mode even with VTOY_LINUX_REMOUNT).
+# Device-mapper lets several tables share one underlying device, so the
+# fallback is a linear dm view of the whole partition, which we mount instead.
+set -uo pipefail
+
+mnt="${1:?usage: oneos-mount-p1 <mountpoint> [rw|ro]}"
+mode="${2:-rw}"
+
+dev="$(blkid -L Ventoy 2>/dev/null)"
+if [[ -z "$dev" ]]; then
+  udevadm settle -t 10 2>/dev/null || true
+  dev="$(blkid -L Ventoy 2>/dev/null)"
+fi
+[[ -n "$dev" ]] || { echo "oneos-mount-p1: no partition labelled Ventoy" >&2; exit 2; }
+
+mkdir -p "$mnt"
+mountpoint -q "$mnt" && exit 0
+
+err="$(mount -t exfat -o "$mode" "$dev" "$mnt" 2>&1)" && exit 0
+
+dm=oneos-p1
+if [[ ! -e /dev/mapper/$dm ]]; then
+  sectors="$(blockdev --getsz "$dev")"
+  dmsetup create "$dm" --table "0 $sectors linear $dev 0" 2>/dev/null ||
+    { echo "oneos-mount-p1: mount $dev failed ($err) and dm fallback failed" >&2; exit 1; }
+  udevadm settle -t 5 2>/dev/null || true
+fi
+err2="$(mount -t exfat -o "$mode" "/dev/mapper/$dm" "$mnt" 2>&1)" && exit 0
+echo "oneos-mount-p1: mount $dev: $err; via /dev/mapper/$dm: $err2" >&2
+exit 1
