@@ -9,8 +9,7 @@ Diagnose this failure:
 
 $ARGUMENTS
 
-You have read-only access to this machine (file reads plus a whitelist of
-diagnostic commands). Investigate before you conclude:
+You have read-only access to this machine (file reads plus a whitelist of diagnostic commands). Investigate before you conclude:
 - Verify your understanding: read the files, check versions, inspect the paths named in the error.
 - Form ranked hypotheses; test the cheapest ones first.
 

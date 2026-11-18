@@ -50,15 +50,9 @@ curl -s http://localhost:2024/runs/wait -X POST \
 
 The response is the final `KernelState`: `output`, `route`, and the `trace` log. LangGraph Studio can attach to `http://localhost:2024` for a visual view of the kernel graph.
 
-> The graph reference in `langgraph.json` must be the **module path**
-> (`bashos.kernel.server:graph`), not a file path — the server imports the
-> installed package; file-path loading breaks the package's relative imports.
+> The graph reference in `langgraph.json` must be the **module path** (`bashos.kernel.server:graph`), not a file path — the server imports the installed package; file-path loading breaks the package's relative imports.
 
-> The service runs `langgraph dev --allow-blocking`: on the claude-code backend
-> the adapter spawns the Claude Code CLI, whose bootstrap does synchronous file
-> IO that the dev server's blocking detector would otherwise reject as a
-> `BlockingError`. Fine for a dev server; a production deployment would prefer
-> the `api` backend (fully async) or thread-wrapped calls.
+> The service runs `langgraph dev --allow-blocking`: on the claude-code backend the adapter spawns the Claude Code CLI, whose bootstrap does synchronous file IO that the dev server's blocking detector would otherwise reject as a `BlockingError`. Fine for a dev server; a production deployment would prefer the `api` backend (fully async) or thread-wrapped calls.
 
 ## Observability (Phoenix)
 
@@ -70,17 +64,14 @@ export PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
 bashos run "/sh list open ports"                      # kernel spans → Phoenix project "bashos"
 ```
 
-- In compose, `langgraph-dev` ships with tracing on, pointed at the bundled
-  `phoenix` service.
-- Spans cover kernel nodes and loop structure. On the `claude-code` backend the
-model call runs inside the `claude` subprocess, so its span carries timing but not token-level detail; the `api` backend yields full LLM telemetry.
+- In compose, `langgraph-dev` ships with tracing on, pointed at the bundled `phoenix` service.
+- Spans cover kernel nodes and loop structure. On the `claude-code` backend the model call runs inside the `claude` subprocess, so its span carries timing but not token-level detail; the `api` backend yields full LLM telemetry.
 
 ### Already running a Phoenix?
 
 Phoenix separates data by **project name** — bashOS reports as project `bashos`, so it can share one Phoenix with other stacks. Two options:
 
-1. **Reuse it** (recommended): skip the bundled service and point
-   `PHOENIX_COLLECTOR_ENDPOINT` at the existing instance.
+1. **Reuse it** (recommended): skip the bundled service and point `PHOENIX_COLLECTOR_ENDPOINT` at the existing instance.
 2. **Run both**: remap bashOS's host ports so they don't collide:
 
    ```bash

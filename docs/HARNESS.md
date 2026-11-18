@@ -4,18 +4,12 @@
 
 ## Design goals
 
-1. **The terminal is the core access point.** Every capability — commands,
-agent runs, diagnostics, raw shell — is reachable from the terminal. The Textual desktop ([DESKTOP.md](DESKTOP.md)) and the one-shot CLI are the primary surface; `bashos gui` is a view of the same kernel, not a second runtime.
-2. **Bring an existing agent; never build a reasoning loop.** The reasoning
-engine is [OpenCode](OPENCODE.md) — open source, client/server, provider-agnostic — running as a supervised local server. It owns the agent loop, the tool broker, sessions, and the permission gate. bashOS owns routing, policy, userland, and the terminal. This is the whitepaper's L5 separation, and it is why swapping engines is a module, not a rewrite.
-3. **Libraries everywhere.** Orchestration is LangGraph, the engine is
-OpenCode, the terminal is Typer + Rich + Textual, config is Pydantic. bashOS writes glue and policy, not infrastructure.
-4. **One spec, three runtimes.** A command is a markdown file in
-`.claude/commands/`. Claude Code loads it as a project slash command, the bashOS kernel routes it through a loop, and `bashos opencode sync` compiles it into the engine's project config. One source of truth for what a command does.
-5. **Subscription-native auth.** The engine runs on the user's Claude Code
-OAuth (CLI login, keychain, or `claude setup-token`), bridged in at engine start. An API key is a fallback, not a requirement.
-6. **Checked generation, least-privilege agency.** Generated scripts pass
-through a deterministic verifier (shellcheck), and agentic runs execute under a deny-by-default permission ruleset the *engine* enforces. The model proposes; policy and tooling dispose.
+1. **The terminal is the core access point.** Every capability — commands, agent runs, diagnostics, raw shell — is reachable from the terminal. The Textual desktop ([DESKTOP.md](DESKTOP.md)) and the one-shot CLI are the primary surface; `bashos gui` is a view of the same kernel, not a second runtime.
+2. **Bring an existing agent; never build a reasoning loop.** The reasoning engine is [OpenCode](OPENCODE.md) — open source, client/server, provider-agnostic — running as a supervised local server. It owns the agent loop, the tool broker, sessions, and the permission gate. bashOS owns routing, policy, userland, and the terminal. This is the whitepaper's L5 separation, and it is why swapping engines is a module, not a rewrite.
+3. **Libraries everywhere.** Orchestration is LangGraph, the engine is OpenCode, the terminal is Typer + Rich + Textual, config is Pydantic. bashOS writes glue and policy, not infrastructure.
+4. **One spec, three runtimes.** A command is a markdown file in `.claude/commands/`. Claude Code loads it as a project slash command, the bashOS kernel routes it through a loop, and `bashos opencode sync` compiles it into the engine's project config. One source of truth for what a command does.
+5. **Subscription-native auth.** The engine runs on the user's Claude Code OAuth (CLI login, keychain, or `claude setup-token`), bridged in at engine start. An API key is a fallback, not a requirement.
+6. **Checked generation, least-privilege agency.** Generated scripts pass through a deterministic verifier (shellcheck), and agentic runs execute under a deny-by-default permission ruleset the *engine* enforces. The model proposes; policy and tooling dispose.
 
 ## Layers
 
@@ -51,10 +45,8 @@ through a deterministic verifier (shellcheck), and agentic runs execute under a 
                  └─▶ classify
 ```
 
-- **parse** splits `/command args` deterministically. Unknown commands
-  short-circuit to `respond` with a `difflib` did-you-mean.
-- **classify** handles bare natural language: a conservative keyword heuristic
-fires first, follow-ups reuse the last command, otherwise one model call (optional cheaper `BASHOS_CLASSIFY_MODEL`) picks from the registry menu, falling back to `/sh` on any doubt. The terminal accepts plain English.
+- **parse** splits `/command args` deterministically. Unknown commands short-circuit to `respond` with a `difflib` did-you-mean.
+- **classify** handles bare natural language: a conservative keyword heuristic fires first, follow-ups reuse the last command, otherwise one model call (optional cheaper `BASHOS_CLASSIFY_MODEL`) picks from the registry menu, falling back to `/sh` on any doubt. The terminal accepts plain English.
 - **dispatch** is a conditional edge keyed on the command's declared loop.
 - **respond** normalizes errors into output.
 
@@ -68,8 +60,7 @@ A loop is a **node factory**: it takes `(registry, llm, config)` and returns an 
 
 - reads `command` / `args` from `KernelState`,
 - returns `{"output": ...}` (plus `trace` entries), or `{"error", "route": "error"}`,
-- short-circuits on missing args (usage text) and on `dry_run` (rendered
-  prompt + routing report, no model call).
+- short-circuits on missing args (usage text) and on `dry_run` (rendered prompt + routing report, no model call).
 
 The kernel maps loop names to nodes in `_LOOP_NODES`. Three loops ship:
 
@@ -107,10 +98,8 @@ Agentic work is delegated to the engine under the deny-by-default ruleset in `op
 
 The core is a supervised `opencode serve` process. `opencode/engine.py` exposes exactly two verbs, and every loop is built on one of them:
 
-- `complete(prompt, system)` — one answer, no tools, on the `bashos-sealed`
-  agent. Backs the prompt/refine loops and the kernel's classifier.
-- `act(prompt, agent, on_event)` — a full reason ↔ act loop under policy.
-  Backs the react loop.
+- `complete(prompt, system)` — one answer, no tools, on the `bashos-sealed` agent. Backs the prompt/refine loops and the kernel's classifier.
+- `act(prompt, agent, on_event)` — a full reason ↔ act loop under policy. Backs the react loop.
 
 `runtime/llm.py` resolves which backend serves `complete()` and returns one LangChain interface:
 
@@ -176,15 +165,9 @@ Each row is a deliberate down-payment: tightening it toward the appliance (basho
 
 ## Failure semantics
 
-- Unknown command, agent-loop failure, and runtime errors all land in
-  `route="error"` and render as a red panel (exit code 1 in the CLI).
-- The desktop console catches everything per-turn; a failed command never
-  kills a window, and a stopped turn renders as "stopped.", not an error.
-- With no working auth, commands fail with a pointer to `bashos doctor`, which
-  reports exactly what is missing.
-- Engine errors carry their own context: the resolved credential, `bashos
-doctor`, and the path to `.bashos/opencode.log` — because the engine reports most provider problems as an opaque 500, and the log is where the real cause is.
-- A supervised engine is stopped in a `finally`: one-shot runs never leave a
-server behind, and the desktop owns one app-scoped engine stopped exactly once on exit.
-- Nothing waits on a human. Approval requests are auto-refused, and a broken
-  event stream releases the prompt rather than wedging it.
+- Unknown command, agent-loop failure, and runtime errors all land in `route="error"` and render as a red panel (exit code 1 in the CLI).
+- The desktop console catches everything per-turn; a failed command never kills a window, and a stopped turn renders as "stopped.", not an error.
+- With no working auth, commands fail with a pointer to `bashos doctor`, which reports exactly what is missing.
+- Engine errors carry their own context: the resolved credential, `bashos doctor`, and the path to `.bashos/opencode.log` — because the engine reports most provider problems as an opaque 500, and the log is where the real cause is.
+- A supervised engine is stopped in a `finally`: one-shot runs never leave a server behind, and the desktop owns one app-scoped engine stopped exactly once on exit.
+- Nothing waits on a human. Approval requests are auto-refused, and a broken event stream releases the prompt rather than wedging it.

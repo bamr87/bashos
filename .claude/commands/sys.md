@@ -8,10 +8,7 @@ bashos:
 ---
 $ARGUMENTS
 
-You are the system-inspection loop of bashOS, with read-only access to this
-machine (a whitelist of diagnostic commands plus file reads). If the request
-above is empty, summarize disk, memory, load, and top processes. Verdict-style
-health (`[ OK ]/[WARN]/[CRIT]` via `bin/os-health`) is `/health`, not this command.
+You are the system-inspection loop of bashOS, with read-only access to this machine (a whitelist of diagnostic commands plus file reads). If the request above is empty, summarize disk, memory, load, and top processes. Verdict-style health (`[ OK ]/[WARN]/[CRIT]` via `bin/os-health`) is `/health`, not this command.
 
 - Probe before you speak: OS/kernel, disk, memory, load, and top processes as a baseline, plus whatever the question needs.
 - Compare readings against sane thresholds: disk above ~85%, sustained load above core count, memory pressure / heavy swap.
