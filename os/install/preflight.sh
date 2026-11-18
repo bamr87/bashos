@@ -3,27 +3,31 @@
 
 phase_preflight() {
   os_step "preflight"
-  local release id="" version="" like="" arch port
-  release=$(os_path /etc/os-release)
-  if [[ -r $release ]]; then
-    id=$(sed -n 's/^ID=//p' "$release" | tr -d '"')
-    version=$(sed -n 's/^VERSION_ID=//p' "$release" | tr -d '"')
-    like=$(sed -n 's/^ID_LIKE=//p' "$release" | tr -d '"')
-  fi
+  local id version arch port
+  id=$(os_release ID) version=$(os_release VERSION_ID)
   # A preview is allowed anywhere; a real install only where it can work.
   local strict=1
   { os_dry || os_fake_root; } && strict=0
 
   if [[ $(uname -s) != Linux ]] && ! os_fake_root; then
     ((strict)) && os_die "bashOS the OS layer is Linux-only (this is $(uname -s)); try --dry-run"
-    os_warn "$(uname -s): previewing only — the layer installs on Debian 13"
-  elif [[ $id == debian && $version == 13 ]]; then
-    os_ok "Debian 13 ($(sed -n 's/^VERSION_CODENAME=//p' "$release"))"
-  elif [[ $id == debian || " $like " == *" debian "* ]]; then
-    os_warn "${id:-unknown} ${version} — built for Debian 13; package names may differ"
+    os_warn "$(uname -s): previewing only — the layer installs on Amrchy (Arch) or Debian 13"
   else
-    ((strict)) && os_die "${id:-an unknown distribution}: the layer installs on Debian 13 (apt + systemd)"
-    os_warn "${id:-unknown distribution}: previewing only"
+    case $(os_base) in
+      amrchy) os_ok "Amrchy on Arch ($(os_amrchy_version)) — bashOS's own base" ;;
+      arch) os_warn "Arch without Amrchy — the layer installs, the desktop pieces wait for Amrchy" ;;
+      debian)
+        if [[ $id == debian && $version == 13 ]]; then
+          os_ok "Debian 13 ($(os_release VERSION_CODENAME))"
+        else
+          os_warn "${id:-unknown} ${version} — built for Debian 13; package names may differ"
+        fi
+        ;;
+      *)
+        ((strict)) && os_die "${id:-an unknown distribution}: the layer installs on Amrchy (Arch) or Debian 13"
+        os_warn "${id:-unknown distribution}: previewing only"
+        ;;
+    esac
   fi
 
   arch=$(uname -m)

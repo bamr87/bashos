@@ -344,9 +344,9 @@ features:
     docs: "one-os/docs/reference/oneos-vm.md"
   - id: BASHOS-037
     title: "one-os: bashOS and Amrchy as bootable systems"
-    description: "bashOS and Amrchy as catalog entries one-os builds, puts on the stick and the PXE menu, deploys unattended and proves in QEMU, with machine profiles that check drivers against a system's kernel before deploying."
+    description: "bashOS (Amrchy with the bashOS layer, ADR 0005) as a system one-os builds, puts on the stick and the PXE menu, deploys unattended and proves in QEMU. Machine profiles (BASHOS-042) and the ISO build (BASHOS-041) exist; the catalog entry, the deployer and the install tests do not yet."
     implemented: false
-    status: planned
+    status: partial
     prd: [TBD]
     surface: cli
     link: "one-os/docs/epics/0001-bashos-and-amrchy.md"
@@ -360,3 +360,39 @@ features:
     surface: cli
     link: "one-os/scripts/oneos-remote"
     docs: "one-os/docs/operator-guide/06-remote-sessions.md"
+  - id: BASHOS-039
+    title: "amrchy: the framework under bashOS"
+    description: "bamr87/amrchy, the Omarchy fork (Arch, Hyprland, Omarchy's installer and updates), in amrchy/ as a squashed git subtree kept in step both ways (bashos os amrchy status | pull | push), with layers: a product's own setup (install/layers/<name>/) runs last in the installer."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "os/amrchy/sync.sh"
+    docs: "docs/AMRCHY.md"
+  - id: BASHOS-040
+    title: "bashOS on Amrchy: the OS layer on Arch"
+    description: "bashos os install reads the machine's base: on Amrchy it installs Arch packages with pacman, opens the shared tmux console in a terminal window when Hyprland starts and lists bashOS in the app launcher, and keeps tty1 for the login screen; Debian 13 works as before. bashos os status reports the base."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "os/install/console.sh"
+    docs: "docs/OS.md"
+  - id: BASHOS-041
+    title: "The bashOS ISO, its unattended seed and first boot"
+    description: "bashos os iso build stages amrchy/ with the bashOS layer and builds the ISO with Omarchy's own builder at pinned commits; bashos os iso seed writes the cidata drive that installs it unattended on one machine's disk; bashos-firstboot finishes the runtime, the engine and the hub once the machine is online. The os iso workflow builds the ISO and installs it unattended in a KVM VM through first boot (first passed 2026-11-14); not yet branded, not yet on hardware."
+    implemented: true
+    status: partial
+    prd: [TBD]
+    surface: cli
+    link: "os/iso/build.sh"
+    docs: "docs/AMRCHY.md"
+  - id: BASHOS-042
+    title: "one-os: machine profiles"
+    description: "A custom PC's parts, firmware, drives and chips, each chip with the first kernel that drives it, and where a system installs (one-os/machines/), checked against an operating system's kernel or a live lspci before anything is deployed (bashos one-os machine check, seed-args). The ASUS ROG Crosshair X870E Dark Hero desktop, bashOS's machine in forge's place, is the first profile."
+    implemented: true
+    status: shipped
+    prd: [TBD]
+    surface: cli
+    link: "one-os/scripts/oneos-machine"
+    docs: "one-os/docs/reference/machines.md"

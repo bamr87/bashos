@@ -1,0 +1,26 @@
+# The kernel each operating system one-os deploys boots with: what `oneos-machine check` compares
+# a machine's chips against. Record where each version was read; bump it with the system.
+schema: 1
+systems:
+  bashos:
+    title: bashOS (Amrchy on Arch, the linux-omarchy kernel)
+    kernel: "7.2"
+    source: >-
+      Omarchy's stable 4.5.0 image boots 7.2.15-1-omarchy (nightly.omarchy.org, 2026-11-05); the
+      bashOS ISO takes its kernel from the same channel when it is built, so at least as new.
+  home-base:
+    title: one-os home base (Debian 13 with the backports kernel)
+    kernel: "7.2"
+    source: manifest.yaml lightos.backports; field report 2026-11-12
+  debian-13:
+    title: Debian 13 (trixie) installer and the Debian bashOS image
+    kernel: "6.12"
+    source: Debian 13 release kernel
+  steamos-3.8:
+    title: SteamOS 3.8
+    kernel: "6.16"
+    source: field report 2026-11-12 (SteamOS 3.8.14)
+  steamos-3.9:
+    title: SteamOS 3.9
+    kernel: "7.2"
+    source: field report 2026-11-12 (the Beta channel); the X870E runs SteamOS 3.9.5 on 7.2.7-valve2 (read 2026-11-13)

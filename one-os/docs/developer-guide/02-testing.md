@@ -47,6 +47,7 @@ graphical menus.
 | ID | Test | Firmware | Asserts | Suite |
 |---|---|---|---|---|
 | T00 | `test_00_image` | — | partitions (Ventoy exFAT + 32 MB VTOYEFI), payload checksums, `ventoy.json` schema, persistence image label + `/ union` | fast |
+| T05 | `test_05_machines` | — | `machines/` lints; `oneos-machine check` reports the X870E's MT7927 Wi-Fi missing on SteamOS 3.8, every known chip driven on a 7.2 kernel, exit 2 with no network chip | fast |
 | T10 | `test_10_boot_menu` | UEFI, BIOS | OCR finds "Home base" and "Network install" | fast |
 | T20 | `test_20_lightos` | UEFI, BIOS | bare `ONEOS-READY` via Ventoy (P1 mountable); ISO boots without Ventoy | fast |
 | T21 | `test_desktop_autologin` | UEFI | `user` exists, password `live`, Xfce session running | fast |

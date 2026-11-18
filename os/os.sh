@@ -20,8 +20,10 @@ usage() {
   cat <<'EOF'
 usage: bashos os <command>
 
-  install [-n] [...]      turn this Debian 13 machine into a bashOS machine (install --help)
-  update [-n] [--system]  pull the layer, re-apply it, run pending migrations (--system: apt too)
+  install [-n] [...]      turn this Amrchy (Arch) or Debian 13 machine into a bashOS machine
+                          (install --help)
+  update [-n] [--system]  pull the layer, re-apply it, run pending migrations (--system: the
+                          system too — `omarchy update` on Amrchy, apt full-upgrade on Debian)
   migrate [--pending]     run pending migrations (--pending: list them; exit 1 when none)
   status                  what is running, as [ OK ]/[WARN]/[CRIT] verdicts (exit = worst)
   engine [verb]           status | update | verify | latest | fetch VERSION DIR — OpenCode, kept
@@ -30,7 +32,11 @@ usage: bashos os <command>
   console                 attach the shared tmux console (what tty1 shows)
   heal                    add a missing bashos window to the console (the timer's job)
   uninstall [-n] [--purge]  remove what install added (--purge: /opt/bashos and /etc/bashos too)
-  image <verb>            build | test — the bootable image (os/image/README.md)
+  amrchy <verb>           status | pull [REF] | push BRANCH — amrchy/, the framework, kept in step
+                          with bamr87/amrchy (a squashed git subtree)
+  iso <verb>              build | seed | test — bashOS on Amrchy: the ISO, the cidata drive that
+                          installs it unattended, and that install checked in a VM (docs/AMRCHY.md)
+  image <verb>            build | test — the Debian 13 disk image (os/image/README.md)
   version                 the installed layer's version
 EOF
 }
@@ -50,6 +56,13 @@ cmd_status() {
   os_conf_load
   local v session=${BASHOS_CONSOLE_SESSION:-console} port=${BASHOS_HARNESS_PORT:-4001} code
   printf 'bashos os status · %s · %s\n\n' "$(hostname 2>/dev/null)" "$(date '+%Y-%m-%d %H:%M')"
+
+  case $(os_base) in
+    amrchy) verdict " OK " base "Amrchy $(os_amrchy_version) on Arch · kernel $(uname -r)" ;;
+    debian) verdict " OK " base "$(os_release PRETTY_NAME) · kernel $(uname -r)" ;;
+    arch) verdict WARN base "Arch without Amrchy — the desktop pieces are skipped" ;;
+    *) verdict WARN base "$(os_release PRETTY_NAME): not a base bashOS installs on" ;;
+  esac
 
   if [[ -x $BASHOS_OS_PATH/os/os.sh ]]; then
     verdict " OK " layer "$BASHOS_OS_PATH $(os_version)"
@@ -72,7 +85,7 @@ cmd_status() {
     verdict WARN auth "no Claude credential — run: claude (sign in once)"
   fi
 
-  if [[ ${BASHOS_CONSOLE:-auto} == off ]]; then
+  if [[ $(os_console_mode) == off ]]; then
     verdict " OK " console "off (BASHOS_CONSOLE=off)"
   elif tmux has-session -t "=$session" 2>/dev/null; then
     local windows clients
@@ -119,6 +132,10 @@ cmd_status() {
   fi
   if [[ -f /var/lib/bashos/provisioned ]]; then
     verdict " OK " provision "first boot done $(cat /var/lib/bashos/provisioned)"
+  elif [[ -f /var/lib/bashos/firstboot-failed ]]; then
+    verdict CRIT provision "first boot failed $(cat /var/lib/bashos/firstboot-failed) — /var/log/bashos-firstboot.log, then: sudo bashos-firstboot"
+  elif [[ -f /var/lib/bashos/firstboot-pending ]]; then
+    verdict WARN provision "first boot waiting for a user or the network — journalctl -u bashos-firstboot"
   fi
   return "$STATUS"
 }
@@ -183,8 +200,15 @@ cmd_update() {
   os_dry || os_ok "layer at $(os_version)"
   if ((system)); then
     os_step "system packages"
-    os_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    os_root env DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
+    if [[ $(os_base) == amrchy ]]; then
+      # The framework's own update path: packages, its migrations, its hooks (one sudo prompt).
+      os_run omarchy-update -y
+    elif os_arch_base; then
+      os_root pacman -Syu --noconfirm
+    else
+      os_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+      os_root env DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
+    fi
   fi
   # The freshly pulled code re-applies itself, then brings this install forward.
   local flags=()
@@ -236,9 +260,13 @@ cmd_uninstall() {
   for f in .zprofile .bash_profile .profile .zshrc .bashrc .tmux.conf; do
     os_block_drop "$HOME/$f"
   done
+  os_block_drop "$HOME/.config/hypr/autostart.lua" --
+  for f in "$HOME"/.local/share/applications/{bashos-console,bashos}.desktop; do
+    [[ -e $f ]] && os_run rm -f "$f"
+  done
   os_step "system"
   for l in /usr/local/bin/bashos /usr/local/bin/os-health /usr/local/bin/bashos-os /usr/local/bin/bashos-console \
-    /usr/local/bin/bashos-harness /usr/local/sbin/bashos-provision; do
+    /usr/local/bin/bashos-harness /usr/local/sbin/bashos-provision /usr/local/sbin/bashos-firstboot; do
     [[ -L $(os_path "$l") && $(readlink "$(os_path "$l")") == "$BASHOS_OS_PATH"/* ]] && os_root rm -f "$(os_path "$l")"
   done
   l=/usr/local/bin/opencode
@@ -331,6 +359,15 @@ case $cmd in
       build) shift; exec "$OS_DIR/image/build.sh" "$@" ;;
       test) shift; exec "$OS_DIR/image/test/boot-smoke.sh" "$@" ;;
       *) os_die "usage: bashos os image build|test [options] (os/image/README.md)" ;;
+    esac
+    ;;
+  amrchy) exec "$OS_DIR/amrchy/sync.sh" "$@" ;;
+  iso)
+    case ${1:-} in
+      build) shift; exec "$OS_DIR/iso/build.sh" "$@" ;;
+      seed) shift; exec "$OS_DIR/iso/seed.sh" "$@" ;;
+      test) shift; exec "$OS_DIR/iso/test.sh" "$@" ;;
+      *) os_die "usage: bashos os iso build|seed|test [options] (docs/AMRCHY.md)" ;;
     esac
     ;;
   version) printf 'bashos os %s (%s)\n' "$(os_version)" "$BASHOS_OS_PATH" ;;

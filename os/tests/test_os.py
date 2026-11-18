@@ -240,6 +240,89 @@ def test_uninstall_removes_what_install_added(env, root, home):
     assert not (root / "opt/bashos").exists() and not (root / "etc/bashos").exists()
 
 
+# ---------------------------------------------------------------- the Amrchy base (ADR 0005)
+
+ARCH_RELEASE = 'NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\n'
+
+
+def _amrchy(root: Path, home: Path) -> None:
+    """Make the fake root an installed Amrchy: Arch, the framework's runtime, its user config."""
+    (root / "etc/os-release").write_text(ARCH_RELEASE)
+    (root / "usr/share/omarchy").mkdir(parents=True)
+    (root / "usr/share/omarchy/version").write_text("4.0.0\n")
+    (home / ".config/hypr").mkdir(parents=True)
+    (home / ".config/hypr/autostart.lua").write_text('-- Extra autostart processes.\no.launch_on_start("my-app")\n')
+
+
+@needs_bash
+@pytest.mark.parametrize(("release", "framework", "base"), [
+    ('ID=debian\nVERSION_ID="13"\n', False, "debian"),
+    ('ID=raspbian\nID_LIKE=debian\nVERSION_ID="13"\n', False, "debian"),
+    (ARCH_RELEASE, False, "arch"),
+    (ARCH_RELEASE, True, "amrchy"),
+    ('ID=fedora\nVERSION_ID="45"\n', False, "other"),
+])
+def test_the_base_is_read_from_the_machine(env, root, release, framework, base):
+    (root / "etc/os-release").write_text(release)
+    if framework:
+        (root / "usr/share/omarchy").mkdir(parents=True)
+    p = run("-c", f'source "{OS}/lib.sh"; os_base', env=env)
+    assert p.stdout == base
+
+
+@needs_bash
+def test_amrchy_is_a_supported_base(env, root, home):
+    _amrchy(root, home)
+    p = install(env, "--only", "preflight")
+    assert "Amrchy on Arch (4.0.0)" in p.stdout
+
+
+@needs_bash
+def test_amrchy_takes_arch_package_names_and_no_kiosk(env, root, home):
+    _amrchy(root, home)
+    p = run("-c", f'source "{OS}/lib.sh"; source "{OS}/install/packages.sh"; os_package_lists; '
+            'echo ---; os_packages --all $(os_package_lists)', env=env)
+    lists, packages = p.stdout.split("---\n")
+    assert lists.split() == ["base", "services"]  # no cage/foot kiosk on a desktop
+    assert {"python", "procps-ng", "openssh", "nss-mdns", "docker"} <= set(packages.split())
+    assert "python3-venv" not in packages and "cage" not in packages
+
+
+@needs_bash
+def test_amrchy_console_is_a_window_on_the_desktop(env, root, home):
+    _amrchy(root, home)
+    install(env)
+    # The login screen keeps tty1: no getty autologin, no tty1 hook. ssh still joins the console.
+    assert not (root / "etc/systemd/system/getty@tty1.service.d/bashos-autologin.conf").exists()
+    assert not (home / ".zprofile").exists() or "bashos-console" not in (home / ".zprofile").read_text()
+    assert "bashos-console --attach" in (home / ".zshrc").read_text()
+    # Hyprland opens it at login, inside a Lua-comment managed block below the user's own lines.
+    autostart = (home / ".config/hypr/autostart.lua").read_text().splitlines()
+    assert autostart[:2] == ["-- Extra autostart processes.", 'o.launch_on_start("my-app")']
+    assert autostart[3].startswith("-- >>> bashos os managed") and autostart[-1] == "-- <<< bashos os managed <<<"
+    assert any("bashos-console --attach" in line and "launch_on_start" in line for line in autostart)
+    # The launcher lists the console and the desktop.
+    apps = home / ".local/share/applications"
+    console = configparser.ConfigParser(interpolation=None)
+    console.read(apps / "bashos-console.desktop")
+    assert console["Desktop Entry"]["Exec"].endswith("/usr/local/bin/bashos-console --attach")
+    assert (apps / "bashos.desktop").is_file()
+    # A second run changes nothing.
+    first = tree(home)
+    install(env)
+    assert tree(home) == first
+
+
+@needs_bash
+def test_uninstall_takes_the_console_off_the_desktop(env, root, home):
+    _amrchy(root, home)
+    install(env)
+    run(str(OS / "os.sh"), "uninstall", env=env)
+    assert (home / ".config/hypr/autostart.lua").read_text() == \
+        '-- Extra autostart processes.\no.launch_on_start("my-app")\n'
+    assert not list((home / ".local/share/applications").glob("bashos*.desktop"))
+
+
 # ---------------------------------------------------------------- the monitor: rotation, VNC
 
 
