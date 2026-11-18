@@ -664,3 +664,42 @@ def test_settings_load_without_a_home(env):
     e = {k: v for k, v in env.items() if k not in ("HOME", "BASHOS_HUB_DIR")}
     p = run("-c", f'set -u; source "{OS}/lib.sh"; os_conf_load; printf %s "$BASHOS_HUB_DIR"', env=e)
     assert p.stdout == "~/dev/bamr87"
+
+
+def _fake_bin(d: Path, name: str, log: Path) -> None:
+    """A stand-in for `name` that records its argv, one per line, then a blank separator."""
+    f = d / name
+    f.write_text(f'#!/usr/bin/env bash\nprintf "%s\\n" "$@" >>"{log}"\nprintf "\\n" >>"{log}"\n')
+    f.chmod(0o755)
+
+
+@needs_bash
+@pytest.mark.parametrize("cached", [False, True])
+def test_image_build_package_cache_is_opt_in(tmp_path, env, cached):
+    """bamr87/bamr87#856: BASHOS_PKG_CACHE persists mkosi's packages; unset, the build is unchanged."""
+    if sys.platform != "linux":
+        pytest.skip("build.sh runs mkosi only on Linux")
+    bins, log, out = tmp_path / "bin", tmp_path / "argv.log", tmp_path / "out"
+    bins.mkdir()
+    _fake_bin(bins, "docker", log)
+    _fake_bin(bins, "mkosi", log)
+    e = dict(env, PATH=f"{bins}:{env['PATH']}")
+    cache = tmp_path / "pkg-cache"
+    if cached:
+        e["BASHOS_PKG_CACHE"] = str(cache)
+
+    run(str(OS / "image/build.sh"), "--docker", "--arch", "x86-64", "--out", str(out), env=e)
+    docker = log.read_text().split("\n")
+    assert "debian:trixie" in docker
+    assert (f"{cache}:/cache" in docker) is cached
+    assert ("BASHOS_PKG_CACHE=/cache" in docker) is cached
+
+    log.unlink()
+    run(str(OS / "image/build.sh"), "--arch", "x86-64", "--out", str(out), env=e)
+    mkosi = log.read_text().strip().split("\n")
+    assert mkosi[-2:] == ["--force", "build"]
+    if cached:
+        i = mkosi.index("--package-cache-dir")
+        assert mkosi[i + 1] == str(cache) and cache.is_dir()
+    else:
+        assert "--package-cache-dir" not in mkosi and not cache.exists()

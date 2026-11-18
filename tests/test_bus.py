@@ -56,7 +56,7 @@ class _BusClient:
                 raise item
             yield item
 
-    async def reject_permission(self, session_id, permission_id):
+    async def reject_permission(self, session_id, permission_id, message=""):
         self.rejected.append((session_id, permission_id))
 
     async def reject_permission_v2(self, request_id, message):

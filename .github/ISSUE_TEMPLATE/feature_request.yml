@@ -1,0 +1,46 @@
+# kit: community v0.1.0 (UPS-REPO-18). Applies the fleet type `feature`
+# (bamr87/.github used GitHub's default `enhancement`, which the label sync renames).
+# Tailored for bashOS (#52): adds the surface dropdown. The community fan-out
+# leaves a tailored copy alone.
+name: ✨ Feature request
+description: Suggest a new capability.
+labels: ["feature", "agent:queued"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What are you trying to do, and why is it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      description: Where would it live? Pick every one it touches.
+      multiple: true
+      options:
+        - "CLI (bashos run and friends)"
+        - "Textual desktop"
+        - "GUI (bashos gui)"
+        - "Slash commands and loops"
+        - "Engine and tool policy"
+        - "chui (macOS terminal environment)"
+        - "OS layer (bashos os)"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know it is done?
+      placeholder: "- [ ] …"
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

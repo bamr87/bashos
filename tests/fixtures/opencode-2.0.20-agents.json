@@ -1,0 +1,504 @@
+[
+ {
+  "id": "bashos",
+  "name": "bashos",
+  "permissions": [
+   {
+    "action": "*",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "external_directory",
+    "resource": "*",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env.*",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env.example",
+    "effect": "allow"
+   },
+   {
+    "action": "*",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "shell",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "shell",
+    "resource": "uname",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "uname *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "uptime",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "uptime *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "df",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "df *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "du",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "du *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "ps",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "ps *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "top",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "top *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "vm_stat",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "vm_stat *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "free",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "free *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "sw_vers",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "sw_vers *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "sysctl",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "sysctl *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "ls",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "ls *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "which",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "which *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "whoami",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "whoami *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "id",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "id *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "date",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "date *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "netstat",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "netstat *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "head",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "head *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "wc",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "wc *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "file",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "file *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "stat",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "stat *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "git status",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "git status *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "git log",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "git log *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "bin/os-health",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "bin/os-health *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "./bin/os-health",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "./bin/os-health *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux list-",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux list- *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux capture-pane",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux capture-pane *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux has-session",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux has-session *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux display-message",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux display-message *",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "tmux *#(*",
+    "effect": "deny"
+   },
+   {
+    "action": "shell",
+    "resource": "git log *--output*",
+    "effect": "deny"
+   },
+   {
+    "action": "read",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "glob",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "grep",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "list",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "edit",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "apply_patch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "webfetch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "websearch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "execute",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "subagent",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "edit",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "external_directory",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "question",
+    "resource": "*",
+    "effect": "deny"
+   }
+  ]
+ },
+ {
+  "id": "bashos-sealed",
+  "name": "bashos-sealed",
+  "permissions": [
+   {
+    "action": "*",
+    "resource": "*",
+    "effect": "allow"
+   },
+   {
+    "action": "external_directory",
+    "resource": "*",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env.*",
+    "effect": "ask"
+   },
+   {
+    "action": "read",
+    "resource": "*.env.example",
+    "effect": "allow"
+   },
+   {
+    "action": "shell",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "read",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "glob",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "grep",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "list",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "edit",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "apply_patch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "webfetch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "websearch",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "execute",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "subagent",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "todowrite",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "question",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "skill",
+    "resource": "*",
+    "effect": "deny"
+   },
+   {
+    "action": "*",
+    "resource": "*",
+    "effect": "deny"
+   }
+  ]
+ }
+]

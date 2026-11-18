@@ -290,7 +290,7 @@ features:
     docs: "docs/OS.md"
   - id: BASHOS-031
     title: "Managed OpenCode engine, always latest and verified"
-    description: "OpenCode is a dependency bashOS owns. bashos opencode verify judges the permission rules a live engine resolved against policy.py (the engine contract). On a bashOS machine the OS layer fetches npm's latest OpenCode binary from the registry (sha512-checked, root-owned) and promotes a release only after the contract passes, falling back to the newest passing release. A daily timer and a daily CI canary keep it current; an OpenCode 2 binary is named with the way out (#71)."
+    description: "OpenCode is a dependency bashOS owns. bashos opencode verify judges the permission rules a live engine resolved against policy.py (the engine contract). On a bashOS machine the OS layer fetches npm's latest OpenCode binary from the registry (sha512-checked, root-owned) and promotes a release only after the contract passes, falling back to the newest passing release. A daily timer and a daily CI canary (npm's latest, and the newest OpenCode 2 release) keep it current. bashOS speaks OpenCode 1 and 2 (#71); an OpenCode 2 engine also answers the contract's samples itself, and runs the contract at start before anything runs on it."
     implemented: true
     status: partial
     prd: [TBD]

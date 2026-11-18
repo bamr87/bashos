@@ -53,6 +53,11 @@
     "action": "allow"
    },
    {
+    "permission": "*",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
     "permission": "bash",
     "pattern": "*",
     "action": "deny"
@@ -388,6 +393,11 @@
     "action": "deny"
    },
    {
+    "permission": "execute",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
     "permission": "task",
     "pattern": "*",
     "action": "deny"
@@ -504,6 +514,11 @@
    },
    {
     "permission": "websearch",
+    "pattern": "*",
+    "action": "deny"
+   },
+   {
+    "permission": "execute",
     "pattern": "*",
     "action": "deny"
    },

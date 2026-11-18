@@ -1,0 +1,72 @@
+name: bashOS checks
+
+# bashOS's extra gates, beside the thin ci.yml caller (UPS-QA-20: "extra gates
+# live in their own workflows beside it"). The shared standard-ci gate runs no
+# Python linter, shellcheck, compose check or image build, so they live here,
+# unchanged from the old ci.yml `lint` and `docker` jobs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bashos-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (ruff + shellcheck + compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: ruff
+        run: |
+          pip install ruff
+          ruff check .
+      - name: shellcheck
+        run: |
+          shellcheck bin/bashos one-os/one-os.sh
+          shellcheck -x -P SCRIPTDIR --severity=warning chui/*.sh chui/config/home.sh chui/config/terminal/macos-font.sh
+          shellcheck -x -P SCRIPTDIR --severity=warning os/*.sh os/install/*.sh os/bin/* os/iso/*.sh os/amrchy/sync.sh os/image/build.sh os/image/test/boot-smoke.sh os/image/mkosi.postinst.chroot
+      - name: compose config
+        run: docker compose config --quiet
+
+  amrchy:
+    name: amrchy (the fork's own tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      # The layers contract bashOS installs through, the build-time rebrand and the upstream
+      # sync: the parts of amrchy/ this fork owns (amrchy/default/upstream.toml). The rest of
+      # amrchy's suite needs its desktop and runs in bamr87/amrchy.
+      - name: layers, rebrand, upstream sync
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
+          cd amrchy
+          for t in layers rebrand upstream-sync; do bash "test/shell.d/$t-test.sh"; done
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: build service image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
