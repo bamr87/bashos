@@ -79,6 +79,8 @@ Mermaid diagrams must parse (no `;` or `{}` in sequence messages).
 ## Map
 
 - `manifest.yaml` — pins; `scripts/manifest.py lint` enforces schema/no `<PIN>`
+- `machines/` — machine profiles (parts, firmware, chips and their first kernels) and the systems'
+  kernels; `scripts/oneos-machine check NAME --system SYS` before any deploy (docs/reference/machines.md)
 - `lightos/` — live-build tree; tools in `config/includes.chroot/usr/local/bin/`
 - `scripts/` — fetch, build, stage, install-to-device, flash (Linux/macOS), lint, bump
 - `ui/` — flash wizard (stdlib HTTP server + single page)

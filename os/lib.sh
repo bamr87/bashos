@@ -45,9 +45,11 @@ os_fake_root() { [[ -n $BASHOS_OS_ROOT ]]; }
 os_image() { [[ $BASHOS_OS_IMAGE == 1 ]]; }
 os_has() { command -v "$1" >/dev/null 2>&1; }
 # os_user_bins HOME — where a person's own tools live, off the system PATH: fnm's default Node,
-# ~/.local/bin (claude), ~/.opencode/bin, Volta. Non-interactive shells and systemd units miss them.
+# ~/.local/bin (claude), ~/.opencode/bin, Volta, mise's shims (Amrchy's Node and agent CLIs).
+# Non-interactive shells and systemd units miss them.
 os_user_bins() {
-  printf '%s\n' "$1/.local/share/fnm/aliases/default/bin" "$1/.local/bin" "$1/.opencode/bin" "$1/.volta/bin"
+  printf '%s\n' "$1/.local/share/fnm/aliases/default/bin" "$1/.local/bin" "$1/.opencode/bin" "$1/.volta/bin" \
+    "$1/.local/share/mise/shims"
 }
 # os_user_has CMD [HOME] — CMD is on PATH or in one of HOME's tool directories.
 os_user_has() {
@@ -57,6 +59,56 @@ os_user_has() {
   return 1
 }
 os_is_root() { [[ ${EUID:-$(id -u)} -eq 0 ]]; }
+
+# os_release KEY — one value from the machine's /etc/os-release (under the fake root).
+os_release() {
+  local f
+  f=$(os_path /etc/os-release)
+  [[ -r $f ]] || return 0
+  sed -n "s/^$1=//p" "$f" | tr -d '"'
+}
+
+# os_base — the operating system under the layer:
+#   amrchy  Arch with the Amrchy (or upstream Omarchy) framework: bashOS's own base (ADR 0005)
+#   arch    Arch without it
+#   debian  Debian 13 or a derivative (Raspberry Pi OS): the base ADR 0002 built on
+#   other   anything else (a preview only)
+os_base() {
+  local id like
+  id=$(os_release ID) like=$(os_release ID_LIKE)
+  if [[ $id == arch || $id == amrchy || $id == omarchy || " $like " == *" arch "* ]]; then
+    if [[ -d $(os_path /usr/share/omarchy) || -d $(os_path /usr/share/amrchy) ]]; then
+      printf 'amrchy'
+    else
+      printf 'arch'
+    fi
+  elif [[ $id == debian || " $like " == *" debian "* ]]; then
+    printf 'debian'
+  else
+    printf 'other'
+  fi
+}
+os_arch_base() { [[ $(os_base) == amrchy || $(os_base) == arch ]]; }
+
+# os_amrchy_version — the framework's version file (Omarchy's runtime ships one), or "unknown".
+os_amrchy_version() {
+  local d v
+  for d in /usr/share/amrchy /usr/share/omarchy; do
+    v=$(os_path "$d/version")
+    [[ -r $v ]] && { tr -d '\n' <"$v"; return 0; }
+  done
+  printf 'unknown'
+}
+
+# os_console_mode — what BASHOS_CONSOLE means on this machine. `auto` on Amrchy is `desktop`:
+# the login screen keeps tty1 and the console opens in a terminal window when the desktop starts.
+os_console_mode() {
+  local mode=${BASHOS_CONSOLE:-auto}
+  if [[ $mode == auto && $(os_base) == amrchy ]]; then
+    mode=desktop
+  fi
+  printf '%s' "$mode"
+}
 
 # os_path /etc/x — a system path, under the fake root when there is one.
 os_path() { printf '%s%s' "$BASHOS_OS_ROOT" "$1"; }
@@ -168,6 +220,27 @@ os_write_file() {
   rm -f "$tmp"
 }
 
+# os_user_write FILE [MODE] < CONTENT — a file in the user's home that bashOS owns whole (its name
+# says so: bashos-*), written as the user, only when it differs.
+os_user_write() {
+  local file=$1 mode=${2:-0644} tmp
+  tmp=$(mktemp)
+  cat >"$tmp"
+  if [[ -f $file ]] && cmp -s "$tmp" "$file"; then
+    rm -f "$tmp"
+    os_log "${_os_d}unchanged${_os_0} ${file/#$HOME/\~}"
+    return 0
+  fi
+  if os_dry; then
+    os_run install -m "$mode" "<generated>" "${file/#$HOME/\~}"
+  else
+    mkdir -p "$(dirname "$file")"
+    install -m "$mode" "$tmp" "$file"
+    os_ok "wrote ${file/#$HOME/\~}"
+  fi
+  rm -f "$tmp"
+}
+
 # os_link TARGET LINK — a symlink bashOS owns (system path).
 os_link() {
   local target=$1 link
@@ -189,30 +262,47 @@ os_link() {
   os_ok "linked $2 -> $target"
 }
 
-# os_block_put FILE CONTENT [top|bottom] — put bashOS's managed block into a user file,
+# os_marks [COMMENT] — the block's two marker lines for a file whose comments start with COMMENT
+# (default `#`; Lua is `--`), as OS_MARK_BEGIN and OS_MARK_END.
+os_marks() {
+  local c=${1:-#}
+  OS_MARK_BEGIN="$c${OS_BEGIN#\#}" OS_MARK_END="$c${OS_END#\#}"
+}
+
+# _os_block_strip FILE — FILE without the block (markers from os_marks) and without trailing blank
+# lines, so the blank line os_block_put puts before a bottom block never accumulates.
+_os_block_strip() {
+  awk -v b="$OS_MARK_BEGIN" -v e="$OS_MARK_END" '
+    $0 == b { skip = 1; next }
+    $0 == e { skip = 0; next }
+    skip { next }
+    $0 == "" { blank++; next }
+    { while (blank > 0) { print ""; blank-- } print }
+  ' "$1"
+}
+
+# os_block_put FILE CONTENT [top|bottom] [COMMENT] — put bashOS's managed block into a user file,
 # replacing an earlier copy of the block and keeping every other line. `top` places it first
-# (defaults the user's own lines then override); `bottom` (the default) places it last.
+# (defaults the user's own lines then override); `bottom` (the default) places it last. COMMENT
+# is the file's comment leader for the markers (os_marks).
 os_block_put() {
   local file=$1 content=$2 where=${3:-bottom} tmp rest
+  os_marks "${4:-#}"
   tmp=$(mktemp)
   rest=$(mktemp)
   if [[ -f $file ]]; then
-    awk -v b="$OS_BEGIN" -v e="$OS_END" '
-      $0 == b { skip = 1; next }
-      $0 == e { skip = 0; next }
-      !skip { print }
-    ' "$file" >"$rest"
+    _os_block_strip "$file" >"$rest"
   fi
   {
     if [[ $where == top ]]; then
-      printf '%s\n%s\n%s\n' "$OS_BEGIN" "$content" "$OS_END"
+      printf '%s\n%s\n%s\n' "$OS_MARK_BEGIN" "$content" "$OS_MARK_END"
       cat "$rest"
     else
       cat "$rest"
       # One blank line between the user's last line and the block.
       [[ -s $rest && -n $(tail -c1 "$rest") ]] && printf '\n'
       [[ -s $rest ]] && printf '\n'
-      printf '%s\n%s\n%s\n' "$OS_BEGIN" "$content" "$OS_END"
+      printf '%s\n%s\n%s\n' "$OS_MARK_BEGIN" "$content" "$OS_MARK_END"
     fi
   } >"$tmp"
   rm -f "$rest"
@@ -233,20 +323,17 @@ os_block_put() {
   os_ok "updated the bashos block in ${file/#$HOME/\~}"
 }
 
-# os_block_drop FILE — remove bashOS's managed block, keeping every other line.
+# os_block_drop FILE [COMMENT] — remove bashOS's managed block, keeping every other line.
 os_block_drop() {
   local file=$1 tmp
-  [[ -f $file ]] && grep -qxF "$OS_BEGIN" "$file" || return 0
+  os_marks "${2:-#}"
+  [[ -f $file ]] && grep -qxF -e "$OS_MARK_BEGIN" "$file" || return 0
   if os_dry; then
     os_run "remove the bashos block from ${file/#$HOME/\~}"
     return 0
   fi
   tmp=$(mktemp)
-  awk -v b="$OS_BEGIN" -v e="$OS_END" '
-    $0 == b { skip = 1; next }
-    $0 == e { skip = 0; next }
-    !skip { print }
-  ' "$file" >"$tmp"
+  _os_block_strip "$file" >"$tmp"
   cat "$tmp" >"$file"
   rm -f "$tmp"
   os_ok "removed the bashos block from ${file/#$HOME/\~}"

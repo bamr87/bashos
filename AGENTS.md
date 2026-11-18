@@ -6,9 +6,9 @@
 
 ## What this repo is
 
-bashOS is a terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are routed by a LangGraph kernel (`src/bashos/kernel/`) through a loop (`src/bashos/loops/`) onto the OpenCode engine (`src/bashos/opencode/`), authenticated with the user's Claude Code OAuth. It serves people who want an AI-assisted terminal for software development and systems work, through three surfaces on one kernel: the Typer CLI (`shell/`), the Textual desktop (`desktop/`) and the loopback GUI (`gui/`). `chui/` is the optional macOS terminal environment. A change is done when `make test`, `make lint`, `node --test tests/shell.test.mjs` and `.venv/bin/bashos opencode sync` (leaving no diff) are all clean, the generated docs are current, and the docs a change affects are updated in the same PR.
+bashOS is a terminal-first AI runtime: Markdown slash commands (`.claude/commands/*.md`) are routed by a LangGraph kernel (`src/bashos/kernel/`) through a loop (`src/bashos/loops/`) onto the OpenCode engine (`src/bashos/opencode/`), authenticated with the user's Claude Code OAuth. It serves people who want an AI-assisted terminal for software development and systems work, through three surfaces on one kernel: the Typer CLI (`shell/`), the Textual desktop (`desktop/`) and the loopback GUI (`gui/`). `chui/` is the optional macOS terminal environment. On a machine of its own, bashOS is a layer (`os/`) on Amrchy (`amrchy/`, the maintainer's Omarchy fork and bashOS's framework), installed from one ISO; `one-os/` builds, checks and deploys the machines it runs on, custom PCs included. A change is done when `make test`, `make lint`, `node --test tests/shell.test.mjs` and `.venv/bin/bashos opencode sync` (leaving no diff) are all clean, the generated docs are current, and the docs a change affects are updated in the same PR.
 
-Design docs: [docs/HARNESS.md](docs/HARNESS.md) (layers, loops, extension guide), [docs/OPENCODE.md](docs/OPENCODE.md) (policy, credential bridge, projection), [docs/DESKTOP.md](docs/DESKTOP.md) (the Textual desktop and the GUI), [docs/FORGE.md](docs/FORGE.md) (the dev-box monitoring pattern behind `bin/os-health`, `/health`, `/dash`), [docs/OS.md](docs/OS.md) (bashOS as the operating system: the Debian 13 layer, the bootable image, the harness service), [docs/ONE-OS.md](docs/ONE-OS.md) (one-os: building, booting, managing and deploying machines). Every document is indexed in [docs/README.md](docs/README.md).
+Design docs: [docs/HARNESS.md](docs/HARNESS.md) (layers, loops, extension guide), [docs/OPENCODE.md](docs/OPENCODE.md) (policy, credential bridge, projection), [docs/DESKTOP.md](docs/DESKTOP.md) (the Textual desktop and the GUI), [docs/FORGE.md](docs/FORGE.md) (the dev-box monitoring pattern behind `bin/os-health`, `/health`, `/dash`), [docs/OS.md](docs/OS.md) (bashOS as the operating system: the layer on Amrchy or Debian 13, the console, the harness service), [docs/AMRCHY.md](docs/AMRCHY.md) (the framework under bashOS, the layer, the ISO and its first boot), [docs/ONE-OS.md](docs/ONE-OS.md) (one-os: building, booting, managing and deploying machines). Every document is indexed in [docs/README.md](docs/README.md).
 
 ## Hard rules
 
@@ -43,11 +43,16 @@ python3 tools/docs_index.py --write              # regenerate the docs/README.md
 .venv/bin/bashos gui --browser                   # the GUI desktop, in a browser tab
 bin/bashos chui install --dry-run                # macOS terminal environment: the plan, nothing changed
 bin/bashos os install --dry-run                  # Linux OS layer: the plan for this machine, nothing changed
+bin/bashos os amrchy status                      # amrchy/ (the framework) against bamr87/amrchy; pull / push BRANCH
+bin/bashos os iso build --stage-only             # the bashOS ISO tree: amrchy/ + the bashOS layer (a full build needs Docker, ~30 GB)
+bin/bashos os iso seed --user U --disk DEV --disk-bytes N   # the cidata drive that installs it unattended
+bin/bashos os iso test                           # that install in a KVM VM, through first boot (the os-iso workflow runs build + test)
 bin/bashos os engine update                      # OpenCode → npm's latest, verified before it is promoted
 bin/bashos os image build --docker               # the bootable Debian 13 disk image (mkosi, privileged container)
 bin/bashos os image test --docker                # boot it in QEMU with a seed drive and check it like a user
 bin/bashos one-os lint                           # one-os: shellcheck, ruff, manifest schema (in its builder container on macOS)
 bin/bashos one-os test ARGS="-k t21 -v"          # one-os: one harness test in QEMU (the fast suite takes ~30 min emulated)
+bin/bashos one-os machine check x870e-dark-hero --system bashos   # a machine profile's chips against a system's kernel
 ```
 
 Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.mjs` pass, and `.venv/bin/bashos opencode sync` leaves no diff.
@@ -65,7 +70,8 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - `src/bashos/gui/` — the GUI desktop (`bashos gui`). `http.py` is a ~300-line asyncio HTTP/SSE server (never add a web framework); `server.py` routes onto the kernel behind a loopback + per-process-token guard; `web/` is hand-written and unbundled — `app.js` draws, `shell.js` is a pure layout reducer tested by `tests/shell.test.mjs`. It runs kernel lines only: no shell passthrough, no policy of its own, never a loop. Window/OS-shell direction: [docs/frontend/](docs/frontend/README.md).
 - `bin/` — `bashos` (the launcher: bootstraps `.venv`, dispatches `chui` before it) and `os-health` (the verdict floor `/health` and the desktop's Health app run).
 - `chui/` — the optional macOS terminal environment (Oh My Zsh + p10k + Zellij + modern CLI; formerly bamr87/chui, merged with history). See **chui** below.
-- `os/` — the optional Linux OS layer (Omarchy-style, Debian 13): `bashos os install` turns a machine into a bashOS machine (tty1 → the shared tmux console, the hub's Harness Console as a user service, updates + migrations), and `os/image/` builds it into a bootable mkosi disk image provisioned from a `BASHOS-SEED` drive. See **os** below.
+- `amrchy/` — the framework: bamr87/amrchy, the Omarchy fork (Arch, Hyprland, its installer, updates and migrations), as a squashed git subtree in upstream's naming. Its one extension point, layers (`install/layers/<name>/`), is how bashOS installs on it. See **amrchy** below.
+- `os/` — the bashOS layer on Amrchy (primary) or Debian 13: `bashos os install` turns a machine into a bashOS machine (the shared tmux console on the desktop or tty1, the hub's Harness Console as a user service, updates + migrations). `os/amrchy/layer/` and `bashos-firstboot` put it on an Amrchy install, `os/iso/` builds the bashOS ISO and its `cidata` seed, and `os/image/` the Debian mkosi image. See **os** below.
 - `one-os/` — one-os, the tool that builds, boots, manages and deploys machines (formerly the standalone one-usb): a manifest of pinned ISOs, the Ventoy stick and its Debian home base, the PXE server, the SteamOS deployer, the flash wizard and a QEMU harness. Self-contained, with its own Makefile, builder container, docs and ADRs. See **one-os** below.
 - `tools/` — repository scripts that do not ship: `capture_desktop.py` (the stills/GIFs in `docs/DESKTOP-TOUR.md`; not in CI, re-run when the front end changes, needs `pip install playwright pillow`), `gen_commands_table.py` and the vendored `docs_index.py`.
 - `docker-compose.yml`, `docker/` — optional services: `phoenix` (:6006), `langgraph-dev` (serves the kernel graph via `langgraph.json`, :2024), `bashos` (the containerized terminal, profile `cli`). LangChain/LangGraph are in-process libraries otherwise.
@@ -103,15 +109,27 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 - Plain bash (≥ 4.4; Debian 13 ships 5.2), no Python dependency: `bin/bashos os …` dispatches to `os/os.sh` BEFORE the venv bootstrap, and the Typer `bashos os` command forwards to the same script.
 - Every change to a machine goes through `os/lib.sh` (`os_root`, `os_install_file`, `os_write_file`, `os_link`, `os_block_put`, `os_systemctl`) so `--dry-run` and the fake root (`--root DIR`) stay truthful; a phase never calls `sudo` or writes a system path itself. A re-run changes nothing — anything a re-run cannot express is a migration in `os/migrations/`.
 - The user's files are theirs: only the `>>> bashos os managed` block is written; `/etc/bashos/os.conf` and `~/.config/bashos/harness.env` are created once; existing hooks (forge's console mirror) are adopted. The layer at `/opt/bashos` is root-owned.
-- It never widens `opencode/policy.py`, gives a loop a tool, or touches the engine's credential path. Changing what runs on forge (an install, an image written to a disk) is a deploy: it needs the maintainer's explicit go-ahead.
-- Tests: `os/tests/` (fake root + throwaway `$HOME`; in `make test`); the image is built and booted by `os/image/test/boot-smoke.sh` in the `os-image.yml` workflow. Docs: [os/README.md](os/README.md), [docs/OS.md](docs/OS.md).
+- It never widens `opencode/policy.py`, gives a loop a tool, or touches the engine's credential path. Changing what runs on bashOS's machine (the X870E desktop, which replaced forge) is a deploy: an install, or an image written to a disk, needs the maintainer's explicit go-ahead.
+- Two bases, read from `/etc/os-release` (`os_base`): Amrchy (Arch package lists in `os/packages/arch/`, pacman, the console as a desktop window) and Debian 13 (apt, tty1). A change that differs by base says so where it branches, and is tested against both fake roots.
+- The Amrchy layer (`os/amrchy/layer/system.sh`) runs inside the installer, as root, with no network: it may only copy, write and enable. Anything that needs the network belongs to `bashos-firstboot`, which retries by exiting 75 and records every other failure instead of looping.
+- Building an ISO and installing it into a VM (`bashos os iso test`, the `os-iso` workflow) is safe. Writing it to a stick or a real disk is the maintainer's step, like every disk write in one-os.
+- Tests: `os/tests/` (fake root + throwaway `$HOME`; in `make test`), `os/tests/test_iso.py` for the layer, first boot, staging and the seed; the Debian image is built and booted by `os/image/test/boot-smoke.sh` in the `os-image.yml` workflow. Docs: [os/README.md](os/README.md), [docs/OS.md](docs/OS.md), [docs/AMRCHY.md](docs/AMRCHY.md).
+
+## amrchy
+
+- `amrchy/` is a squashed git subtree of [bamr87/amrchy](https://github.com/bamr87/amrchy), the fork of record, where the daily AI upstream sync with Omarchy runs. Bring it in with `bin/bashos os amrchy pull`. Send changes made here back with `bin/bashos os amrchy push BRANCH` and a pull request there; never push to its `main`.
+- It is upstream's code: Omarchy's naming (`omarchy-*`, `/usr/share/omarchy`) and its own rules, in [amrchy/AGENTS.md](amrchy/AGENTS.md). Its shell tests are `amrchy/test/shell`, and it is outside this repo's ruff and Markdown rules.
+- Change the framework only for something every layer needs, through its layers contract ([amrchy/docs/layers.md](amrchy/docs/layers.md)); bashOS's own setup belongs in `os/amrchy/layer/`. The only edits to upstream files are the two `run_logged` lines that call the layers, which an upstream sync must keep last.
+- `os/iso/iso.conf` pins Omarchy's ISO builder to the day of amrchy's upstream base: move it in the same change as a pull that moves that base. Never run `bin/rebrand --apply` on `amrchy/`; the brand is applied to builds.
+- Docs: [docs/AMRCHY.md](docs/AMRCHY.md), [ADR 0005](docs/adr/0005-bashos-is-amrchy-plus-a-layer.md), [ADR 0003](docs/adr/0003-bashos-on-omarchy.md).
 
 ## one-os
 
-- Self-contained: `bin/bashos one-os <target>` dispatches to `one-os/one-os.sh` BEFORE the venv bootstrap, which forwards to `one-os/Makefile` (and `one-os vm …` to `one-os/scripts/oneos-vm`). Nothing in `src/bashos/` imports it, and it never widens `opencode/policy.py` or gives a loop a tool.
+- Self-contained: `bin/bashos one-os <target>` dispatches to `one-os/one-os.sh` BEFORE the venv bootstrap, which forwards to `one-os/Makefile` (and `one-os vm …` to `one-os/scripts/oneos-vm`, `one-os machine …` to `one-os/scripts/oneos-machine`). Nothing in `src/bashos/` imports it, and it never widens `opencode/policy.py` or gives a loop a tool.
 - **Never write a real disk.** No `make flash`, `scripts/flash*.sh`, `write-image.py`, `dd`, `diskutil erase*` or `oneos-install` against hardware: those are the maintainer's steps. A physical stick may be booted read-only in a VM, and the maintainer runs that command too. The full working notes are in [one-os/AGENTS.md](one-os/AGENTS.md); read them before changing anything there.
 - The harness is the definition of done: `make -C one-os lint` often, `make -C one-os test ARGS="-k <id>"` for the test that covers a change. Its tests boot VMs, so they are not in `make test`; the `one-os` workflow runs them when `one-os/**` changes.
 - Names: tools are `oneos-*`, the package is `oneos_harness`, variables are `ONEOS_*`. Pins live in `one-os/manifest.yaml`; `scripts/manifest.py lint` rejects an unpinned entry.
+- Machine profiles (`one-os/machines/`) record a machine's parts and the first kernel each chip needs; a fact not read off the machine is `TBD`, never a guess. Run `oneos-machine check` before deploying a system to a machine.
 - Docs: [docs/ONE-OS.md](docs/ONE-OS.md) (the overview), [one-os/docs/README.md](one-os/docs/README.md) (user, operator and developer guides), [ADR 0004](docs/adr/0004-one-os.md), one-os's own ADRs in `one-os/docs/adr/`.
 
 ## Releasing
@@ -124,6 +142,7 @@ Member of the bamr87 fleet, vendored in the hub as the `projects/bashos` submodu
 
 ## Standard deviations
 
+- `amrchy/` is a subtree of an upstream project ([ADR 0005](docs/adr/0005-bashos-is-amrchy-plus-a-layer.md)): it keeps Omarchy's naming, bash style and hard-wrapped documents, ruff excludes it (`pyproject.toml`), and its tests are its own (`amrchy/test/`), outside `make test`.
 - `one-os/` was imported whole ([ADR 0004](docs/adr/0004-one-os.md)): its documents are hard-wrapped and do not all open with a `>` summary, its Python follows `one-os/ruff.toml` (110 columns), and its tests run outside `make test`. New one-os documents follow this repo's Markdown rule.
 
 ## Governance

@@ -1,4 +1,5 @@
-# os/install/system.sh — /etc/bashos, never-sleep, the systemd units, tty1 autologin, linger.
+# os/install/system.sh — /etc/bashos, never-sleep, the systemd units, tty1 autologin (not on a
+# desktop: Amrchy's login screen keeps tty1), linger.
 # shellcheck shell=bash disable=SC2154  # the _os_* colours come from lib.sh, which install.sh sources first
 
 # The getty drop-in that auto-logs USER in on tty1 — the physical monitor.
@@ -58,7 +59,10 @@ EOF
 
 os_console_login() {
   local user=$1
-  [[ ${BASHOS_CONSOLE:-auto} != off ]] || { os_log "console off: tty1 left alone"; return 0; }
+  case $(os_console_mode) in
+    off) os_log "console off: tty1 left alone"; return 0 ;;
+    desktop) os_log "console on the desktop: tty1 stays the login screen's"; return 0 ;;
+  esac
   if os_autologin_elsewhere "$user"; then
     os_ok "tty1 already logs $user in (an existing getty drop-in) — kept"
     return 0
