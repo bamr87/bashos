@@ -2,6 +2,8 @@
 
 # bashos
 
+> bashOS's direction is to become the ultimate open home for all things terminal-first AI runtime: data, tools, resources and transparency, with an inspectable kernel for slash commands and a GUI that sits beside the terminal, not above it, for everyone ([constitution](docs/constitution.md) §1).
+
 > How to work in bashOS: the exact commands, the layout, the hard rules and the generated files, canonical for every coding agent and contributor.
 
 ## What this repo is

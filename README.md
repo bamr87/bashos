@@ -1,6 +1,6 @@
 # bashOS
 
-> Terminal-first AI runtime that routes Claude slash commands through a LangGraph kernel onto the OpenCode engine.
+> bashOS's direction is to become the ultimate open home for all things terminal-first AI runtime: data, tools, resources and transparency, with an inspectable kernel for slash commands and a GUI that sits beside the terminal, not above it, for everyone ([constitution](docs/constitution.md) §1).
 
 [![CI](https://github.com/bamr87/bashos/actions/workflows/ci.yml/badge.svg)](https://github.com/bamr87/bashos/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

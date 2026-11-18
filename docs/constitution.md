@@ -6,11 +6,17 @@
 > Agents read this before [AGENTS.md](../AGENTS.md) conventions, the [PRD](../PRD.md), or the
 > [feature catalog](../features/features.yml). Ratified by merged PR; amended only per § 8.
 
-## 1. Mission
+## 1. Missions
 
 bashOS is one platform from the terminal to the machine it runs on: a terminal-first AI runtime whose Markdown slash commands run on one kernel behind every surface (the CLI, the Textual desktop and the loopback GUI), on any machine that has a terminal. On a machine of its own it boots as Amrchy, the maintainer's fork of Omarchy, with bashOS as its layer. one-os builds, checks and deploys those machines, custom-built PCs among them, and proves each step in a VM before hardware is touched. Every part stays customizable and versatile, and nothing in the operating system or the hardware tooling widens what the AI loops can touch.
 
-_Sources: [AGENTS.md](../AGENTS.md), [ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md), [docs/frontend/PRD-os-shell.md](frontend/PRD-os-shell.md); amended by [0002](amendments/0002-mission-a-platform-from-terminal-to-machine.md) (proposed)._
+1. **Provide data, tools, resources and transparency for all stakeholders, operators, AI practitioners and the general public.** Operators, contributors, agent builders, and the general public are first-class audiences. The aim is a shared, open commons: the same kernel, the same tools, and the same trail of evidence for everyone.
+2. **Make AI assistance a first-class part of the terminal: route slash commands through a reliable kernel onto the engine, with runs, health and settings that anyone can inspect.** The path starts with Claude slash commands through a LangGraph kernel onto the OpenCode engine. The terminal remains the home of record; nothing important happens only in a hidden session.
+3. **Put that runtime in every operator's hands, from the CLI and from a GUI access layer that sits beside the terminal, not above it.** The same kernel serves both; a no-build front end is one path to Overview, Console, Commands, Runs, Health, Engine and Settings — an open toolkit for working with all things terminal-first AI runtime.
+
+These missions set the course; they do not claim the work is finished. They serve the README and the OS-shell PRD: a terminal-first runtime, with a GUI beside the terminal rather than above it. The earlier §1 text about `bashos gui` (one page, seven hash-routed scenes, same kernel, no-build front end) is absorbed into mission 3 and is kept as direction, not as a claim that the GUI already ships. Every feature must trace to them.
+
+_Sources: [AGENTS.md](../AGENTS.md), [ADR 0005](adr/0005-bashos-is-amrchy-plus-a-layer.md), [docs/frontend/PRD-os-shell.md](frontend/PRD-os-shell.md); amended by [0002](amendments/0002-mission-a-platform-from-terminal-to-machine.md) and [0003](amendments/0003-mission-statement.md) (both proposed); the missions are [frontend/PRD-os-shell.md](frontend/PRD-os-shell.md) §1.1._
 
 ## 2. Invariants (non-negotiable)
 

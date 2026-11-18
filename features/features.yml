@@ -396,3 +396,11 @@ features:
     surface: cli
     link: "one-os/scripts/oneos-machine"
     docs: "one-os/docs/reference/machines.md"
+  - id: BASHOS-044
+    title: "Missions in constitution §1"
+    description: "Three product missions under one direction statement, ratified through amendment 0003 (beside 0002, the platform direction statement)."
+    implemented: false
+    status: planned
+    prd: ["§1.1"]
+    surface: docs
+    docs: "docs/constitution.md"

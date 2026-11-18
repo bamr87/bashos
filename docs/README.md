@@ -12,7 +12,7 @@
 
 | Document | What it covers |
 | --- | --- |
-| [`AGENTS.md`](../AGENTS.md) | How to work in bashOS: the exact commands, the layout, the hard rules and the generated files, canonical for every coding agent and contributor. |
+| [`AGENTS.md`](../AGENTS.md) | bashOS's direction is to become the ultimate open home for all things terminal-first AI runtime: data, tools, resources and transparency, with an inspectable kernel for slash commands and a GUI that sits beside the terminal, not above it… |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | How to set up, the architecture rules a pull request must keep, and how releases are cut; the full command list and hard rules are in [AGENTS.md](../AGENTS.md). |
 | [`CHANGELOG.md`](../CHANGELOG.md) | Release history: the notable changes in each version, newest first. |
 | [`SECURITY.md`](../SECURITY.md) | Which bashOS versions get security fixes, how to report a vulnerability privately, what is in scope, and how fast you will hear back. |
