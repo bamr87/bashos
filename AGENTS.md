@@ -105,7 +105,7 @@ Before opening a PR: `make test`, `make lint` and `node --test tests/shell.test.
 
 ## Releasing
 
-Tag `vX.Y.Z` and push the tag; CI builds the sdist/wheel, cuts a GitHub release, publishes to PyPI and pushes the GHCR image. Agents do not tag or release unless explicitly asked.
+Releases are cut by release-please (fleet standard, UPS-QA-32); nobody pushes a tag by hand. Every push to `main` runs `.github/workflows/release.yml`, whose `release` job calls the hub's reusable `bamr87/bamr87/.github/workflows/release-please.yml@v2` (pinned to the floating major tag, never a branch). That job opens or updates a release PR that bumps `pyproject.toml`, `src/bashos/__init__.py` and `CHANGELOG.md` from the Conventional Commits since the last tag (config: `release-please-config.json`, `.release-please-manifest.json`). The PR is opened with the `RELEASE_PLEASE_TOKEN` repo secret, because this repo's Actions settings forbid `GITHUB_TOKEN` from creating pull requests; the caller passes `strict-pr-creation: true`, so a release PR that cannot be opened fails the run instead of only warning. When a human merges the release PR, the resulting push tags `vX.Y.Z` and creates the GitHub release. The build, PyPI, GitHub-release-asset and GHCR jobs then run **in the same workflow run**, chained with `needs:` on the `release_created` output. No tag-push trigger is involved, so the rule that a tag made by `GITHUB_TOKEN` triggers no other workflow never applies. To re-publish an existing tag, dispatch `release.yml` with `tag: vX.Y.Z`. Agents never merge the release PR and never tag or release unless explicitly asked.
 
 ## Fleet context
 
