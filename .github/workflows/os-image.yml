@@ -38,8 +38,25 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # mkosi's package cache (bamr87/bamr87#856): the build otherwise downloads every Debian
+      # package afresh. Keyed on what decides the package set; a partial hit still saves most of it.
+      - name: restore the mkosi package cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/mkosi-pkg-cache
+          key: mkosi-pkgs-x86-64-${{ hashFiles('os/image/mkosi.conf', 'os/image/mkosi.conf.d/**', 'os/packages/*.list') }}
+          restore-keys: mkosi-pkgs-x86-64-
       - name: build (mkosi in debian:trixie, privileged)
+        env:
+          BASHOS_PKG_CACHE: ${{ runner.temp }}/mkosi-pkg-cache
         run: os/image/build.sh --docker --arch x86-64
+      - name: hand the package cache back to the runner (the container wrote it as root)
+        if: always()
+        run: |
+          cache="$RUNNER_TEMP/mkosi-pkg-cache"
+          [[ -d $cache ]] || exit 0
+          sudo chown -R "$(id -u):$(id -g)" "$cache"
+          du -sh "$cache"
       - name: boot test (QEMU + KVM, seed drive)
         run: os/image/test/boot-smoke.sh --docker --arch x86-64 --harness --timeout 1800
       - name: evidence

@@ -23,6 +23,8 @@ The output lands in `os/image/mkosi.output/` (gitignored): `bashos_<version>.raw
 | `seed.example/` | A documented `BASHOS-SEED` drive ([README](seed.example/README.md)) |
 | `test/boot-smoke.sh` | The boot test |
 
+`BASHOS_PKG_CACHE=DIR` keeps mkosi's downloaded Debian packages in `DIR` between builds (mkosi `--package-cache-dir`; with `--docker` the directory is mounted at `/cache`). It is opt-in: unset, every build downloads its packages afresh, as before. The `os image` workflow sets it and persists the directory with `actions/cache`, keyed on `mkosi.conf`, `mkosi.conf.d/` and `os/packages/*.list`.
+
 An x86-64 build on an Apple-silicon Mac runs under emulation and is slow; build arm64 there to iterate (`--arch arm64`) and let CI (the `os image` workflow, KVM) or forge build x86-64.
 
 ## Test
