@@ -83,7 +83,11 @@ def registry():
 
 @pytest.fixture
 def machine(tmp_path: Path) -> dict[str, str]:
-    """A fake root, an x86-64 glibc `uname`/`ldd`, and a verifier that rejects OpenCode 2."""
+    """A fake root, an x86-64 glibc `uname`/`ldd`, and a stand-in verifier.
+
+    The verifier passes every release of either major bashOS speaks, unless the test drops a
+    `reject` file (refuse everything) or a `reject-<major>` file (refuse that major only).
+    """
     root, shims = tmp_path / "root", tmp_path / "shims"
     (root / "etc").mkdir(parents=True)
     shims.mkdir()
@@ -91,7 +95,8 @@ def machine(tmp_path: Path) -> dict[str, str]:
         "uname": 'case "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac',
         "ldd": "echo 'ldd (GNU libc) 2.41'",
         # stands in for `bashos opencode verify --binary BIN`
-        "verify": f'echo "$1" >>{tmp_path}/verified; v=$("$1" --version); [ "${{v%%.*}}" = 1 ] && [ ! -e {tmp_path}/reject ]',
+        "verify": (f'echo "$1" >>{tmp_path}/verified; v=$("$1" --version); '
+                   f'[ ! -e {tmp_path}/reject ] && [ ! -e {tmp_path}/reject-"${{v%%.*}}" ]'),
     }.items():
         (shims / name).write_text(f"#!/bin/sh\n{body}\n")
         (shims / name).chmod(0o755)
@@ -179,19 +184,37 @@ def test_a_release_that_fails_the_contract_is_never_promoted(registry, machine, 
 
 
 @needs_gnu
-def test_a_new_major_the_contract_rejects_keeps_the_newest_release_that_runs(registry, machine):
+def test_a_new_major_that_fails_the_contract_keeps_the_newest_release_that_runs(registry, machine, tmp_path):
     env = dict(machine, BASHOS_ENGINE_REGISTRY=registry.url)
     registry.publish("1.2.3")
     registry.latest("1.2.3")
     engine(env, "update")
     for v in ("1.2.5", "2.0.0"):
         registry.publish(v)
-    registry.latest("2.0.0")  # OpenCode 2: the stand-in verifier refuses it, as bashOS does (#71)
+    registry.latest("2.0.0")
+    (tmp_path / "reject-2").touch()  # this OpenCode 2 release does not enforce policy.py
     engine(env, "update")
     assert os.readlink(home(env) / "current") == "1.2.5"
-    assert "bamr87/bashos#71" in state(env)["detail"]
+    assert not (home(env) / "2.0.0").exists()  # verified in a staging dir, never installed
+    assert "2.0.0 failed the engine contract" in state(env)["detail"]
     kept = sorted(p.name for p in home(env).iterdir() if p.name != "current")
     assert kept == ["1.2.3", "1.2.5"]  # this release and the one before it, for a rollback
+
+
+@needs_gnu
+def test_an_opencode_2_release_is_promoted_once_the_contract_passes_on_it(registry, machine, tmp_path):
+    env = dict(machine, BASHOS_ENGINE_REGISTRY=registry.url)
+    registry.publish("1.2.3")
+    registry.latest("1.2.3")
+    engine(env, "update")
+    registry.publish("2.0.0")
+    registry.latest("2.0.0")
+    engine(env, "update")
+    assert os.readlink(home(env) / "current") == "2.0.0"
+    assert state(env)["verdict"] == "ok" and state(env)["version"] == "2.0.0"
+    # the contract ran on the staged 2.0.0 before the switch, and the 1.x release stays for a rollback
+    assert len((tmp_path / "verified").read_text().split()) == 2
+    assert sorted(p.name for p in home(env).iterdir() if p.name != "current") == ["1.2.3", "2.0.0"]
 
 
 @needs_gnu

@@ -4,13 +4,19 @@ bashOS does not reimplement a reasoning loop — it runs one. That loop lives in
 an `opencode serve` process, and this module is the supervisor: it either
 attaches to a server the user already has (`BASHOS_OPENCODE_URL`, or
 `opencode serve` in another terminal) or starts a private one bound to
-loopback, waits for it to answer `/global/health`, and shuts it down on exit.
+loopback, waits for it to answer its health route, and shuts it down on exit.
 
 A supervised server gets a free port picked at start time and a random
 per-process password, so several bashOS sessions run side by side without a
 port fight and the loopback socket — which brokers shell access — is not open
-to every other process on the box. Its real address is read back from its own
-startup line rather than assumed.
+to every other process on the box. The password also keeps OpenCode 2 from
+generating one and printing it on stdout. Its real address is read back from
+its own startup line rather than assumed.
+
+bashOS speaks two engine majors. The major of a binary it starts comes from
+`opencode --version`; the major of an engine it attaches to is probed
+(`OpencodeClient.detect`). Everything major-specific on the wire lives in
+`client.py`; the flags live here.
 """
 
 from __future__ import annotations
@@ -34,20 +40,24 @@ STARTUP_TIMEOUT = 60.0
 # opencode's server reads these; the username has a default we must match
 SERVER_USER = "opencode"
 
-# The OpenCode major whose API bashOS speaks. OpenCode 2 moved the server API under /api and
-# changed its flags; until the port (bamr87/bashos#71) lands, a 2.x engine is named, not crashed on.
-SUPPORTED_MAJOR = 1
+# The OpenCode majors whose API bashOS speaks (bamr87/bashos#71). OpenCode 1 serves its API at
+# the root; OpenCode 2 serves it under /api, takes lowercase log levels, and resolves bashOS's
+# policy into its own rule shape, which the engine contract (contract.py) judges either way.
+SUPPORTED_MAJORS = (1, 2)
+# An engine whose --version names no version is spoken to as OpenCode 1, as it always was.
+LEGACY_MAJOR = 1
 VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
 
 def unsupported_hint(version: str, executable: str) -> str:
     match = VERSION_RE.search(version)
     version = match.group(0) if match else version
+    majors = " and ".join(str(m) for m in SUPPORTED_MAJORS)
     return (
-        f"opencode {version} ({executable}) speaks a newer API than bashOS: OpenCode 2 moved the\n"
-        f"server API under /api. bashOS runs on OpenCode {SUPPORTED_MAJOR} until the port lands (bamr87/bashos#71).\n"
-        "  on a bashOS machine: bashos os engine update   (the managed engine: the newest verified OpenCode 1)\n"
-        "  elsewhere:           npm i -g opencode-ai@1, then point bashOS at it with BASHOS_OPENCODE_BIN"
+        f"opencode {version} ({executable}) is a major bashOS does not speak yet: bashOS runs on\n"
+        f"OpenCode {majors}, and a new major is trusted only once the engine contract passes on it.\n"
+        "  on a bashOS machine: bashos os engine update   (the managed engine: the newest verified release)\n"
+        "  elsewhere:           npm i -g opencode-ai, then point bashOS at it with BASHOS_OPENCODE_BIN"
     )
 
 
@@ -56,11 +66,46 @@ def major_of(version: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def supported(major: int | None) -> bool:
+    return major is None or major in SUPPORTED_MAJORS
+
+
+def log_level(major: int) -> str:
+    """OpenCode 1 takes `INFO`; OpenCode 2 rejects it and takes `info`."""
+    return "INFO" if major < 2 else "info"
+
+
+def serve_argv(executable: str, port: int, major: int) -> list[str]:
+    """The `opencode serve` command line for a binary of `major`."""
+    return [
+        executable,
+        "serve",
+        "--port",
+        str(port),
+        "--hostname",
+        "127.0.0.1",
+        # without this the engine logs into its own state dir, where a
+        # failing run is nobody's first place to look
+        "--print-logs",
+        "--log-level",
+        log_level(major),
+    ]
+
+
 INSTALL_HINT = (
     "opencode is not installed — bashOS runs on the OpenCode engine.\n"
     "  install: npm i -g opencode-ai   (or: curl -fsSL https://opencode.ai/install | bash)\n"
     "  then:    bashos doctor"
 )
+
+
+@dataclass(frozen=True)
+class EngineBinary:
+    """An `opencode` binary bashOS may start, and the API major it speaks."""
+
+    path: str
+    version: str
+    major: int
 
 
 @dataclass
@@ -77,6 +122,10 @@ class EngineHandle:
     @property
     def supervised(self) -> bool:
         return self.process is not None
+
+    @property
+    def major(self) -> int:
+        return self.client.major
 
     async def stop(self) -> None:
         if self.drain_task is not None:
@@ -143,6 +192,18 @@ async def _binary_version(executable: str) -> str:
     return out.decode(errors="replace").strip()
 
 
+async def resolve_binary(binary: str = DEFAULT_BINARY) -> EngineBinary:
+    """The engine binary to start and the major it speaks — or why there is none."""
+    executable = find_binary(binary)
+    if executable is None:
+        raise OpencodeError(INSTALL_HINT)
+    version = await _binary_version(executable)
+    major = major_of(version)
+    if not supported(major):
+        raise OpencodeError(unsupported_hint(version, executable))
+    return EngineBinary(path=executable, version=version, major=major or LEGACY_MAJOR)
+
+
 def configured_url() -> str | None:
     """An engine URL the user pinned, if any."""
     url = os.environ.get("BASHOS_OPENCODE_URL", "").strip()
@@ -165,11 +226,17 @@ def _free_port() -> int:
 
 
 async def attach(url: str, *, directory: str | None = None) -> EngineHandle:
-    """Attach to an already-running engine, failing if it does not answer."""
+    """Attach to an already-running engine, failing if it does not answer.
+
+    Nobody told us which binary serves it, so its major is probed from its routes.
+    """
     handle_auth = _configured_auth()
     client = OpencodeClient(url, directory=directory, auth=handle_auth)
     try:
-        await client.health()
+        await client.detect()
+        version = await client.version()
+        if not supported(major_of(version)):
+            raise OpencodeError(unsupported_hint(version, url))
     except OpencodeError:
         await client.aclose()
         raise
@@ -182,19 +249,16 @@ async def spawn(
     binary: str = DEFAULT_BINARY,
     log_path: Path | None = None,
     env_extra: dict[str, str] | None = None,
+    engine: EngineBinary | None = None,
 ) -> EngineHandle:
     """Start a private engine on a free loopback port, password-protected.
 
     `env_extra` carries the credential wiring (see auth.py). It goes into the
     child's environment and nowhere else, so nothing secret is written to disk
-    and the engine's credentials die with the process.
+    and the engine's credentials die with the process. `engine` is a binary the
+    caller already resolved (the credential wiring depends on its major).
     """
-    executable = find_binary(binary)
-    if executable is None:
-        raise OpencodeError(INSTALL_HINT)
-    version = await _binary_version(executable)
-    if (major := major_of(version)) is not None and major != SUPPORTED_MAJOR:
-        raise OpencodeError(unsupported_hint(version, executable))
+    engine = engine or await resolve_binary(binary)
 
     auth = (SERVER_USER, secrets.token_urlsafe(32))
     env = {
@@ -207,17 +271,7 @@ async def spawn(
     log_file = open(log_path, "ab") if log_path else asyncio.subprocess.DEVNULL
     try:
         process = await asyncio.create_subprocess_exec(
-            executable,
-            "serve",
-            "--port",
-            str(_free_port()),
-            "--hostname",
-            "127.0.0.1",
-            # without this the engine logs into its own state dir, where a
-            # failing run is nobody's first place to look
-            "--print-logs",
-            "--log-level",
-            "INFO",
+            *serve_argv(engine.path, _free_port(), engine.major),
             cwd=directory,
             env=env,
             stdout=asyncio.subprocess.PIPE,
@@ -235,7 +289,7 @@ async def spawn(
         detail = f" (engine log: {log_path})" if log_path else ""
         raise EngineUnreachable(f"opencode server did not start{detail}: {exc}") from exc
 
-    client = OpencodeClient(url, directory=directory, auth=auth)
+    client = OpencodeClient(url, directory=directory, auth=auth, major=engine.major)
     await _wait_healthy(client)
     assert process.stdout is not None
     return EngineHandle(
@@ -270,7 +324,10 @@ async def _drain_stdout(stream: asyncio.StreamReader, log_path: Path | None) -> 
 
 
 async def _read_listen_url(process: asyncio.subprocess.Process) -> str:
-    """Read the server's own startup line to learn the port it landed on."""
+    """Read the server's own startup line to learn the port it landed on.
+
+    OpenCode 1 and 2 both print `… listening on http://127.0.0.1:PORT`.
+    """
     assert process.stdout is not None
     while True:
         raw = await process.stdout.readline()

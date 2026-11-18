@@ -1,0 +1,52 @@
+# Base of the home base. Desktop + extra_packages come from manifest.yaml
+# (generated into manifest.list.chroot at build time).
+live-boot
+live-config
+live-config-systemd
+# live-config Recommends, needed because we build with --apt-recommends false:
+# user-setup creates the live "user" account (no account → no login/autologin).
+user-setup
+locales
+# Control channel for scripts/oneos-vm and the harness (ADR-0004). Only starts when
+# a virtio port named org.qemu.guest_agent.0 exists, i.e. inside our VMs.
+qemu-guest-agent
+# SteamOS installer (oneos-steamos) and the repo clone on the stick
+lbzip2
+pv
+whiptail
+git
+systemd-sysv
+linux-image-amd64
+sudo
+less
+nano
+vim-tiny
+bash-completion
+ca-certificates
+openssh-client
+wpasupplicant
+iw
+rfkill
+pciutils
+usbutils
+parted
+gdisk
+dosfstools
+e2fsprogs
+exfatprogs
+ntfs-3g
+btrfs-progs
+xfsprogs
+lvm2
+dmsetup
+cryptsetup
+rsync
+jq
+python3
+python3-yaml
+efibootmgr
+grub-efi-amd64-bin
+grub-pc-bin
+grub2-common
+eject
+zstd

@@ -13,12 +13,13 @@ ROOT="$(cd "$(dirname "$_src")/.." && pwd)"
 unset _src _dir
 VENV="${ROOT}/.venv"
 
-# The macOS terminal environment (chui/) and the Linux OS layer (os/) are plain shell: they run
-# before any Python exists, so a fresh Mac can `bin/bashos chui install` and a fresh Debian box
-# `bin/bashos os install` without a virtualenv.
+# The macOS terminal environment (chui/), the Linux OS layer (os/) and one-os (one-os/) are plain
+# shell: they run before any Python exists, so a fresh Mac can `bin/bashos chui install`, a fresh
+# Debian box `bin/bashos os install`, and either can `bin/bashos one-os lint` without a virtualenv.
 case "${1:-}" in
   chui) shift; exec "${ROOT}/chui/tui.sh" "$@" ;;
   os) shift; exec "${ROOT}/os/os.sh" "$@" ;;
+  one-os) shift; exec "${ROOT}/one-os/one-os.sh" "$@" ;;
 esac
 
 if [[ ! -x "${VENV}/bin/bashos" ]]; then

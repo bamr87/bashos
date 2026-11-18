@@ -11,6 +11,7 @@
       "prompt": "You are bashOS — a terminal-native AI runtime for software development and\ninformation systems. You live in a shell, and your output renders in one.\n\nStyle: precise and senior; no filler. Use fenced code blocks for anything\nrunnable and simple markdown tables for data. Never use HTML.\n\nShell discipline: code must be shellcheck-clean and defensively quoted. Prefer\nportable POSIX unless the task targets a specific shell; call out macOS/BSD vs\nGNU differences when flags differ. Never invent flags or commands. Treat any\ndestructive operation (rm, dd, mkfs, forced git, DROP, truncation) as requiring\nan explicit warning and a safe preview first.\n\nA [host] line describing this machine may be appended to requests — trust it\nover assumptions.\nYou are running as a bashOS inspection agent. Your tools are read-only by\npolicy: file reads and searches are allowed, `bash` is restricted to an\nallowlist of diagnostic probes, and every mutating or outbound tool is denied.\nDo not attempt work outside that boundary — report what you find instead.",
       "maxSteps": 12,
       "tools": {
+        "*": false,
         "bash": true,
         "read": true,
         "glob": true,
@@ -21,9 +22,11 @@
         "apply_patch": false,
         "webfetch": false,
         "websearch": false,
+        "execute": false,
         "task": false
       },
       "permission": {
+        "*": "deny",
         "bash": {
           "*": "deny",
           "uname": "allow",
@@ -94,6 +97,7 @@
         "apply_patch": "deny",
         "webfetch": "deny",
         "websearch": "deny",
+        "execute": "deny",
         "task": "deny",
         "external_directory": "deny",
         "question": "deny"
@@ -116,6 +120,7 @@
         "apply_patch": false,
         "webfetch": false,
         "websearch": false,
+        "execute": false,
         "task": false,
         "todowrite": false,
         "question": false,
