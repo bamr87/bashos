@@ -1,8 +1,16 @@
 # kit: community v0.1.0 (UPS-REPO-18). Labels are fleet taxonomy (UPS-AGENT-32).
+# Tailored for bashOS (#52): adds the loop, version, os and doctor fields and the
+# credentials check. The community fan-out leaves a tailored copy alone.
 name: 🐛 Bug report
 description: Something is broken or behaves unexpectedly.
 labels: ["bug", "agent:queued"]
 body:
+  - type: markdown
+    attributes:
+      value: >-
+        Found a security problem, such as a tool-policy bypass or a leaked credential?
+        Do not file it here: report it privately as the
+        [security policy](https://github.com/bamr87/bashos/security/policy) describes.
   - type: textarea
     id: what
     attributes:
@@ -20,13 +28,42 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      placeholder: "1. …\n2. …"
+      description: The exact command or slash command you ran, and where you ran it (CLI, desktop, GUI, chui or the OS layer).
+      placeholder: "1. bashos run /sh …\n2. …"
     validations:
       required: true
+  - type: dropdown
+    id: loop
+    attributes:
+      label: Loop
+      description: "Which loop ran the command? `bashos list` shows each command's loop. Choose *not a loop* for the desktop or GUI themselves, chui, the OS layer or setup."
+      options:
+        - "prompt"
+        - "refine"
+        - "react"
+        - "not a loop"
   - type: input
     id: version
     attributes:
-      label: Version, commit or URL
+      label: bashOS version
+      description: "Run `pip show bashos` (`.venv/bin/pip show bashos` in a checkout) and copy the `Version:` line, or run `python -c 'import bashos; print(bashos.__version__)'`. From a checkout, add `git rev-parse --short HEAD`."
+      placeholder: "0.1.0, main @ 1a2b3c4"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and terminal
+      description: OS and version, CPU architecture, terminal emulator and shell.
+      placeholder: "macOS 26 arm64, Ghostty, zsh"
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of bashos doctor
+      description: "Run `bashos doctor` and paste the table. It runs offline and checks the engine, the Claude Code login, the backend and the helper tools; it names where a credential comes from, not the credential itself."
+      render: text
   - type: dropdown
     id: impact
     attributes:
@@ -37,3 +74,10 @@ body:
         - "Major: a core flow is broken"
         - "Minor: a workaround exists"
         - "Cosmetic"
+  - type: checkboxes
+    id: credentials
+    attributes:
+      label: Credentials
+      options:
+        - label: "I removed every credential from what I pasted: Claude Code OAuth tokens, API keys, and the GUI's per-process token (the `k=` value in a `bashos gui` URL)."
+          required: true
