@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bashos"
-version = "0.1.0"
+version = "1.0.0"
 description = "Terminal-first AI runtime: Claude slash commands routed through a LangGraph kernel onto the OpenCode engine, on Claude Code OAuth"
 readme = "README.md"
 license = "MIT"
