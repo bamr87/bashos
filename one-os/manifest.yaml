@@ -43,21 +43,24 @@ lightos:
 # - No separate -sb variant: after the one-time MOK enrollment Ventoy boots the
 #   plain .efi under Secure Boot.
 netboot:
+  # Pinned to a tagged netboot.xyz release: boot.netboot.xyz/ipxe/ republishes these files in
+  # place (2026-11-13, again by 2026-11-18), which broke `make fetch` each time. To move on,
+  # change the version in each `url` and `sha256_from` and run `make bump`.
   # SNP build: uses the firmware's network driver. The plain netboot.xyz.efi brings its own
   # drivers, which take the USB controller from the firmware on some boards (dead keyboard).
   - name: netboot.xyz-efi
     file: ISO/netboot.xyz-snp.efi
-    url: "https://boot.netboot.xyz/ipxe/netboot.xyz-snp.efi"
-    sha256: "f30777ff2dbaeb5643bc077a807ae9c77ccdf60fa54355cc4b54235791242c97"
-    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    url: "https://github.com/netbootxyz/netboot.xyz/releases/download/3.0.3/netboot.xyz-snp.efi"
+    sha256: "e7e7788a94a4dd170e344590f7a97b2671ca394be864ce9de202c3df465ccacd"
+    sha256_from: "https://github.com/netbootxyz/netboot.xyz/releases/download/3.0.3/netboot.xyz-sha256-checksums.txt"
     alias: "Network install (netboot.xyz)"
     mode: uefi
     ci: true
   - name: netboot.xyz-bios
     file: ISO/netboot.xyz.iso
-    url: "https://boot.netboot.xyz/ipxe/netboot.xyz.iso"
-    sha256: "5dbffcb3aa89bd322378ab7ee0bd278afe80d37777f9489fce4327413cf19f79"
-    sha256_from: "https://boot.netboot.xyz/ipxe/netboot.xyz-sha256-checksums.txt"
+    url: "https://github.com/netbootxyz/netboot.xyz/releases/download/3.0.3/netboot.xyz.iso"
+    sha256: "2206b05c1c7a8ec7a7a4356dd5f811e19c8081d7d5e2bc856f1f3f4059c5fed1"
+    sha256_from: "https://github.com/netbootxyz/netboot.xyz/releases/download/3.0.3/netboot.xyz-sha256-checksums.txt"
     alias: "Network install (netboot.xyz)"
     mode: legacy
     ci: true
