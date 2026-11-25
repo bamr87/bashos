@@ -36,7 +36,7 @@ dependencies = [
   #   npm i -g opencode-ai   (or: curl -fsSL https://opencode.ai/install | bash)
   "httpx>=0.28.1",
   # fallback model runtime (Claude Code OAuth harness, no tool policy)
-  "claude-agent-sdk>=0.2.179",
+  "claude-agent-sdk>=0.2.187",
   # terminal
   "typer>=0.29.1",
   "rich>=15.0.0",
